@@ -8,7 +8,6 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Transactions from './pages/Transactions.jsx';
-import Categories from './pages/Categories.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Recurring from './pages/Recurring.jsx';
@@ -32,7 +31,7 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
-        <Route path="/categories" element={<Categories />} />
+        <Route path="/categories" element={<Navigate to="/profile" replace />} />
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/recurring" element={<Recurring />} />
         <Route path="/profile" element={<Profile />} />

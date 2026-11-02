@@ -66,7 +66,6 @@ export default function Layout() {
         <nav className="main-nav">
           <NavLink to="/dashboard">แดชบอร์ด</NavLink>
           <NavLink to="/transactions">รายการ</NavLink>
-          <NavLink to="/categories">หมวดหมู่</NavLink>
           <NavLink to="/budgets">งบประมาณ</NavLink>
           <NavLink to="/recurring">รายการซ้ำ</NavLink>
         </nav>

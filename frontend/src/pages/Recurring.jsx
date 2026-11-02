@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   getRecurring,
   createRecurring,
@@ -6,6 +6,7 @@ import {
   deleteRecurring,
   getCategoriesForRecurring,
 } from '../recurringApi.js';
+import CategorySelect from '../components/CategorySelect.jsx';
 
 const FREQ_LABEL = {
   daily: 'รายวัน',
@@ -69,6 +70,7 @@ export default function Recurring() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(''); // ข้อความผิดพลาดที่แสดงในป๊อปอัป
+  const [editExtra, setEditExtra] = useState(null); // หมวดเดิมของกฎที่กำลังแก้ (ถ้าถูกซ่อนไปแล้วก็ยังแสดง)
 
   const showMsg = (kind, text) => setMsg({ kind, text });
 
@@ -94,10 +96,13 @@ export default function Recurring() {
     return found ? found.name : '-';
   };
 
-  const categoryOptions = useMemo(
-    () => categories.filter((c) => c.type === form.type),
-    [categories, form.type]
-  );
+  // เพิ่ม/อัปเดตหมวดที่เพิ่งสร้างหรือเพิ่งแสดงอีกครั้ง เข้าในรายการหมวดทันที
+  const addCategory = (cat) =>
+    setCategories((prev) =>
+      prev.some((c) => String(catId(c)) === String(cat.category_id))
+        ? prev.map((c) => (String(catId(c)) === String(cat.category_id) ? cat : c))
+        : [...prev, cat]
+    );
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -105,6 +110,7 @@ export default function Recurring() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditExtra(null);
     setForm(emptyForm());
     setFormError('');
     setShowForm(true);
@@ -122,6 +128,7 @@ export default function Recurring() {
       start_date: String(r.start_date || '').slice(0, 10),
       end_date: r.end_date ? String(r.end_date).slice(0, 10) : '',
     });
+    setEditExtra({ category_id: String(r.category_id ?? ''), name: r.category_name, type: r.type });
     setFormError('');
     setShowForm(true);
     setMsg(null);
@@ -288,14 +295,14 @@ export default function Recurring() {
 
             <div className="rc-field">
               <label>หมวดหมู่</label>
-              <select value={form.category_id} onChange={(e) => setField('category_id', e.target.value)}>
-                <option value="">-- เลือกหมวดหมู่ --</option>
-                {categoryOptions.map((c) => (
-                  <option key={catId(c)} value={catId(c)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <CategorySelect
+                categories={categories}
+                type={form.type}
+                value={form.category_id}
+                onChange={(v) => setField('category_id', v)}
+                onCreated={addCategory}
+                extra={editExtra}
+              />
             </div>
 
             <div className="rc-field">

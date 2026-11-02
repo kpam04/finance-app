@@ -1,8 +1,11 @@
+
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AiQuickInput from '../components/AiQuickInput.jsx';
 import AiConfirmModal from '../components/AiConfirmModal.jsx';
+import CategorySelect, { orderForPicker } from '../components/CategorySelect.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
 const today = () => {
@@ -74,7 +77,7 @@ export default function Transactions() {
   // โหลดหมวดหมู่จาก API
   useEffect(() => {
     api
-      .getCategories()
+      .getCategories({ include_hidden: 1 }) // รวมหมวดที่ซ่อน เพื่อให้กรองรายการเก่าด้วยหมวดนั้นได้ (ฟอร์ม/AI ใช้เฉพาะหมวดที่ไม่ซ่อน)
       .then((r) => setCats(r.data))
       .catch((e) => setError(e.message));
   }, []);
@@ -100,15 +103,23 @@ export default function Transactions() {
     load();
   }, [load]);
 
-  // กรองหมวดหมู่ให้ตรงกับประเภทรายการในฟอร์ม
-  const formCats = useMemo(
-    () => cats.filter((c) => c.type === form.type),
-    [cats, form.type]
-  );
+  // หมวดที่ใช้เลือกได้ (ไม่รวมหมวดที่ซ่อน) สำหรับฟอร์มและ AI
+  const activeCats = useMemo(() => cats.filter((c) => !c.hidden), [cats]);
+
+  // หมวดเดิมของรายการที่กำลังแก้ไข (ถ้าถูกซ่อนไปแล้วก็ยังต้องแสดงในช่องเลือก)
+  const [editExtra, setEditExtra] = useState(null);
+
+  // เพิ่ม/อัปเดตหมวดที่เพิ่งสร้างหรือเพิ่งแสดงอีกครั้ง เข้าในรายการหมวดทันที
+  const addCat = useCallback((cat) => {
+    setCats((prev) => (prev.some((c) => String(c.category_id) === String(cat.category_id))
+      ? prev.map((c) => (String(c.category_id) === String(cat.category_id) ? cat : c))
+      : [...prev, cat]));
+  }, []);
 
   // เปิดฟอร์มเพิ่มรายการ
   const openAdd = () => {
     setEditingId(null);
+    setEditExtra(null);
     setForm(emptyForm());
     setFormError('');
     setShowForm(true);
@@ -122,6 +133,7 @@ export default function Transactions() {
   useEffect(() => {
     if (!wantAdd) return;
     setEditingId(null);
+    setEditExtra(null);
     setForm(emptyForm());
     setFormError('');
     setShowForm(true);
@@ -216,6 +228,7 @@ export default function Transactions() {
       transaction_date: t.transaction_date,
     });
 
+    setEditExtra({ category_id: t.category_id, name: t.category_name, type: t.type });
     setFormError('');
     setShowForm(true);
   };
@@ -280,7 +293,7 @@ export default function Transactions() {
 
       <div className="ai-quick-section">
         <AiQuickInput
-          categories={cats}
+          categories={activeCats}
           onDraftGenerated={setAiDraft}
         />
       </div>
@@ -311,12 +324,12 @@ export default function Transactions() {
           >
             <option value="">ทุกหมวดหมู่</option>
 
-            {cats.map((c) => (
+            {orderForPicker(cats).map((c) => (
               <option
                 key={c.category_id}
                 value={c.category_id}
               >
-                {c.name}
+                {c.name}{c.hidden ? ' (ซ่อนอยู่)' : ''}
               </option>
             ))}
           </select>
@@ -505,30 +518,17 @@ export default function Transactions() {
                 <div>
                   <label>หมวดหมู่</label>
 
-                  <select
+                  <CategorySelect
+                    categories={cats}
+                    type={form.type}
                     value={form.category_id}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        category_id: e.target.value,
-                      })
-                    }
+                    onChange={(v) => setForm({ ...form, category_id: v })}
+                    onCreated={addCat}
+                    extra={editExtra}
+                    placeholder={form.type ? '-- เลือกหมวดหมู่ --' : '-- เลือกประเภทก่อน --'}
                     disabled={!form.type}
                     required
-                  >
-                    <option value="">
-                      {form.type ? '-- เลือกหมวดหมู่ --' : '-- เลือกประเภทก่อน --'}
-                    </option>
-
-                    {formCats.map((c) => (
-                      <option
-                        key={c.category_id}
-                        value={c.category_id}
-                      >
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
               </div>
@@ -640,7 +640,8 @@ export default function Transactions() {
       {aiDraft && (
         <AiConfirmModal
           draft={aiDraft}
-          categories={cats}
+          categories={activeCats}
+          onCategoryCreated={addCat}
           onConfirm={confirmAiDraft}
           onClose={() => setAiDraft(null)}
         />

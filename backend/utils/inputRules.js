@@ -4,7 +4,9 @@
 const MAX_AMOUNT = 100000000; // เพดานจำนวนเงินต่อรายการ 100 ล้านบาท
 const MAX_NOTE = 200;
 const MAX_CATEGORY_NAME = 40;
-const MAX_USER_CATEGORIES = 30; // หมวดที่ผู้ใช้สร้างเองได้สูงสุดต่อคน
+const MAX_ACTIVE_CATEGORIES = 10; // หมวดที่ผู้ใช้สร้างเองและยังใช้งานอยู่ (ไม่ซ่อน) ได้สูงสุดต่อคน
+const MAX_TOTAL_CATEGORIES = 20;  // รวมหมวดที่ซ่อนอยู่ด้วย (กันสะสมหมวดที่ซ่อนไปเรื่อย ๆ)
+const MAX_USER_CATEGORIES = MAX_TOTAL_CATEGORIES; // ชื่อเดิม (เผื่อโค้ดเก่าอ้างถึง)
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2100;
 
@@ -66,6 +68,6 @@ function cleanIcon(raw) {
 }
 
 module.exports = {
-  MAX_AMOUNT, MAX_NOTE, MAX_CATEGORY_NAME, MAX_USER_CATEGORIES,
+  MAX_AMOUNT, MAX_NOTE, MAX_CATEGORY_NAME, MAX_USER_CATEGORIES, MAX_ACTIVE_CATEGORIES, MAX_TOTAL_CATEGORIES,
   parseAmount, cleanNote, yearInRange, cleanCategoryName, cleanColor, cleanIcon,
 };

@@ -53,6 +53,8 @@ async function request(path, { method = 'GET', body, params } = {}) {
   if (!res.ok || (json && json.success === false)) {
     const err = new Error((json && json.message) || `เกิดข้อผิดพลาด (${res.status})`);
     err.status = res.status;
+    err.code = json && json.code; // รหัสข้อผิดพลาดจากหลังบ้าน (เช่น HIDDEN_EXISTS) ใช้แยกกรณีพิเศษ
+    err.data = json;
     throw err;
   }
   return json;
@@ -68,8 +70,12 @@ export const api = {
   deleteAccount: (password) => request('/auth/account', { method: 'DELETE', body: { password } }),
 
   // categories
-  getCategories: () => request('/categories'),
+  getCategories: (params) => request('/categories', { params }), // params: { include_hidden: 1 } = รวมหมวดที่ซ่อน
+  getMyCategories: () => request('/categories/mine'),
   createCategory: (data) => request('/categories', { method: 'POST', body: data }),
+  updateCategory: (id, data) => request(`/categories/${id}`, { method: 'PUT', body: data }),
+  deleteCategory: (id) => request(`/categories/${id}`, { method: 'DELETE' }),
+  restoreCategory: (id) => request(`/categories/${id}/restore`, { method: 'POST' }),
 
   // transactions
   getTransactions: (params) => request('/transactions', { params }),

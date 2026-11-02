@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import CategorySelect from '../components/CategorySelect.jsx';
 
 const MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -69,10 +70,10 @@ const css = `
   padding: 16px 20px;
   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  font-size: 13px; line-height: 1.6; color: #4b5563;
+  font-size: 13px; line-height: 1.7; color: #4b5563;
 }
 .bd-info-pop ul { margin: 0; padding-left: 18px; }
-.bd-info-pop li + li { margin-top: 4px; }
+.bd-info-pop li + li { margin-top: 8px; }
 /* สะพานโปร่งใสกันกล่องหายตอนเลื่อนเมาส์จากไอคอนลงมาที่กล่อง */
 .bd-info-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
 .bd-title.open .bd-info-pop { display: block; }
@@ -482,18 +483,17 @@ export default function Budgets() {
             <form onSubmit={submit}>
               <div style={{ marginBottom: 12 }}>
                 <label style={label}>หมวดหมู่ (รายจ่าย)</label>
-                <select
+                <CategorySelect
                   style={field}
+                  categories={cats}
+                  type="expense"
                   value={form.category_id}
-                  onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                  onChange={(v) => setForm({ ...form, category_id: v })}
+                  onCreated={(c) => setCats((prev) => (prev.some((x) => String(x.category_id) === String(c.category_id)) ? prev : [...prev, c]))}
+                  extra={editing ? { category_id: editing.category_id, name: editing.category_name, type: 'expense' } : null}
                   disabled={!!editing}
                   required
-                >
-                  <option value="">-- เลือกหมวดหมู่ --</option>
-                  {cats.map((c) => (
-                    <option key={c.category_id} value={c.category_id}>{c.name}</option>
-                  ))}
-                </select>
+                />
                 {!editing && (
                   <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
                     ถ้าหมวดนี้มีงบของเดือนนี้อยู่แล้ว ระบบจะอัปเดตวงเงินให้ใหม่
@@ -529,7 +529,7 @@ export default function Budgets() {
                 </div>
               </div>
 
-                            <label
+              <label
                 data-repeat-field
                 style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 8, fontSize: 13, marginBottom: 12, color: '#374151', cursor: 'pointer' }}
               >

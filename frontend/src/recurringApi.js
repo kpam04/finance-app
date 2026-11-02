@@ -12,4 +12,5 @@ export const deleteRecurring = async (id) => (await api.delete(`/recurring/${id}
 
 export const runRecurringDue = async () => (await api.post('/recurring/run-due')).data;
 
-export const getCategoriesForRecurring = () => api.getCategories();
+// รวมหมวดที่ซ่อนด้วย เพื่อให้กฎเดิมที่ใช้หมวดซึ่งถูกซ่อนไปแล้วยังแสดงชื่อหมวดได้ (ช่องเลือกหมวดจะไม่แสดงหมวดที่ซ่อนให้เลือกใหม่)
+export const getCategoriesForRecurring = () => api.getCategories({ include_hidden: 1 });

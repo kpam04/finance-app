@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, setToken } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PrivacyModal from '../components/PrivacyModal.jsx';
+import MyCategories from '../components/MyCategories.jsx';
 import { checkPassword } from '../utils/validators.js';
 
 const CURRENCIES = ['THB', 'USD', 'EUR', 'JPY', 'GBP', 'CNY'];
@@ -242,6 +243,9 @@ export default function Profile() {
         </div>
         <button className="btn" disabled={pwBusy}>{pwBusy ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}</button>
       </form>
+
+      {/* หมวดหมู่ของฉัน: สร้าง/แก้ชื่อ-สี/ลบ/แสดงอีกครั้ง */}
+      <MyCategories />
 
       <div className="card" style={{ borderColor: '#fecaca' }}>
         <h3 style={{ marginTop: 0, color: '#b91c1c' }}>ลบบัญชี</h3>
