@@ -1,0 +1,218 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const Transaction = require('../models/Transaction');
+const Category = require('../models/Category');
+const auth = require('../middleware/auth');
+const checkBudgetAlert = require('../services/budgetAlert');
+const { parseAmount, cleanNote, yearInRange } = require('../utils/inputRules');
+
+const router = express.Router();
+router.use(auth);
+
+const toDto = (t) => ({
+  transaction_id: t._id,
+  type: t.type,
+  amount: t.amount,
+  note: t.note,
+  transaction_date: t.date.toISOString().slice(0, 10),
+  category_id: t.category && t.category._id,
+  category_name: t.category && t.category.name,
+  category_color: t.category && t.category.color,
+  category_icon: t.category && t.category.icon,
+});
+
+const parseDate = (s) => {
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+// หมวดต้องเป็นหมวดมาตรฐาน หรือของผู้ใช้คนนี้เท่านั้น (ถ้าระบุ type หมวดต้องเป็นประเภทเดียวกับรายการ)
+const categoryAllowed = async (categoryId, userId, type) => {
+  if (!mongoose.isValidObjectId(categoryId)) return false;
+  const q = { _id: categoryId, $or: [{ user: null }, { user: userId }] };
+  if (type) q.type = type;
+  const c = await Category.findOne(q);
+  return !!c;
+};
+
+// ดูรายการ (กรอง + แบ่งหน้า)
+router.get('/', async (req, res) => {
+  try {
+    const q = { user: req.userId };
+
+    if (req.query.start || req.query.end) {
+      q.date = {};
+      if (req.query.start) {
+        const d = parseDate(req.query.start);
+        if (!d) return res.status(400).json({ success: false, message: 'รูปแบบวันที่เริ่มต้นไม่ถูกต้อง' });
+        q.date.$gte = d;
+      }
+      if (req.query.end) {
+        const d = parseDate(req.query.end);
+        if (!d) return res.status(400).json({ success: false, message: 'รูปแบบวันที่สิ้นสุดไม่ถูกต้อง' });
+        q.date.$lte = d;
+      }
+    }
+    if (['income', 'expense'].includes(req.query.type)) q.type = req.query.type;
+    if (req.query.category_id && mongoose.isValidObjectId(req.query.category_id)) {
+      q.category = req.query.category_id;
+    }
+
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+
+    const [total, rows] = await Promise.all([
+      Transaction.countDocuments(q),
+      Transaction.find(q)
+        .populate('category', 'name color icon')
+        .sort({ date: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ]);
+
+    res.json({ success: true, data: rows.map(toDto), pagination: { page, limit, total } });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// เพิ่มรายการ
+router.post('/', async (req, res) => {
+  try {
+    const { type, category_id, transaction_date } = req.body;
+    const amt = parseAmount(req.body.amount);
+    const noteCheck = cleanNote(req.body.note);
+    const date = transaction_date ? parseDate(transaction_date) : null;
+    const amount = amt.value;
+
+    if (!['income', 'expense'].includes(type) || !category_id || !date || !yearInRange(date)) {
+      return res.status(400).json({ success: false, message: 'ข้อมูลไม่ครบถ้วนหรือไม่ถูกต้อง' });
+    }
+    if (amt.error) return res.status(400).json({ success: false, message: amt.error });
+    if (noteCheck.error) return res.status(400).json({ success: false, message: noteCheck.error });
+    if (!(await categoryAllowed(category_id, req.userId, type))) {
+      return res.status(400).json({ success: false, message: 'หมวดหมู่ไม่ถูกต้องหรือไม่ตรงกับประเภทรายการ' });
+    }
+
+    const t = await Transaction.create({
+      user: req.userId,
+      category: category_id,
+      type,
+      amount,
+      note: noteCheck.value,
+      date,
+    });
+
+    // ขั้นที่ 5 จะเพิ่มการตรวจงบประมาณตรงนี้
+    if (type === 'expense') await checkBudgetAlert(req.userId, category_id, date);
+
+    res.status(201).json({
+      success: true,
+      message: 'บันทึกรายการสำเร็จ',
+      data: { transaction_id: t._id },
+    });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// ตรวจ id ก่อนเข้า route ด้านล่าง
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.isValidObjectId(id)) {
+    return res.status(400).json({ success: false, message: 'รหัสรายการไม่ถูกต้อง' });
+  }
+  next();
+});
+
+// ดูรายการเดียว
+router.get('/:id', async (req, res) => {
+  try {
+    const t = await Transaction.findOne({ _id: req.params.id, user: req.userId })
+      .populate('category', 'name color icon');
+    if (!t) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
+    res.json({ success: true, data: toDto(t) });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// แก้ไขรายการ
+router.put('/:id', async (req, res) => {
+  try {
+    const t = await Transaction.findOne({ _id: req.params.id, user: req.userId });
+    if (!t) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
+
+    const before = { category: t.category, date: t.date }; // งบเดิมของรายการนี้ (เผื่อย้ายหมวด/เปลี่ยนวันที่)
+
+    const b = req.body;
+    let changed = false;
+
+    if ('type' in b) {
+      if (!['income', 'expense'].includes(b.type)) {
+        return res.status(400).json({ success: false, message: 'ประเภทไม่ถูกต้อง' });
+      }
+      // ประเภท (รายรับ/รายจ่าย) เปลี่ยนไม่ได้หลังบันทึก ส่งประเภทเดิมมาได้ (หน้าเว็บส่งทั้งฟอร์ม)
+      if (b.type !== t.type) {
+        return res.status(400).json({ success: false, message: 'ไม่สามารถเปลี่ยนประเภทรายการได้ กรุณาลบแล้วเพิ่มใหม่' });
+      }
+    }
+    if ('amount' in b) {
+      const amt = parseAmount(b.amount);
+      if (amt.error) return res.status(400).json({ success: false, message: amt.error });
+      t.amount = amt.value; changed = true;
+    }
+    if ('category_id' in b) {
+      // ส่งหมวดเดิมมาไม่ต้องตรวจซ้ำ (หน้าเว็บส่งทั้งฟอร์ม) แต่ถ้าเปลี่ยนหมวดต้องเป็นหมวดประเภทเดียวกับรายการ
+      if (String(b.category_id) !== String(t.category)) {
+        if (!(await categoryAllowed(b.category_id, req.userId, t.type))) {
+          return res.status(400).json({ success: false, message: 'หมวดหมู่ไม่ถูกต้องหรือไม่ตรงกับประเภทรายการ' });
+        }
+        t.category = b.category_id; changed = true;
+      }
+    }
+    if ('note' in b) {
+      const noteCheck = cleanNote(b.note);
+      if (noteCheck.error) return res.status(400).json({ success: false, message: noteCheck.error });
+      t.note = noteCheck.value; changed = true;
+    }
+    if ('transaction_date' in b) {
+      const d = parseDate(b.transaction_date);
+      if (!d || !yearInRange(d)) return res.status(400).json({ success: false, message: 'วันที่ไม่ถูกต้อง' });
+      t.date = d; changed = true;
+    }
+
+    if (!changed) {
+      return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });
+    }
+    await t.save();
+    if (t.type === 'expense') {
+      await checkBudgetAlert(req.userId, t.category, t.date);
+      // ย้ายหมวดหรือเปลี่ยนวันที่: ยอดใช้ของงบเดิมลดลง ปรับระดับแจ้งเตือนของงบเดิมด้วย (รีเซ็ตเงียบ ๆ)
+      if (String(before.category) !== String(t.category) || before.date.getTime() !== t.date.getTime()) {
+        await checkBudgetAlert(req.userId, before.category, before.date);
+      }
+    }
+    
+    res.json({ success: true, message: 'แก้ไขรายการสำเร็จ' });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// ลบรายการ
+router.delete('/:id', async (req, res) => {
+  try {
+    const t = await Transaction.findOne({ _id: req.params.id, user: req.userId });
+    if (!t) {
+      return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
+    }
+    await Transaction.deleteOne({ _id: t._id, user: req.userId });
+    // ลบรายจ่ายแล้วยอดใช้ของงบลดลง: ปรับระดับแจ้งเตือนของงบนั้น (รีเซ็ตเงียบ ๆ ไม่ส่งแจ้งเตือน)
+    if (t.type === 'expense') await checkBudgetAlert(req.userId, t.category, t.date);
+    res.json({ success: true, message: 'ลบรายการสำเร็จ' });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+module.exports = router;

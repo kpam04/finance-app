@@ -1,0 +1,23 @@
+# Render Blueprint: บริการเว็บเดียว (backend เสิร์ฟหน้าเว็บ frontend/dist ด้วย) วางไว้ที่รากของที่เก็บโค้ด
+# ใช้ได้สองแบบ: New + > Blueprint ให้ Render อ่านไฟล์นี้ หรือตั้งค่าเองในหน้าเว็บด้วยค่าเดียวกัน (ดู README)
+# ค่าลับ (MONGO_URI, JWT_SECRET) ไม่ใส่ในไฟล์นี้ (sync: false) ต้องกรอกในหน้า Environment ของ Render เอง
+services:
+  - type: web
+    name: finance-app
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm --prefix frontend install --include=dev && npm --prefix frontend run build && npm --prefix backend install
+    startCommand: npm --prefix backend start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false

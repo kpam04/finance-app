@@ -1,0 +1,651 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api.js';
+import AiQuickInput from '../components/AiQuickInput.jsx';
+import AiConfirmModal from '../components/AiConfirmModal.jsx';
+
+// คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+const today = () => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+
+// จัดรูปแบบตัวเลขจำนวนเงิน
+const money = (n) =>
+  Number(n).toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+// ค่าเริ่มต้นของฟอร์มเพิ่มรายการ
+const emptyForm = () => ({
+  type: '', // ยังไม่เลือก: ต้องเลือกรายรับหรือรายจ่ายเองก่อนบันทึก
+  amount: '',
+  category_id: '',
+  note: '',
+  transaction_date: today(),
+});
+
+// แจ้งให้กระดิ่งแจ้งเตือนโหลดใหม่ทันที (บันทึกรายจ่ายแล้วอาจใช้งบถึงเกณฑ์ ไม่ต้องรอรอบ 60 วินาที)
+const refreshBell = () => {
+  try {
+    window.dispatchEvent(new Event('notifications:refresh'));
+  } catch {
+    /* การรีเฟรชกระดิ่งล้มเหลวต้องไม่กระทบการบันทึก */
+  }
+};
+
+export default function Transactions() {
+  // ข้อมูลหมวดหมู่และรายการธุรกรรม
+  const [cats, setCats] = useState([]);
+  const [rows, setRows] = useState([]);
+
+  // ข้อมูล Pagination
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+  });
+
+  // ตัวกรองรายการ
+  const [filter, setFilter] = useState({
+    type: '',
+    category_id: '',
+    start: '',
+    end: '',
+  });
+
+  // สถานะของหน้าและฟอร์ม
+  const [page, setPage] = useState(1);
+  const [form, setForm] = useState(emptyForm());
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  // สถานะการแจ้งเตือนและการบันทึก
+  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // ข้อมูลที่ AI วิเคราะห์และรอผู้ใช้ยืนยัน
+  const [aiDraft, setAiDraft] = useState(null);
+
+  // โหลดหมวดหมู่จาก API
+  useEffect(() => {
+    api
+      .getCategories()
+      .then((r) => setCats(r.data))
+      .catch((e) => setError(e.message));
+  }, []);
+
+  // โหลดรายการรายรับ-รายจ่ายตามตัวกรองและหน้าปัจจุบัน
+  const load = useCallback(async () => {
+    try {
+      const res = await api.getTransactions({
+        ...filter,
+        page,
+        limit: 20,
+      });
+
+      setRows(res.data);
+      setPagination(res.pagination);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
+  }, [filter, page]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // กรองหมวดหมู่ให้ตรงกับประเภทรายการในฟอร์ม
+  const formCats = useMemo(
+    () => cats.filter((c) => c.type === form.type),
+    [cats, form.type]
+  );
+
+  // เปิดฟอร์มเพิ่มรายการ
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormError('');
+    setShowForm(true);
+  };
+
+  // มาจากปุ่ม "+ เพิ่มรายการ" ในแดชบอร์ด (navigate('/transactions', { state: { openAdd: true } })): เปิดฟอร์มเพิ่มรายการทันที
+  // แล้วล้าง state ออกจากประวัติ กันฟอร์มเด้งซ้ำเมื่อรีเฟรชหรือกดย้อนกลับ
+  const location = useLocation();
+  const navigate = useNavigate();
+  const wantAdd = !!(location.state && location.state.openAdd);
+  useEffect(() => {
+    if (!wantAdd) return;
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormError('');
+    setShowForm(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [wantAdd, location.pathname, navigate]);
+
+  // ปิดฟอร์มและคืนค่าเริ่มต้น
+  const closeForm = useCallback(() => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormError('');
+  }, []);
+
+  // กด Esc เพื่อปิดฟอร์ม
+  useEffect(() => {
+    if (!showForm) return undefined;
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeForm();
+    };
+
+    window.addEventListener('keydown', onKey);
+
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showForm, closeForm]);
+
+  // เปลี่ยนประเภทแล้วล้างหมวดหมู่เดิม
+  const changeType = (type) => {
+    setForm({
+      ...form,
+      type,
+      category_id: '',
+    });
+  };
+
+  // บันทึกข้อมูลเพิ่มหรือแก้ไขรายการ
+  const submit = async (e) => {
+    e.preventDefault();
+
+    // กันกรณีที่เบราว์เซอร์ไม่ตรวจช่องบังคับ: ต้องเลือกประเภทก่อนเสมอ
+    if (!form.type) {
+      setFormError('โปรดระบุประเภท');
+      return;
+    }
+
+    setFormError('');
+    setBusy(true);
+
+    const payload = {
+      ...form,
+      amount: Number(form.amount),
+    };
+
+    try {
+      if (editingId) {
+        await api.updateTransaction(editingId, payload);
+      } else {
+        await api.createTransaction(payload);
+      }
+
+      closeForm();
+      await load();
+      refreshBell();
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ยืนยันรายการที่ได้จาก AI และบันทึกลงระบบ
+  const confirmAiDraft = async (data) => {
+    await api.createTransaction(data);
+
+    setAiDraft(null);
+    setError('');
+
+    await load();
+    refreshBell();
+  };
+
+  // เปิดฟอร์มแก้ไขรายการ
+  const startEdit = (t) => {
+    setEditingId(t.transaction_id);
+
+    setForm({
+      type: t.type,
+      amount: String(t.amount),
+      category_id: t.category_id,
+      note: t.note || '',
+      transaction_date: t.transaction_date,
+    });
+
+    setFormError('');
+    setShowForm(true);
+  };
+
+  // ลบรายการ
+  const remove = async (t) => {
+    const confirmed = window.confirm(
+      `ลบรายการ "${t.note || t.category_name}" ใช่หรือไม่?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await api.deleteTransaction(t.transaction_id);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // เปลี่ยนค่าตัวกรองและกลับไปหน้าแรก
+  const setF = (key) => (e) => {
+    setPage(1);
+
+    setFilter({
+      ...filter,
+      [key]: e.target.value,
+    });
+  };
+
+  // คำนวณจำนวนหน้าทั้งหมด
+  const totalPages = Math.max(
+    1,
+    Math.ceil(pagination.total / pagination.limit)
+  );
+
+  return (
+    <div className="transactions-page">
+
+      {/* =================================
+          PAGE HEADER
+      ================================= */}
+
+      <div className="transaction-heading">
+        <h2>รายการรายรับ-รายจ่าย</h2>
+
+        <button className="btn" onClick={openAdd}>
+          + เพิ่มรายการ
+        </button>
+      </div>
+
+      {/* แจ้งเตือนข้อผิดพลาด */}
+      {error && (
+        <div className="alert">
+          {error}
+        </div>
+      )}
+
+      {/* =================================
+          AI QUICK INPUT
+      ================================= */}
+
+      <div className="ai-quick-section">
+        <AiQuickInput
+          categories={cats}
+          onDraftGenerated={setAiDraft}
+        />
+      </div>
+
+      {/* =================================
+          FILTER & TRANSACTION TABLE
+      ================================= */}
+
+      <div className="card transaction-card">
+
+        {/* ตัวกรองรายการ */}
+        <div className="form-row transaction-filters">
+
+          <select
+            value={filter.type}
+            onChange={setF('type')}
+            aria-label="กรองตามประเภท"
+          >
+            <option value="">ทุกประเภท</option>
+            <option value="expense">รายจ่าย</option>
+            <option value="income">รายรับ</option>
+          </select>
+
+          <select
+            value={filter.category_id}
+            onChange={setF('category_id')}
+            aria-label="กรองตามหมวดหมู่"
+          >
+            <option value="">ทุกหมวดหมู่</option>
+
+            {cats.map((c) => (
+              <option
+                key={c.category_id}
+                value={c.category_id}
+              >
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={filter.start}
+            onChange={setF('start')}
+            title="ตั้งแต่วันที่"
+            aria-label="ตั้งแต่วันที่"
+          />
+
+          <input
+            type="date"
+            value={filter.end}
+            onChange={setF('end')}
+            title="ถึงวันที่"
+            aria-label="ถึงวันที่"
+          />
+
+        </div>
+
+        {/* ตารางรายการรายรับ-รายจ่าย */}
+        <div className="transactions-table-wrap">
+
+          <table className="table transactions-table">
+
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>หมวดหมู่</th>
+                <th>บันทึก</th>
+                <th className="num">จำนวนเงิน</th>
+                <th className="actions">จัดการ</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {/* กรณีไม่มีข้อมูล */}
+              {rows.length === 0 && (
+                <tr className="empty-row">
+                  <td colSpan="5" className="center-msg">
+                    ยังไม่มีรายการ
+                  </td>
+                </tr>
+              )}
+
+              {/* แสดงข้อมูลแต่ละรายการ */}
+              {rows.map((t) => (
+                <tr key={t.transaction_id}>
+
+                  <td data-label="วันที่">
+                    {t.transaction_date}
+                  </td>
+
+                  <td data-label="หมวดหมู่">
+                    <span
+                      className="dot"
+                      style={{
+                        background: t.category_color,
+                      }}
+                    />
+
+                    {t.category_name}
+                  </td>
+
+                  <td data-label="บันทึก">
+                    {t.note || '-'}
+                  </td>
+
+                  <td
+                    data-label="จำนวนเงิน"
+                    className={`num ${t.type}`}
+                  >
+                    {t.type === 'income' ? '+' : '-'}
+                    {money(t.amount)}
+                  </td>
+
+                  <td data-label="จัดการ" className="actions">
+
+                    <button
+                      className="btn btn-sm btn-light"
+                      onClick={() => startEdit(t)}
+                    >
+                      แก้ไข
+                    </button>
+
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={() => remove(t)}
+                    >
+                      ลบ
+                    </button>
+
+                  </td>
+
+                </tr>
+              ))}
+
+            </tbody>
+          </table>
+
+        </div>
+
+        {/* =================================
+            PAGINATION
+        ================================= */}
+
+        <div className="pager">
+
+          <button
+            className="btn btn-light btn-sm"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+          >
+            ก่อนหน้า
+          </button>
+
+          <span>
+            หน้า {page} / {totalPages}
+            {' '} (ทั้งหมด {pagination.total} รายการ)
+          </span>
+
+          <button
+            className="btn btn-light btn-sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            ถัดไป
+          </button>
+
+        </div>
+
+      </div>
+
+      {/* =================================
+          ADD / EDIT MODAL
+      ================================= */}
+
+      {showForm && (
+        <div
+          className="transaction-overlay"
+          onClick={closeForm}
+        >
+
+          <div
+            className="transaction-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            <h3>
+              {editingId ? 'แก้ไขรายการ' : 'เพิ่มรายการ'}
+            </h3>
+
+            <form onSubmit={submit}>
+
+              {/* ประเภทและหมวดหมู่ */}
+              <div className="transaction-form-grid">
+
+                <div>
+                  <label>ประเภท</label>
+
+                  <select
+                    value={form.type}
+                    onChange={(e) => {
+                      e.target.setCustomValidity('');
+                      changeType(e.target.value);
+                    }}
+                    onInvalid={(e) => e.target.setCustomValidity('โปรดระบุประเภท')}
+                    disabled={!!editingId}
+                    required
+                  >
+                    <option value="">โปรดเลือกประเภทรายการ</option>
+                    <option value="expense">รายจ่าย</option>
+                    <option value="income">รายรับ</option>
+                  </select>
+
+                  {editingId && (
+                    <small className="muted" data-type-locked>
+                      เปลี่ยนประเภทไม่ได้ ถ้าเลือกผิดให้ลบแล้วเพิ่มใหม่
+                    </small>
+                  )}
+                </div>
+
+                <div>
+                  <label>หมวดหมู่</label>
+
+                  <select
+                    value={form.category_id}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        category_id: e.target.value,
+                      })
+                    }
+                    disabled={!form.type}
+                    required
+                  >
+                    <option value="">
+                      {form.type ? '-- เลือกหมวดหมู่ --' : '-- เลือกประเภทก่อน --'}
+                    </option>
+
+                    {formCats.map((c) => (
+                      <option
+                        key={c.category_id}
+                        value={c.category_id}
+                      >
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+              </div>
+
+              {/* จำนวนเงินและวันที่ */}
+              <div className="transaction-form-grid">
+
+                <div>
+                  <label>จำนวนเงิน</label>
+
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.amount}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        amount: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label>วันที่</label>
+
+                  <input
+                    type="date"
+                    value={form.transaction_date}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        transaction_date: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+
+              </div>
+
+              {/* บันทึกช่วยจำ */}
+              <div className="transaction-note-field">
+
+                <label>บันทึกช่วยจำ</label>
+
+                <input
+                  type="text"
+                  placeholder="ไม่บังคับ"
+                  maxLength={200}
+                  value={form.note}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      note: e.target.value,
+                    })
+                  }
+                />
+
+              </div>
+
+              {/* แจ้งเตือนข้อผิดพลาดในฟอร์ม */}
+              {formError && (
+                <div className="alert">
+                  {formError}
+                </div>
+              )}
+
+              {/* ปุ่มยกเลิกและบันทึก */}
+              <div className="transaction-form-actions">
+
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  onClick={closeForm}
+                  disabled={busy}
+                >
+                  ยกเลิก
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn"
+                  disabled={busy}
+                >
+                  {busy
+                    ? 'กำลังบันทึก...'
+                    : editingId
+                      ? 'บันทึกการแก้ไข'
+                      : 'เพิ่มรายการ'}
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* =================================
+          AI CONFIRMATION MODAL
+      ================================= */}
+
+      {aiDraft && (
+        <AiConfirmModal
+          draft={aiDraft}
+          categories={cats}
+          onConfirm={confirmAiDraft}
+          onClose={() => setAiDraft(null)}
+        />
+      )}
+
+    </div>
+  );
+}

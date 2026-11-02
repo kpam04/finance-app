@@ -1,0 +1,17 @@
+# ความลับและไฟล์ที่ติดตั้ง/สร้างขึ้นเอง ห้ามส่งขึ้น GitHub
+.env
+.env.*
+!.env.example
+node_modules
+dist
+
+# ไฟล์สำรองที่สร้างตอนวางไฟล์ทับ / ซิปที่ใช้ส่งงาน
+*.backup_*
+*.backup
+src_backup_*
+*.zip
+
+# ไฟล์ระบบ/บันทึก
+.DS_Store
+Thumbs.db
+npm-debug.log*

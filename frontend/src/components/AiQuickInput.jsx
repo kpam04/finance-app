@@ -1,0 +1,331 @@
+import { useEffect, useRef, useState } from 'react';
+import { parseNaturalLanguage } from '../utils/aiParser.js';
+import { parseReceiptImage } from '../utils/ocrExtractor.js';
+import { normalizeThaiNumbers } from '../utils/thaiNumbers.js';
+import { createSpeechSession, isSpeechSupported, SPEECH_MESSAGES } from '../utils/speechInput.js';
+import PrivacyModal from './PrivacyModal.jsx';
+
+const VOICE_OK_KEY = 'finance_voice_notice_ok';
+const readFlag = () => {
+  try {
+    return localStorage.getItem(VOICE_OK_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+const saveFlag = () => {
+  try {
+    localStorage.setItem(VOICE_OK_KEY, '1');
+  } catch {
+    /* ไม่มี localStorage ก็แจ้งใหม่ทุกครั้ง */
+  }
+};
+const linkBtn = {
+  background: 'none', border: 'none', padding: 0, font: 'inherit',
+  color: '#4f46e5', textDecoration: 'underline', cursor: 'pointer',
+};
+
+// speechEngine: ไม่ต้องใส่ (ใช้ของเบราว์เซอร์) ใส่เฉพาะตอนทดสอบ
+// สไตล์ของการ์ด: ช่องพิมพ์ที่มีปุ่มส่งอยู่ภายใน, แถวปุ่มพูด/สแกน, ไอคอน i แสดงตัวอย่างประโยค
+//  คอมพิวเตอร์: [ ช่องพิมพ์ ➤ ] [🎤 พูด] [📷 สแกน] แถวเดียวกัน
+//  มือถือ (ไม่เกิน 640px): แถวบน = ช่องพิมพ์ / แถวล่าง = ปุ่มพูดและปุ่มสแกนเท่ากัน (กฎกลางของ .form-row เรียงเป็นคอลัมน์อยู่แล้ว)
+const css = `
+.ai-title { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ai-title h3 { margin: 0; }
+.ai-info-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0;
+  border: 1.5px solid #9ca3af; border-radius: 50%;
+  background: #fff; color: #6b7280;
+  font: italic 700 12px/1 Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+}
+.ai-info-btn:hover, .ai-info-btn:focus-visible, .ai-title.open .ai-info-btn {
+  background: #f3f4f6; color: #374151; border-color: #6b7280; outline: none;
+}
+.ai-info-pop {
+  display: none;
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 30;
+  width: min(400px, calc(100vw - 24px));
+  padding: 16px 20px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 13px; line-height: 1.7; color: #4b5563;
+}
+.ai-info-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 10px; }
+.ai-info-pop p { margin: 0 0 6px; }
+.ai-info-pop ul { margin: 0; padding-left: 18px; }
+.ai-info-pop li + li { margin-top: 6px; }
+.ai-title.open .ai-info-pop { display: block; }
+@media (hover: hover) {
+  .ai-info-btn:hover + .ai-info-pop, .ai-info-btn:focus-visible + .ai-info-pop, .ai-info-pop:hover { display: block; }
+}
+
+.ai-input { position: relative; }
+.ai-input .ai-text { padding-right: 56px; }
+.ai-send {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0;
+  border: none; border-radius: 10px;
+  background: var(--primary, #9AAB91); color: #fff;
+  cursor: pointer; transition: background 0.2s ease;
+}
+.ai-send:hover:not(:disabled) { background: var(--primary-dark, #74896F); }
+.ai-send:disabled { background: #EDE6DA; color: #B5ADA2; cursor: not-allowed; }
+.form-row > .ai-actions { flex: 0 0 auto; display: flex; gap: 10px; }
+
+@media (max-width: 640px) {
+  .form-row > .ai-actions { flex: 1 1 auto; width: 100%; }
+  .ai-actions .btn { flex: 1 1 0; min-width: 0; }
+}
+`;
+
+// ไอคอน i ต่อท้ายชื่อการ์ด: ตัวอย่างประโยค (คอมพิวเตอร์: เมาส์ชี้/โฟกัส, ทุกอุปกรณ์: คลิกหรือแตะเพื่อเปิด-ปิด, Esc หรือแตะที่อื่นเพื่อปิด)
+function AiTitle() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className={`ai-title${open ? ' open' : ''}`} ref={ref}>
+      <h3>🤖 AI บันทึกด่วน</h3>
+      <button
+        type="button"
+        className="ai-info-btn"
+        data-info-btn
+        aria-label="ตัวอย่างประโยคที่ใช้ได้"
+        aria-expanded={open}
+        aria-controls="ai-info-pop"
+        onClick={() => setOpen((v) => !v)}
+      >
+        i
+      </button>
+      <div id="ai-info-pop" className="ai-info-pop" role="tooltip" data-info-pop>
+        <p>พิมพ์หรือกด 🎤 แล้วพูดเป็นประโยคธรรมดา ระบบจะเปิดการ์ดให้ตรวจก่อนบันทึกทุกครั้ง เช่น</p>
+        <ul>
+          <li>“เมื่อวาน ค่ากาแฟ 65”</li>
+          <li>“วันที่ 25 ก.ย. ได้รับเงินเดือน 38000”</li>
+          <li>“เมื่อ 2 วันก่อน เติมน้ำมัน 800”</li>
+          <li>“วันที่ 10 เดือน 5 ซื้ออาหารแมว 350”</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export default function AiQuickInput({ categories, onDraftGenerated, speechEngine }) {
+  const [text, setText] = useState('');
+  const [msg, setMsg] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
+  const [showPolicy, setShowPolicy] = useState(false);
+  const fileRef = useRef(null);
+  const sessionRef = useRef(null);
+  const catsRef = useRef(categories);
+  const draftCb = useRef(onDraftGenerated);
+  catsRef.current = categories;
+  draftCb.current = onDraftGenerated;
+
+  const supported = isSpeechSupported(speechEngine);
+
+  // ปิดการฟังเมื่อออกจากหน้า
+  useEffect(() => () => sessionRef.current && sessionRef.current.abort(), []);
+
+  const handleText = (e) => {
+    e.preventDefault();
+    setMsg('');
+    if (!text.trim()) return;
+    if (categories.length === 0) {
+      setMsg('ยังโหลดหมวดหมู่ไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่');
+      return;
+    }
+    const draft = parseNaturalLanguage(text, categories);
+    if (draft) {
+      onDraftGenerated(draft);
+      setText('');
+    }
+  };
+
+  const handleHeard = (heard) => {
+    const cats = catsRef.current;
+    if (cats.length === 0) {
+      setMsg('ยังโหลดหมวดหมู่ไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่');
+      return;
+    }
+    const normalized = normalizeThaiNumbers(heard); // "หกสิบห้า" -> 65 ก่อนอ่านวันที่/จำนวนเงิน
+    const draft = parseNaturalLanguage(normalized, cats);
+    if (!draft) {
+      setMsg(SPEECH_MESSAGES['no-speech']);
+      return;
+    }
+    draft.raw_text = heard; // ข้อความที่ได้ยินจริง (ไว้ให้ผู้ใช้เทียบในหน้ายืนยัน)
+    draft.normalized_text = normalized;
+    draft.source = 'voice';
+    draftCb.current(draft); // เปิดหน้ายืนยันทันที
+    setText('');
+  };
+
+  const startListening = () => {
+    setMsg('');
+    const session = createSpeechSession({
+      EngineCtor: speechEngine,
+      onInterim: (t) => setText(t),
+      onFinal: handleHeard,
+      onError: (code, message) => setMsg(message),
+      onEnd: () => {
+        setListening(false);
+        sessionRef.current = null;
+      },
+    });
+    sessionRef.current = session;
+    setText('');
+    setListening(true);
+    session.start();
+  };
+
+  const onMic = () => {
+    if (listening) {
+      if (sessionRef.current) sessionRef.current.stop();
+      return;
+    }
+    if (!supported) {
+      setMsg(SPEECH_MESSAGES.unsupported);
+      return;
+    }
+    if (!readFlag()) {
+      setShowNotice(true); // ครั้งแรก: แจ้งเรื่องเสียงถูกประมวลผลโดยเบราว์เซอร์ก่อน
+      return;
+    }
+    startListening();
+  };
+
+  const acceptNotice = () => {
+    saveFlag();
+    setShowNotice(false);
+    startListening();
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setMsg('');
+    if (!file.type.startsWith('image/')) {
+      setMsg('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      return;
+    }
+    setScanning(true);
+    try {
+      const draft = await parseReceiptImage(file, categories);
+      if (draft) onDraftGenerated(draft);
+    } catch (err) {
+      setMsg(err.message);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  return (
+    <form className="card" onSubmit={handleText}>
+      <style>{css}</style>
+      <AiTitle />
+      <div className="form-row ai-row">
+        {/* ช่องพิมพ์: ปุ่มส่ง (ลูกศร) อยู่ในช่อง ใช้ได้เมื่อมีข้อความ หรือกด Enter ก็ได้เหมือนกัน */}
+        <div className="grow ai-input">
+          <input
+            className="ai-text"
+            placeholder='พิมพ์หรือกด 🎤 แล้วพูด เช่น "เมื่อวาน ค่ากาแฟ 65"'
+            aria-label="พิมพ์รายการที่ต้องการบันทึก"
+            enterKeyHint="send"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            readOnly={listening}
+          />
+          <button
+            type="submit"
+            className="ai-send"
+            data-send
+            aria-label="ตรวจสอบรายการ"
+            title="ตรวจสอบรายการ (หรือกด Enter)"
+            disabled={listening || !text.trim()}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12h14" />
+              <path d="M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="ai-actions">
+          <button
+            type="button"
+            className={`btn ${listening ? '' : 'btn-light'}`}
+            style={{ minHeight: 44, minWidth: 44 }}
+            onClick={onMic}
+            disabled={!supported && !listening ? true : false}
+            title={supported ? 'กดแล้วพูดหนึ่งประโยค เช่น "เมื่อวาน ค่ากาแฟหกสิบห้าบาท"' : SPEECH_MESSAGES.unsupported}
+            aria-label={listening ? 'หยุดฟัง' : 'พูดเพื่อบันทึกรายการ'}
+            data-mic
+          >
+            {listening ? '🔴 กำลังฟัง... (กดเพื่อหยุด)' : '🎤 พูด'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-light"
+            disabled={scanning || listening}
+            onClick={() => fileRef.current && fileRef.current.click()}
+          >
+            {scanning ? 'กำลังอ่านรูป...' : '📷 สแกนใบเสร็จ/สลิป'}
+          </button>
+          <input type="file" accept="image/*" ref={fileRef} onChange={handleFile} style={{ display: 'none' }} />
+        </div>
+      </div>
+
+      {!supported && (
+        <div data-voice-unsupported style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+          ปุ่มพูดใช้ไม่ได้: {SPEECH_MESSAGES.unsupported}
+        </div>
+      )}
+
+      {showNotice && (
+        <div className="alert" data-voice-notice style={{ marginTop: 10 }}>
+          <div style={{ marginBottom: 8 }}>
+            การใช้ปุ่มพูด เบราว์เซอร์ของคุณจะส่งเสียงไปแปลงเป็นข้อความกับผู้ให้บริการของเบราว์เซอร์ (เช่น Google สำหรับ Chrome) ต้องมีอินเทอร์เน็ต
+            ระบบของเราไม่เก็บไฟล์เสียง{' '}
+            <button type="button" style={linkBtn} onClick={() => setShowPolicy(true)}>อ่านนโยบายความเป็นส่วนตัว</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn btn-sm" onClick={acceptNotice}>ตกลง เริ่มพูด</button>
+            <button type="button" className="btn btn-sm btn-light" onClick={() => setShowNotice(false)}>ยกเลิก</button>
+          </div>
+        </div>
+      )}
+
+      {msg && <div className="alert" data-voice-msg style={{ marginTop: 10 }}>{msg}</div>}
+      <div aria-live="polite" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>
+        {listening ? 'กำลังฟัง' : ''}
+      </div>
+
+      {showPolicy && <PrivacyModal onClose={() => setShowPolicy(false)} />}
+    </form>
+  );
+}
