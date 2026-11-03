@@ -53,6 +53,7 @@ function publicUser(u) {
     birth_date: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
     occupation: u.occupation || '',
     monthly_income: u.monthlyIncome === undefined ? null : u.monthlyIncome,
+    avatar: u.avatar || null, // รูปโปรไฟล์ (data URL) หรือ null ถ้ายังไม่มี ผู้ดูแลระบบไม่ได้รับฟิลด์นี้ (หน้าผู้ดูแลเลือกเฉพาะฟิลด์พื้นฐาน)
     policy_accepted_at: u.policyAcceptedAt || null,
     policy_version: u.policyVersion || '',
     role: u.role || 'user',
@@ -222,6 +223,13 @@ router.put('/profile', auth, async (req, res) => {
         if (r.error) return fail(res, 400, r.error);
         user[field] = r.value;
       }
+    }
+
+    // รูปโปรไฟล์ (ส่ง avatar เป็น data URL เพื่อเปลี่ยน ส่ง null หรือ '' เพื่อลบ ไม่ส่งมา = ไม่เปลี่ยน)
+    if ('avatar' in b) {
+      const r = v.checkAvatar(b.avatar);
+      if (r.error) return fail(res, 400, r.error);
+      user.avatar = r.value === null ? undefined : r.value;
     }
 
     // เปลี่ยนรหัสผ่าน (ถ้าส่งมา)

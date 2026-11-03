@@ -55,7 +55,7 @@ export default function Register() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to="/transactions" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   const errors = validate(form);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -82,7 +82,7 @@ export default function Register() {
         confirm_password: form.confirm_password,
         accept_policy: true,
       });
-      navigate('/transactions');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.message);
     } finally {

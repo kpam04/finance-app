@@ -2,36 +2,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell.jsx';
-
-// รูปแบบ Avatar ของผู้ใช้งาน
-const avatar = {
-  width: 30,
-  height: 30,
-  minWidth: 30,
-  borderRadius: '50%',
-  background: '#e0e7ff',
-  color: '#4338ca',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontWeight: 600,
-  fontSize: 14,
-};
-
-// รายการ "กลับหน้าผู้ดูแล" ในเมนูโปรไฟล์ของผู้ดูแล/เจ้าของ (โหมดใช้งานส่วนตัว) โทนเขียว Sage ให้เห็นเด่นกว่ารายการอื่นเล็กน้อย
-const adminBackCss = `
-.profile-dropdown-item.admin-back-item {
-  background: #EFF3EB;
-  color: #40563C;
-  font-weight: 600;
-}
-.profile-dropdown-item.admin-back-item:hover {
-  background: #E8EDE4;
-}
-.profile-dropdown-info .admin-mode-label {
-  color: #5C7357;
-}
-`;
+import Avatar from './Avatar.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -47,12 +18,9 @@ export default function Layout() {
   const name =
     (user && (user.display_name || user.full_name || user.email)) || '';
 
-  const isAdmin =
-    !!user && (user.role === 'admin' || user.role === 'owner');
 
   return (
     <div className="app">
-      <style>{adminBackCss}</style>
 
       {/* ================= HEADER ================= */}
       <header className="topbar">
@@ -83,9 +51,7 @@ export default function Layout() {
 
             <summary className="profile-trigger">
 
-              <span style={avatar}>
-                {name ? name.charAt(0).toUpperCase() : '?'}
-              </span>
+              <Avatar src={user && user.avatar} name={name} size={30} />
 
               <span className="profile-name">
                 {name}
@@ -102,39 +68,16 @@ export default function Layout() {
 
               <div className="profile-dropdown-header">
 
-                <span style={avatar}>
-                  {name ? name.charAt(0).toUpperCase() : '?'}
-                </span>
+                <Avatar src={user && user.avatar} name={name} size={30} />
 
                 <div className="profile-dropdown-info">
                   <strong>{name}</strong>
-                  {isAdmin ? (
-                    <span className="admin-mode-label">
-                      {user.role === 'owner' ? 'เจ้าของระบบ' : 'ผู้ดูแลระบบ'} · โหมดใช้งานส่วนตัว
-                    </span>
-                  ) : (
-                    <span>บัญชีผู้ใช้งาน</span>
-                  )}
+                  <span>บัญชีผู้ใช้งาน</span>
                 </div>
 
               </div>
 
               <div className="profile-dropdown-divider" />
-
-              {/* ผู้ดูแล/เจ้าของ: กลับไปหน้าผู้ดูแลระบบ */}
-              {isAdmin && (
-                <NavLink
-                  to="/admin"
-                  className="profile-dropdown-item admin-back-item"
-                  data-admin-link
-                  onClick={(e) => {
-                    e.currentTarget.closest('details').open = false;
-                  }}
-                >
-                  <span>←</span>
-                  กลับหน้าผู้ดูแล
-                </NavLink>
-              )}
 
               <NavLink
                 to="/profile"

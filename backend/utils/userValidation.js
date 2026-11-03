@@ -131,7 +131,32 @@ function checkCurrency(value) {
   return { value: v };
 }
 
+
+// ---------- รูปโปรไฟล์ ----------
+// รับเฉพาะ data URL ของ JPG/PNG/WebP (ไม่รับ SVG/GIF เพราะเสี่ยงสคริปต์) หน้าเว็บย่อรูปเป็น 256x256 ก่อนส่ง (ราว 20-40KB)
+// ตรวจซ้ำที่นี่: รูปแบบ base64, ขนาดหลังถอดรหัสไม่เกิน 60KB, และ "ไบต์แรกของไฟล์" ต้องตรงกับชนิดที่อ้าง
+// ส่ง null หรือ '' = ลบรูป (คืน value: null)
+const AVATAR_MAX_BYTES = 60 * 1024;
+const AVATAR_RE = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function checkAvatar(value) {
+  if (value === null || value === undefined || value === '') return { value: null };
+  if (typeof value !== 'string') return { error: 'รูปโปรไฟล์ไม่ถูกต้อง' };
+  const m = AVATAR_RE.exec(value);
+  if (!m || m[2].length % 4 !== 0) return { error: 'รูปโปรไฟล์ต้องเป็นไฟล์ JPG, PNG หรือ WebP' };
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length === 0 || buf.length > AVATAR_MAX_BYTES) return { error: 'รูปโปรไฟล์ใหญ่เกินไป (ไม่เกิน 60KB หลังย่อ) ลองเลือกรูปอื่น' };
+  const okMagic = m[1] === 'jpeg'
+    ? buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+    : m[1] === 'png'
+      ? buf.subarray(0, 8).equals(PNG_MAGIC)
+      : buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP';
+  if (!okMagic) return { error: 'ไฟล์รูปไม่ถูกต้อง (ชนิดไฟล์ไม่ตรงกับเนื้อหา)' };
+  return { value };
+}
+
 module.exports = {
   cleanText, splitFullName, checkName, checkNickname, checkEmail, checkSignupEmail, ALLOWED_EMAIL_DOMAINS, checkPassword,
-  checkPhone, checkBirthDate, checkOccupation, checkIncome, checkCurrency,
+  checkPhone, checkBirthDate, checkOccupation, checkIncome, checkCurrency, checkAvatar, AVATAR_MAX_BYTES,
 };

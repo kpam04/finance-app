@@ -1,47 +1,71 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, setToken } from '../api.js';
+import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PrivacyModal from '../components/PrivacyModal.jsx';
 import MyCategories from '../components/MyCategories.jsx';
-import { checkPassword } from '../utils/validators.js';
-
-const CURRENCIES = ['THB', 'USD', 'EUR', 'JPY', 'GBP', 'CNY'];
+import ProfileEditModal from '../components/ProfileEditModal.jsx';
+import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
+import Avatar from '../components/Avatar.jsx';
 
 const fmtDate = (s) => {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString('th-TH', { dateStyle: 'long' });
 };
 
-const toForm = (u) => ({
-  first_name: u.first_name || '',
-  last_name: u.last_name || '',
-  nickname: u.nickname || '',
-  phone: u.phone || '',
-  birth_date: u.birth_date || '',
-  occupation: u.occupation || '',
-  monthly_income: u.monthly_income === null || u.monthly_income === undefined ? '' : String(u.monthly_income),
-  currency: u.currency || 'THB',
-});
-
 const label = { display: 'block', fontSize: 13, marginBottom: 4, color: '#4b5563' };
 const field = { width: '100%', boxSizing: 'border-box' };
-const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 };
-const okBox = { background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 14px', marginBottom: 12 };
+const okBox = { background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 14px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 };
+
+// สไตล์หน้าโปรไฟล์: การ์ดโปรไฟล์ (ส่วนหัว + ข้อมูล + สถิติ) ปุ่มดินสอ/เปลี่ยนรหัสผ่านมุมขวาบน
+const css = `
+.pf-page { max-width: 1100px; margin: 0 auto; }
+.pf-page .card { padding: 26px 32px; }
+.pf-head { display: flex; gap: 22px; align-items: center; }
+.pf-who { flex: 1 1 auto; min-width: 0; }
+.pf-name { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 22px; font-weight: 700; line-height: 1.3; word-break: break-word; }
+.pf-badge { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.pf-email { margin-top: 4px; color: #6b7280; word-break: break-all; }
+.pf-since { margin-top: 2px; font-size: 13px; color: #9ca3af; }
+.pf-actions { display: flex; gap: 8px; flex: 0 0 auto; align-self: flex-start; }
+.pf-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 12px; border: 1px solid var(--border, #E9E1D6); border-radius: 10px; background: #fff; color: #4b5563; font: inherit; font-size: 13px; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.pf-btn:hover { background: #F6F2EA; border-color: #d8cfc0; color: #3F3A34; }
+.pf-btn.icon { width: 38px; padding: 0; }
+.pf-btn svg { flex: 0 0 auto; }
+.pf-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px 32px; margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--border, #E9E1D6); }
+.pf-label { font-size: 12px; color: #6b7280; margin-bottom: 3px; }
+.pf-value { font-size: 15px; word-break: break-word; }
+.pf-empty { color: #b3a99b; }
+.pf-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 26px; }
+.pf-stat { padding: 16px 20px; border-radius: 12px; background: var(--bg, #F6F2EA); }
+.pf-stat .n { font-size: 26px; font-weight: 700; line-height: 1.3; }
+.pf-stat .l { font-size: 13px; color: #6b7280; }
+.pf-policy { margin: 22px 0 0; font-size: 12px; color: #8A8177; }
+.pf-policy button { background: none; border: none; padding: 0; font: inherit; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
+@media (max-width: 640px) {
+  .pf-page .card { padding: 20px 18px; }
+  .pf-head { flex-wrap: wrap; gap: 14px; }
+  .pf-actions { order: 3; width: 100%; justify-content: flex-end; }
+  .pf-stats { gap: 10px; }
+  .pf-stat { padding: 12px 14px; }
+  .pf-stat .n { font-size: 20px; }
+}
+`;
+
+const IconPencil = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+);
+const IconLock = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+);
 
 export default function Profile() {
-  const { user, stats, refreshProfile, logout } = useAuth();
+  const { user, stats, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState(() => toForm(user || {})); // user อาจยังเป็น null ชั่วขณะตอนโหลดข้อมูล
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const [pw, setPw] = useState({ current_password: '', new_password: '', confirm_new_password: '' });
-  const [pwMsg, setPwMsg] = useState('');
-  const [pwErr, setPwErr] = useState('');
-  const [pwBusy, setPwBusy] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [showEdit, setShowEdit] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [showDelete, setShowDelete] = useState(false);
   const [delPassword, setDelPassword] = useState('');
@@ -50,55 +74,17 @@ export default function Profile() {
 
   const [showPolicy, setShowPolicy] = useState(false);
 
-  // เมื่อข้อมูลผู้ใช้โหลดใหม่ (เช่น หลังบันทึก) ให้ฟอร์มตรงกับข้อมูลล่าสุด
+  // ข้อความแจ้งผลสำเร็จหายเองหลังไม่กี่วินาที
   useEffect(() => {
-    if (user) setForm(toForm(user));
-  }, [user]);
+    if (!notice) return undefined;
+    const t = setTimeout(() => setNotice(''), 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
 
-  if (!user) return null;
+  if (!user) return null; // user อาจยังเป็น null ชั่วขณะตอนโหลดข้อมูล
 
   const name = user.display_name || user.full_name || user.email;
   const isStaff = user.role === 'admin' || user.role === 'owner';
-  const setF = (k) => (e) => setForm({ ...form, [k]: e.target.value });
-  const currencyOptions = CURRENCIES.includes(form.currency) ? CURRENCIES : [form.currency, ...CURRENCIES];
-
-  const saveProfile = async (e) => {
-    e.preventDefault();
-    setMsg('');
-    setErr('');
-    setBusy(true);
-    try {
-      await api.updateProfile({ ...form });
-      await refreshProfile();
-      setMsg('บันทึกข้อมูลเรียบร้อยแล้ว');
-    } catch (e2) {
-      setErr(e2.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const changePassword = async (e) => {
-    e.preventDefault();
-    setPwMsg('');
-    setPwErr('');
-    const check = checkPassword(pw.new_password, 'รหัสผ่านใหม่');
-    if (check.error) return setPwErr(check.error);
-    if (pw.new_password !== pw.confirm_new_password) return setPwErr('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
-
-    setPwBusy(true);
-    try {
-      const res = await api.updateProfile({ ...pw });
-      // เปลี่ยนรหัสผ่านแล้ว token เดิมใช้ไม่ได้ทุกเครื่อง backend ส่ง token ใหม่มาให้เครื่องนี้ใช้ต่อ
-      if (res && res.token) setToken(res.token);
-      setPw({ current_password: '', new_password: '', confirm_new_password: '' });
-      setPwMsg('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
-    } catch (e2) {
-      setPwErr(e2.message);
-    } finally {
-      setPwBusy(false);
-    }
-  };
 
   const deleteAccount = async (e) => {
     e.preventDefault();
@@ -117,134 +103,74 @@ export default function Profile() {
     }
   };
 
-  return (
+  const Info = ({ title, children, empty }) => (
     <div>
+      <div className="pf-label">{title}</div>
+      <div className={`pf-value${empty ? ' pf-empty' : ''}`}>{empty ? 'ยังไม่ระบุ' : children}</div>
+    </div>
+  );
+
+  return (
+    <div className="pf-page">
+      <style>{css}</style>
       <h2>โปรไฟล์ของฉัน</h2>
 
-      <div className="card">
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div
-            style={{
-              width: 56, height: 56, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 700,
-            }}
-          >
-            {name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              {user.full_name || name}
+      {notice && (
+        <div style={okBox} role="status" data-pf-notice>
+          <span>{notice}</span>
+          <button type="button" className="btn btn-sm btn-light" onClick={() => setNotice('')} aria-label="ปิดข้อความ">ปิด</button>
+        </div>
+      )}
+
+      <div className="card" data-profile-card>
+        <div className="pf-head">
+          <Avatar src={user.avatar} name={name} size={96} alt={`รูปโปรไฟล์ของ ${name}`} style={{ border: '3px solid #fff', boxShadow: '0 0 0 1px #E9E1D6' }} />
+          <div className="pf-who">
+            <div className="pf-name">
+              <span data-pf-name>{user.full_name || name}</span>
               {isStaff && (
-                <span data-role-badge style={{ marginLeft: 8, fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: user.role === 'owner' ? '#fef3c7' : '#e0e7ff', color: user.role === 'owner' ? '#92400e' : '#3730a3' }}>
+                <span className="pf-badge" data-role-badge style={{ background: user.role === 'owner' ? '#fef3c7' : '#e0e7ff', color: user.role === 'owner' ? '#92400e' : '#3730a3' }}>
                   {user.role === 'owner' ? 'เจ้าของระบบ' : 'ผู้ดูแลระบบ'}
                 </span>
               )}
             </div>
-            <div style={{ color: '#6b7280' }}>{user.email}</div>
-            <div style={{ fontSize: 13, color: '#9ca3af', marginTop: 2 }}>สมาชิกตั้งแต่ {fmtDate(user.created_at)}</div>
+            <div className="pf-email">{user.email}</div>
+            <div className="pf-since">สมาชิกตั้งแต่ {fmtDate(user.created_at)}</div>
           </div>
+          <div className="pf-actions">
+            <button type="button" className="pf-btn icon" data-edit-profile aria-label="แก้ไขโปรไฟล์" title="แก้ไขโปรไฟล์" onClick={() => { setNotice(''); setShowEdit(true); }}>
+              <IconPencil />
+            </button>
+            <button type="button" className="pf-btn" data-change-password aria-label="เปลี่ยนรหัสผ่าน" title="เปลี่ยนรหัสผ่าน" onClick={() => { setNotice(''); setShowPassword(true); }}>
+              <IconLock /><span>เปลี่ยนรหัสผ่าน</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="pf-info" data-pf-info>
+          <Info title="ชื่อเล่น" empty={!user.nickname}>{user.nickname}</Info>
+          <Info title="เบอร์โทร" empty={!user.phone}>{user.phone}</Info>
+          <Info title="วันเกิด" empty={!user.birth_date}>{fmtDate(user.birth_date)}</Info>
+          <Info title="อาชีพ" empty={!user.occupation}>{user.occupation}</Info>
         </div>
 
         {stats && (
-          <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 16 }}>
-            <div><div style={{ fontSize: 13, color: '#6b7280' }}>รายการทั้งหมด</div><strong style={{ fontSize: 20 }}>{stats.total_transactions}</strong></div>
-            <div><div style={{ fontSize: 13, color: '#6b7280' }}>งบประมาณ</div><strong style={{ fontSize: 20 }}>{stats.total_budgets}</strong></div>
-            <div><div style={{ fontSize: 13, color: '#6b7280' }}>รายการซ้ำ</div><strong style={{ fontSize: 20 }}>{stats.total_recurring}</strong></div>
+          <div className="pf-stats" data-pf-stats>
+            <div className="pf-stat"><div className="l">รายการทั้งหมด</div><div className="n">{stats.total_transactions}</div></div>
+            <div className="pf-stat"><div className="l">งบประมาณ</div><div className="n">{stats.total_budgets}</div></div>
+            <div className="pf-stat"><div className="l">รายการซ้ำ</div><div className="n">{stats.total_recurring}</div></div>
           </div>
         )}
 
-        <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 0 }}>
+        <p className="pf-policy">
           {user.policy_accepted_at
-            ? `ยอมรับนโยบายความเป็นส่วนตัวเมื่อ ${fmtDate(user.policy_accepted_at)} (เวอร์ชัน ${user.policy_version || '-'}) `
-            : 'ยังไม่มีบันทึกการยอมรับนโยบายความเป็นส่วนตัว '}
-          <button
-            type="button"
-            onClick={() => setShowPolicy(true)}
-            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#4f46e5', textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            อ่านนโยบาย
-          </button>
+            ? `ยอมรับนโยบายความเป็นส่วนตัวเมื่อ ${fmtDate(user.policy_accepted_at)} (เวอร์ชัน ${user.policy_version || '-'}) · `
+            : 'ยังไม่มีบันทึกการยอมรับนโยบายความเป็นส่วนตัว · '}
+          <button type="button" onClick={() => setShowPolicy(true)}>อ่านนโยบาย</button>
         </p>
       </div>
 
-      <form className="card" onSubmit={saveProfile}>
-        <h3 style={{ marginTop: 0 }}>ข้อมูลส่วนตัว</h3>
-        {!user.last_name && (
-          <div className="alert">บัญชีนี้ยังไม่มีนามสกุล กรุณากรอกนามสกุลแล้วกดบันทึก</div>
-        )}
-        {err && <div className="alert">{err}</div>}
-        {msg && <div style={okBox}>{msg}</div>}
-
-        <div style={grid}>
-          <div>
-            <label style={label}>ชื่อ</label>
-            <input style={field} value={form.first_name} onChange={setF('first_name')} maxLength={50} required />
-          </div>
-          <div>
-            <label style={label}>นามสกุล</label>
-            <input style={field} value={form.last_name} onChange={setF('last_name')} maxLength={50} required />
-          </div>
-          <div>
-            <label style={label}>ชื่อเล่น (แสดงในเมนู)</label>
-            <input style={field} value={form.nickname} onChange={setF('nickname')} maxLength={30} />
-          </div>
-          <div>
-            <label style={label}>อีเมล (เปลี่ยนไม่ได้)</label>
-            <input style={field} value={user.email} disabled />
-          </div>
-          <div>
-            <label style={label}>เบอร์โทร</label>
-            <input style={field} value={form.phone} onChange={setF('phone')} placeholder="เช่น 0812345678" />
-          </div>
-          <div>
-            <label style={label}>วันเกิด</label>
-            <input style={field} type="date" value={form.birth_date} onChange={setF('birth_date')} />
-          </div>
-          <div>
-            <label style={label}>อาชีพ</label>
-            <input style={field} value={form.occupation} onChange={setF('occupation')} maxLength={100} />
-          </div>
-          <div>
-            <label style={label}>รายได้ต่อเดือนโดยประมาณ</label>
-            <input style={field} type="number" min="0" step="0.01" value={form.monthly_income} onChange={setF('monthly_income')} />
-          </div>
-          <div>
-            <label style={label}>สกุลเงิน</label>
-            <select style={field} value={form.currency} onChange={setF('currency')}>
-              {currencyOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 0 }}>
-          ช่องที่ไม่บังคับ (ชื่อเล่น เบอร์โทร วันเกิด อาชีพ รายได้) เว้นว่างได้ รายได้ใช้ประกอบการวิเคราะห์และวางแผนการเงินของคุณเท่านั้น
-        </p>
-        <button className="btn" disabled={busy}>{busy ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}</button>
-      </form>
-
-      <form className="card" onSubmit={changePassword}>
-        <h3 style={{ marginTop: 0 }}>เปลี่ยนรหัสผ่าน</h3>
-        {pwErr && <div className="alert">{pwErr}</div>}
-        {pwMsg && <div style={okBox}>{pwMsg}</div>}
-        <div style={grid}>
-          <div>
-            <label style={label}>รหัสผ่านปัจจุบัน</label>
-            <input style={field} type="password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} required />
-          </div>
-          <div>
-            <label style={label}>รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label>
-            <input style={field} type="password" value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} required />
-          </div>
-          <div>
-            <label style={label}>ยืนยันรหัสผ่านใหม่</label>
-            <input style={field} type="password" value={pw.confirm_new_password} onChange={(e) => setPw({ ...pw, confirm_new_password: e.target.value })} required />
-          </div>
-        </div>
-        <button className="btn" disabled={pwBusy}>{pwBusy ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}</button>
-      </form>
-
-      {/* หมวดหมู่ของฉัน: สร้าง/แก้ชื่อ-สี/ลบ/แสดงอีกครั้ง */}
+      {/* หมวดหมู่ของฉัน: เพิ่ม/แก้ไข/ลบ/แสดงอีกครั้ง */}
       <MyCategories />
 
       <div className="card" style={{ borderColor: '#fecaca' }}>
@@ -282,6 +208,8 @@ export default function Profile() {
         )}
       </div>
 
+      {showEdit && <ProfileEditModal user={user} onClose={() => setShowEdit(false)} onSaved={(m) => { setShowEdit(false); setNotice(m); }} />}
+      {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} onChanged={(m) => { setShowPassword(false); setNotice(m); }} />}
       {showPolicy && <PrivacyModal onClose={() => setShowPolicy(false)} />}
     </div>
   );

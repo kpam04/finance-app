@@ -4,7 +4,7 @@
 !.env.example
 node_modules
 dist
-readme.md
+
 
 # ไฟล์สำรองที่สร้างตอนวางไฟล์ทับ / ซิปที่ใช้ส่งงาน
 *.backup_*

@@ -3,7 +3,8 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import SessionNotice from '../components/SessionNotice.jsx';
 
-const landingFor = () => '/transactions';
+// หน้าแรกหลังเข้าสู่ระบบ: ทุกบทบาทไปหน้าแดชบอร์ด (ยังไม่มีหน้าผู้ดูแลระบบ)
+const landingFor = () => '/dashboard';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -21,7 +22,7 @@ export default function Login() {
     try {
       await login(email.trim(), password);
       // login() โหลดโปรไฟล์ (รวมบทบาท) ไว้แล้ว: เมื่อ user ถูกตั้งค่า บรรทัด <Navigate> ด้านบนจะพาไปหน้าที่ตรงกับบทบาทเอง
-      // navigate('/transactions') แบบตายตัวถูกเอาออก เพราะจะพาผู้ดูแลไปผิดหน้า
+      // navigate('/dashboard') แบบตายตัวถูกเอาออก เพราะจะพาผู้ดูแลไปผิดหน้า
     } catch (err) {
       setError(err.message);
     } finally {

@@ -11,7 +11,8 @@ const schema = new mongoose.Schema({
   phone:         { type: String, default: '' },
   birthDate:     { type: Date, default: null },
   occupation:    { type: String, default: '' },
-  monthlyIncome: { type: Number, default: null, min: 0 },
+  monthlyIncome: { type: Number, default: null, min: 0 }, // เลิกใช้ในหน้าโปรไฟล์แล้ว (ข้อมูลเดิมยังอยู่ ไม่แสดงที่ไหน)
+  avatar:        { type: String },                        // รูปโปรไฟล์ (data URL JPG/PNG/WebP ย่อ 256x256 หน้าเว็บส่งมา ไม่เกิน 60KB) ไม่ตั้งค่า = ใช้ตัวอักษรย่อ
   policyAcceptedAt: { type: Date, default: null },   // วันเวลาที่ยอมรับนโยบายความเป็นส่วนตัว
   policyVersion:    { type: String, default: '' },   // เวอร์ชันของนโยบายที่ยอมรับ
 
