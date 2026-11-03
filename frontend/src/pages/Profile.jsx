@@ -32,7 +32,7 @@ const css = `
 .pf-btn:hover { background: #F6F2EA; border-color: #d8cfc0; color: #3F3A34; }
 .pf-btn.icon { width: 38px; padding: 0; }
 .pf-btn svg { flex: 0 0 auto; }
-.pf-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px 32px; margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--border, #E9E1D6); }
+.pf-info { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px 32px; margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--border, #E9E1D6); }
 .pf-label { font-size: 12px; color: #6b7280; margin-bottom: 3px; }
 .pf-value { font-size: 15px; word-break: break-word; }
 .pf-empty { color: #b3a99b; }
@@ -42,7 +42,12 @@ const css = `
 .pf-stat .l { font-size: 13px; color: #6b7280; }
 .pf-policy { margin: 22px 0 0; font-size: 12px; color: #8A8177; }
 .pf-policy button { background: none; border: none; padding: 0; font: inherit; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
+@media (max-width: 900px) {
+  .pf-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 640px) {
+  .pf-info { gap: 18px 16px; margin-top: 20px; padding-top: 18px; }
+  .pf-value { font-size: 14px; }
   .pf-page .card { padding: 20px 18px; }
   .pf-head { flex-wrap: wrap; gap: 14px; }
   .pf-actions { order: 3; width: 100%; justify-content: flex-end; }
