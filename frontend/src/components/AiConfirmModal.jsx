@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CategorySelect from './CategorySelect.jsx';
 
 const overlay = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
@@ -12,7 +13,7 @@ const label = { display: 'block', fontSize: 13, marginBottom: 4, color: '#4b5563
 const field = { width: '100%', boxSizing: 'border-box' };
 const grid = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 };
 
-export default function AiConfirmModal({ draft, categories, onConfirm, onClose }) {
+export default function AiConfirmModal({ draft, categories, onConfirm, onClose, onCategoryCreated }) {
   const [form, setForm] = useState({
     type: draft.type || 'expense',
     category_id: draft.category_id || '',
@@ -23,7 +24,6 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose }
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const catOptions = categories.filter((c) => c.type === form.type);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const submit = async (e) => {
@@ -100,12 +100,15 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose }
             </div>
             <div>
               <label style={label}>หมวดหมู่</label>
-              <select style={field} value={form.category_id} onChange={set('category_id')} required>
-                <option value="">-- เลือกหมวดหมู่ --</option>
-                {catOptions.map((c) => (
-                  <option key={c.category_id} value={c.category_id}>{c.name}</option>
-                ))}
-              </select>
+              <CategorySelect
+                style={field}
+                categories={categories}
+                type={form.type}
+                value={form.category_id}
+                onChange={(v) => setForm((f) => ({ ...f, category_id: v }))}
+                onCreated={onCategoryCreated}
+                required
+              />
             </div>
           </div>
 
