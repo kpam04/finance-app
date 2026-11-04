@@ -7,7 +7,7 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-async function request(path, { method = 'GET', body, params } = {}) {
+async function request(path, { method = 'GET', body, params, signal } = {}) {
   let url = `/api${path}`;
   if (params) {
     const qs = new URLSearchParams();
@@ -29,8 +29,14 @@ async function request(path, { method = 'GET', body, params } = {}) {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
     });
-  } catch {
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      const aborted = new Error('ยกเลิกแล้ว');
+      aborted.name = 'AbortError';
+      throw aborted;
+    }
     throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ตรวจว่า backend รันอยู่ที่พอร์ต 3000)');
   }
 
@@ -82,6 +88,7 @@ export const api = {
   aiConsent: (data) => request('/ai/consent', { method: 'PUT', body: data }),
   aiParseText: (data) => request('/ai/parse-text', { method: 'POST', body: data }),
   aiFeedback: (eventId, data) => request(`/ai/events/${eventId}/feedback`, { method: 'PUT', body: data }),
+  aiParseReceipt: (data, signal) => request('/ai/parse-receipt', { method: 'POST', body: data, signal }), // ส่งรูปใบเสร็จ (ย่อแล้ว) ให้ AI อ่าน
 
   // transactions
   getTransactions: (params) => request('/transactions', { params }),

@@ -20,6 +20,10 @@ const schema = new mongoose.Schema({
   aiEnabled:        { type: Boolean, default: false },
   aiConsentAt:      { type: Date, default: null },
   aiConsentVersion: { type: String, default: '' },
+  // อ่านรูปใบเสร็จด้วย AI (ส่งรูปไปบริการภายนอก) แยกความยินยอมจากการส่งข้อความ ค่าเริ่มต้นปิด
+  aiImageEnabled:        { type: Boolean, default: false },
+  aiImageConsentAt:      { type: Date, default: null },
+  aiImageConsentVersion: { type: String, default: '' },
 
   // --- ผู้ดูแลระบบ (รอบ A) ---
   role:            { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },

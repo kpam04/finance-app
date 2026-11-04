@@ -45,6 +45,8 @@ function createApp({ env = process.env, mount } = {}) {
   const origins = corsOriginsFor(env);
   if (origins.length) app.use(cors({ origin: origins }));
 
+  // รูปใบเสร็จที่ย่อแล้ว (ราว 0.3-1.8MB) ใหญ่กว่าข้อมูลปกติ จึงเปิดเพดานเฉพาะเส้นทางนี้ ต้องมาก่อนตัวอ่านข้อมูลทั่วไป ส่วนเส้นทางอื่นยังจำกัด 100KB
+  app.use('/api/ai/parse-receipt', express.json({ limit: '3mb' }));
   app.use(express.json({ limit: '100kb' }));
 
   // ---------- ตรวจสุขภาพ (ไม่นับเข้าตัวจำกัดอัตรา ใช้กับ Render health check) ----------

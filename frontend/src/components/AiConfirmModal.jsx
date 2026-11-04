@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import CategorySelect from './CategorySelect.jsx';
 import AiConsentModal from './AiConsentModal.jsx';
+import ReceiptPanel from './ReceiptPanel.jsx';
 import { compareWithAi, fallbackReasonFor, itemsToDrafts } from '../utils/aiDrafts.js';
 
 const overlay = {
@@ -55,7 +56,10 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
   const tone = ai ? confTone(ai.confidence) : null;
   const flagCategory = !!ai && ai.flags.category_guessed && form.category_id === (draft.category_id || '');
   const flagDate = !!ai && ai.flags.date_defaulted && form.transaction_date === draft.transaction_date;
-  const flagAmount = !!ai && ai.confidence < 0.6 && form.amount === (draft.amount === '' || draft.amount == null ? '' : String(draft.amount));
+  const isReceipt = !!draft.receipt; // ร่างที่ได้จากการสแกนใบเสร็จ (แสดงแผงใบเสร็จ รูปย่อ และธงเตือนเฉพาะใบเสร็จ)
+  const amountUntouched = form.amount === (draft.amount === '' || draft.amount == null ? '' : String(draft.amount));
+  const amountFlag = !ai ? null : ai.flags.total_mismatch ? 'mismatch' : ai.flags.amount_from_items ? 'items' : ai.confidence < 0.6 ? 'low' : null;
+  const flagAmount = !!amountFlag && amountUntouched;
 
   const canAskAi = !draft.ai && !draft.is_simulated && !!draft.raw_text && !!aiStatus && !!aiStatus.configured;
   const report = (eventId, body) => {
@@ -144,13 +148,15 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
 
         {ai && (
           <div data-ai-badge style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: '#EEEDFE', color: '#3C3489' }}>✨ AI แยกรายการให้</span>
+            <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: '#EEEDFE', color: '#3C3489' }}>{isReceipt ? '✨ AI อ่านจากรูปใบเสร็จ' : '✨ AI แยกรายการให้'}</span>
             <span data-ai-confidence style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: tone.bg, color: tone.fg }}>
               {tone.label} {Math.round(ai.confidence * 100)}%
             </span>
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>ตรวจให้ตรงกับที่ต้องการก่อนกดยืนยันเสมอ</span>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>{isReceipt ? 'ตรวจเทียบกับรูปใบเสร็จก่อนกดยืนยันเสมอ' : 'ตรวจให้ตรงกับที่ต้องการก่อนกดยืนยันเสมอ'}</span>
           </div>
         )}
+
+        {isReceipt && <ReceiptPanel receipt={draft.receipt} image={draft.receipt_image} flags={ai ? ai.flags : {}} clientMs={ai ? ai.client_ms : undefined} engine={ai ? ai.engine : undefined} attempts={ai ? ai.attempts : undefined} />}
 
         {draft.fallback_reason && (
           <div data-fallback className="alert" style={{ marginBottom: 14 }}>
@@ -280,12 +286,12 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
             <div>
               <label style={label}>จำนวนเงิน</label>
               <input style={flagAmount ? { ...field, ...warnRing } : field} type="number" min="0.01" step="0.01" value={form.amount} onChange={set('amount')} required />
-              {flagAmount && <div data-flag-amount style={hint}>AI ไม่ค่อยมั่นใจ ตรวจจำนวนเงินอีกครั้ง</div>}
+              {flagAmount && <div data-flag-amount style={hint}>{amountFlag === 'mismatch' ? 'ยอดรวมไม่ตรงกับผลรวมรายการสินค้า ตรวจกับรูปใบเสร็จ' : amountFlag === 'items' ? 'อ่านยอดรวมไม่ชัด ใช้ผลรวมรายการแทน ตรวจกับรูปใบเสร็จ' : 'AI ไม่ค่อยมั่นใจ ตรวจจำนวนเงินอีกครั้ง'}</div>}
             </div>
             <div>
               <label style={label}>วันที่</label>
               <input style={flagDate ? { ...field, ...warnRing } : field} type="date" value={form.transaction_date} onChange={set('transaction_date')} required />
-              {flagDate && <div data-flag-date style={hint}>AI ไม่พบวันที่ในข้อความ ใช้วันนี้ให้</div>}
+              {flagDate && <div data-flag-date style={hint}>{isReceipt ? 'AI ไม่พบวันที่ในใบเสร็จ ใช้วันนี้ให้' : 'AI ไม่พบวันที่ในข้อความ ใช้วันนี้ให้'}</div>}
             </div>
           </div>
 

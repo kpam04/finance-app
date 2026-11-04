@@ -39,6 +39,8 @@ export const FALLBACK_REASON = {
   AI_UNAVAILABLE: 'ระบบ AI ใช้ไม่ได้ชั่วคราว',
   AI_EMPTY: 'AI ไม่พบรายการในข้อความนี้',
   AI_CONSENT_REQUIRED: 'ยังไม่ได้เปิดใช้ AI',
+  AI_IMAGE_CONSENT_REQUIRED: 'ยังไม่ได้ยินยอมให้ส่งรูปใบเสร็จ',
+  AI_NO_TOTAL: 'อ่านยอดเงินจากรูปนี้ไม่ได้',
 };
 export const fallbackReasonFor = (err) => FALLBACK_REASON[err && err.code] || 'ระบบ AI ใช้ไม่ได้ชั่วคราว';
 
@@ -71,4 +73,42 @@ export function compareWithAi(form, aiItem, categories = []) {
   if (diff.note) rows.push({ key: 'note', label: 'บันทึก', cur: String(form.note || '').trim() || '-', ai: String(aiItem.note || '').trim() || '-', minor: true });
   const keyCount = ['type', 'amount', 'category', 'date'].filter((k) => diff[k]).length;
   return { diff, rows, keyCount };
+}
+
+// ผลอ่านใบเสร็จ (จากหลังบ้าน) -> ร่างรายการ "ยอดที่ชำระ" 1 รายการ ใช้หน้ายืนยันเดิม + แผงใบเสร็จ (รูปย่อ รายการสินค้า ธงเตือน)
+export function receiptToDraft(data, { thumb, clientMs } = {}) {
+  const it = data.items[0];
+  const flags = it.flags || {};
+  const sure = it.confidence >= 0.8 && !flags.category_guessed && !flags.date_defaulted && !flags.total_mismatch && !flags.amount_from_items;
+  return {
+    type: 'expense',
+    amount: it.amount,
+    category_id: it.category_id || '',
+    category_name: it.category_name || '',
+    note: it.note || '',
+    transaction_date: it.transaction_date,
+    confidence: sure ? 'high' : 'medium',
+    raw_text: '',
+    source: 'receipt',
+    receipt: data.receipt,
+    receipt_image: thumb || '',
+    ai: {
+      confidence: it.confidence, event_id: data.event_id, index: 0, total: 1, model: data.model, flags,
+      redactions: data.redactions, ocr_ms: data.ocr_ms, server_ms: data.server_ms, client_ms: clientMs,
+      engine: data.engine, attempts: data.attempts || [], // ตัวอ่านที่ได้ผลจริง (typhoon | gemini) และความพยายามของแต่ละตัว
+    },
+  };
+}
+
+// ระบบอ่านใบเสร็จได้หรือไม่: มีตัวอ่านอย่างน้อยหนึ่งตัว (Typhoon และ/หรือ Gemini) ถ้าหลังบ้านรุ่นเก่ายังไม่ส่งรายการตัวอ่านมา ใช้ค่า configured เดิม
+export const receiptReady = (st) => !!st && (Array.isArray(st.receipt_engines) ? st.receipt_engines.length > 0 : !!st.configured);
+
+// ข้อความบอกว่าใบเสร็จนี้อ่านด้วยตัวไหน (แสดงในแผงใบเสร็จ)
+export function engineLabel(engine, attempts = []) {
+  if (engine === 'gemini') {
+    const typhoonFailed = attempts.some((a) => a.engine === 'typhoon' && !a.ok);
+    return typhoonFailed ? 'อ่านด้วย Google Gemini (ตัวสำรอง เพราะ Typhoon อ่านไม่สำเร็จ)' : 'อ่านด้วย Google Gemini';
+  }
+  if (engine === 'typhoon') return 'อ่านด้วย Typhoon OCR';
+  return '';
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
 import AiConsentModal from './AiConsentModal.jsx';
+import { receiptReady } from '../utils/aiDrafts.js';
 
 // การ์ด "ผู้ช่วย AI" ในหน้าโปรไฟล์: เปิด/ปิดการส่งข้อความไปบริการ AI ภายนอก (ปิดอยู่เป็นค่าเริ่มต้น) และดูโควต้าวันนี้
 const css = `
@@ -21,7 +22,7 @@ const css = `
 
 export default function AiSettingsCard() {
   const [status, setStatus] = useState(null);
-  const [showConsent, setShowConsent] = useState(false);
+  const [showConsent, setShowConsent] = useState(null); // null | 'text' | 'image' (หน้าต่างขอความยินยอมที่เปิดอยู่)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -40,15 +41,15 @@ export default function AiSettingsCard() {
 
   if (!status) return null;
 
-  const toggle = async (e) => {
+  const toggleScope = (scope) => async (e) => {
     setMsg('');
     if (e.target.checked) {
-      setShowConsent(true); // เปิดต้องผ่านหน้าต่างขอความยินยอมก่อนเสมอ
+      setShowConsent(scope); // เปิดต้องผ่านหน้าต่างขอความยินยอมก่อนเสมอ
       return;
     }
     setBusy(true);
     try {
-      const res = await api.aiConsent({ enabled: false });
+      const res = await api.aiConsent({ enabled: false, ...(scope === 'image' ? { scope: 'image' } : {}) });
       setStatus(res.data);
     } catch (err) {
       setMsg(err.message || 'ปิดการใช้ AI ไม่สำเร็จ');
@@ -72,17 +73,38 @@ export default function AiSettingsCard() {
           )}
         </div>
         <label className="as-switch" data-ai-switch>
-          <input type="checkbox" role="switch" aria-label="เปิดใช้ผู้ช่วย AI" checked={!!status.enabled} disabled={!status.configured || busy} onChange={toggle} />
+          <input type="checkbox" role="switch" aria-label="เปิดใช้ผู้ช่วย AI" checked={!!status.enabled} disabled={!status.configured || busy} onChange={toggleScope('text')} />
           <span className="as-track" />
           <span>{status.enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+        </label>
+      </div>
+      <div className="as-row" data-ai-image-row style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #E9E1D6' }}>
+        <div>
+          <h3 style={{ fontSize: 16 }}>อ่านรูปใบเสร็จด้วย AI</h3>
+          <p className="as-desc">
+            ปุ่ม 📷 สแกนใบเสร็จ: ถ่ายหรือเลือกรูป แล้ว AI อ่านยอดที่ชำระ วันที่ ชื่อร้าน และหมวดให้ รูปจะถูกส่งไปบริการ AI ภายนอก (ระบบเราไม่เก็บรูปและข้อความที่อ่านได้) ปิดอยู่เป็นค่าเริ่มต้น
+          </p>
+          {receiptReady(status) && Array.isArray(status.receipt_engines) && status.receipt_engines.length > 0 && (
+            <p className="as-meta" data-ai-engines>ตัวอ่านใบเสร็จ: {status.receipt_engines.map((e, i) => `${e === 'gemini' ? 'Google Gemini' : 'Typhoon OCR'}${i === 0 && status.receipt_engines.length > 1 ? ' (หลัก)' : i > 0 ? ' (สำรอง)' : ''}`).join(' · ')}</p>
+          )}
+          {receiptReady(status) && status.image_enabled && (
+            <p className="as-meta" data-ai-image-usage>วันนี้อ่านใบเสร็จไปแล้ว {status.receipts_used_today}/{status.receipt_daily_limit} ใบ</p>
+          )}
+        </div>
+        <label className="as-switch" data-ai-image-switch>
+          <input type="checkbox" role="switch" aria-label="เปิดให้ AI อ่านรูปใบเสร็จ" checked={!!status.image_enabled} disabled={!receiptReady(status) || busy} onChange={toggleScope('image')} />
+          <span className="as-track" />
+          <span>{status.image_enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
         </label>
       </div>
       {msg && <div className="alert" data-ai-settings-error style={{ marginTop: 10 }}>{msg}</div>}
       {showConsent && (
         <AiConsentModal
-          version={status.consent_version}
-          onAccepted={(data) => { setStatus(data); setShowConsent(false); }}
-          onDeclined={() => setShowConsent(false)}
+          scope={showConsent}
+          engines={status.receipt_engines || []}
+          version={showConsent === 'image' ? status.image_consent_version : status.consent_version}
+          onAccepted={(data) => { setStatus(data); setShowConsent(null); }}
+          onDeclined={() => setShowConsent(null)}
         />
       )}
     </div>

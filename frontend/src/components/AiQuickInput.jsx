@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseNaturalLanguage } from '../utils/aiParser.js';
-import { parseReceiptImage } from '../utils/ocrExtractor.js';
+import { api } from '../api.js';
+import { prepareReceiptImage } from '../utils/receiptImage.js';
+import { receiptToDraft, receiptReady } from '../utils/aiDrafts.js';
+import AiConsentModal from './AiConsentModal.jsx';
 import { normalizeThaiNumbers } from '../utils/thaiNumbers.js';
 import { createSpeechSession, isSpeechSupported, SPEECH_MESSAGES } from '../utils/speechInput.js';
 import PrivacyModal from './PrivacyModal.jsx';
@@ -131,24 +134,43 @@ function AiTitle() {
   );
 }
 
-export default function AiQuickInput({ categories, onDraftGenerated, speechEngine }) {
+export default function AiQuickInput({ categories, onDraftGenerated, speechEngine, aiStatus, onAiStatusChange, prepareImage = prepareReceiptImage }) {
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
-  const [scanning, setScanning] = useState(false);
+  const [scanState, setScanState] = useState('idle'); // idle | preparing | reading (สแกนใบเสร็จ: เตรียมรูป -> AI อ่าน)
+  const [scanElapsed, setScanElapsed] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false); // มือถือ: เมนูเลือก "ถ่ายรูป" หรือ "เลือกรูปจากเครื่อง"
+  const [consentFile, setConsentFile] = useState(null); // รูปที่รอผู้ใช้ตัดสินใจเรื่องความยินยอมให้ส่งรูป (ถามครั้งแรก)
+  const scanning = scanState !== 'idle';
   const [listening, setListening] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const fileRef = useRef(null);
+  const camRef = useRef(null);
+  const abortRef = useRef(null);
+  const alive = useRef(true);
+  const statusRef = useRef(null);
   const sessionRef = useRef(null);
   const catsRef = useRef(categories);
   const draftCb = useRef(onDraftGenerated);
   catsRef.current = categories;
   draftCb.current = onDraftGenerated;
+  statusRef.current = aiStatus;
 
   const supported = isSpeechSupported(speechEngine);
 
-  // ปิดการฟังเมื่อออกจากหน้า
-  useEffect(() => () => sessionRef.current && sessionRef.current.abort(), []);
+  // ปิดการฟัง/ยกเลิกการอ่านใบเสร็จเมื่อออกจากหน้า
+  useEffect(() => () => {
+    alive.current = false;
+    if (sessionRef.current) sessionRef.current.abort();
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+
+  useEffect(() => {
+    if (scanState !== 'reading') return undefined;
+    const t = setInterval(() => setScanElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [scanState]);
 
   const handleText = (e) => {
     e.preventDefault();
@@ -224,24 +246,71 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     startListening();
   };
 
-  const handleFile = async (e) => {
+  // สแกนใบเสร็จ: ย่อรูปในเครื่อง -> ส่งให้หลังบ้านอ่าน (Typhoon OCR + LLM) -> หน้ายืนยันเดิม (มีรูปย่อ/รายการสินค้าให้เทียบ)
+  // ครั้งแรกต้องยินยอมให้ส่งรูปไปบริการภายนอกก่อน ระบบเราไม่เก็บรูปและข้อความที่อ่านได้
+  const scanError = (e) => `${e && e.message ? e.message : 'อ่านใบเสร็จไม่สำเร็จ'} (กรอกรายการเองได้ตามปกติ)`;
+
+  const runScan = async (file) => {
+    setMsg('');
+    setScanElapsed(0);
+    setScanState('preparing');
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    let prepared;
+    try {
+      prepared = await prepareImage(file);
+    } catch (err) {
+      if (alive.current) { setScanState('idle'); setMsg(err.message); }
+      return;
+    }
+    if (ctrl.signal.aborted || !alive.current) return;
+    setScanState('reading');
+    const started = Date.now();
+    try {
+      const res = await api.aiParseReceipt({ image: prepared.dataUrl }, ctrl.signal);
+      if (ctrl.signal.aborted || !alive.current) return;
+      draftCb.current(receiptToDraft(res.data, { thumb: prepared.thumb, clientMs: Date.now() - started }));
+    } catch (err) {
+      if (ctrl.signal.aborted || !alive.current || (err && err.name === 'AbortError')) return;
+      if (err && err.code === 'AI_IMAGE_CONSENT_REQUIRED' && onAiStatusChange) onAiStatusChange({ ...(statusRef.current || {}), image_enabled: false });
+      setMsg(scanError(err));
+    } finally {
+      if (abortRef.current === ctrl) abortRef.current = null;
+      if (alive.current && !ctrl.signal.aborted) setScanState('idle');
+    }
+  };
+
+  const cancelScan = () => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+    setScanState('idle');
+  };
+
+  const onScanClick = () => {
+    setMsg('');
+    const st = statusRef.current;
+    if (!receiptReady(st)) {
+      setMsg('ยังสแกนใบเสร็จไม่ได้ เพราะระบบนี้ยังไม่ได้เปิดบริการ AI อ่านรูป (ต้องตั้งค่าคีย์ AI ที่เซิร์ฟเวอร์) กรุณากรอกรายการเอง');
+      return;
+    }
+    const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (coarse) setMenuOpen((o) => !o); // มือถือ: เลือกถ่ายรูป/เลือกรูปจากเครื่อง
+    else if (fileRef.current) fileRef.current.click(); // คอมพิวเตอร์: เลือกไฟล์รูปทันที
+  };
+
+  const handleFile = (e) => {
     const file = e.target.files && e.target.files[0];
-    e.target.value = '';
+    e.target.value = ''; // เลือกไฟล์เดิมซ้ำได้
+    setMenuOpen(false);
     if (!file) return;
     setMsg('');
-    if (!file.type.startsWith('image/')) {
+    if (!String(file.type || '').startsWith('image/')) {
       setMsg('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
       return;
     }
-    setScanning(true);
-    try {
-      const draft = await parseReceiptImage(file, categories);
-      if (draft) onDraftGenerated(draft);
-    } catch (err) {
-      setMsg(err.message);
-    } finally {
-      setScanning(false);
-    }
+    const st = statusRef.current;
+    if (st && !st.image_enabled) setConsentFile(file); // ยังไม่เคยยินยอมเรื่องรูป: ถามก่อน
+    else runScan(file);
   };
 
   return (
@@ -266,7 +335,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
             data-send
             aria-label="ตรวจสอบรายการ"
             title="ตรวจสอบรายการ (หรือกด Enter)"
-            disabled={listening || !text.trim()}
+            disabled={listening || scanning || !text.trim()}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 12h14" />
@@ -281,7 +350,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
             className={`btn ${listening ? '' : 'btn-light'}`}
             style={{ minHeight: 44, minWidth: 44 }}
             onClick={onMic}
-            disabled={!supported && !listening ? true : false}
+            disabled={(!supported && !listening) || scanning}
             title={supported ? 'กดแล้วพูดหนึ่งประโยค เช่น "เมื่อวาน ค่ากาแฟหกสิบห้าบาท"' : SPEECH_MESSAGES.unsupported}
             aria-label={listening ? 'หยุดฟัง' : 'พูดเพื่อบันทึกรายการ'}
             data-mic
@@ -291,14 +360,31 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
           <button
             type="button"
             className="btn btn-light"
+            data-scan
             disabled={scanning || listening}
-            onClick={() => fileRef.current && fileRef.current.click()}
+            onClick={onScanClick}
+            title="ถ่ายหรือเลือกรูปใบเสร็จ ให้ AI อ่านยอดที่ชำระ วันที่ ร้านค้า และหมวดให้"
           >
-            {scanning ? 'กำลังอ่านรูป...' : '📷 สแกนใบเสร็จ/สลิป'}
+            {scanState === 'preparing' ? 'กำลังเตรียมรูป...' : scanState === 'reading' ? `กำลังอ่านใบเสร็จ... ${scanElapsed} วินาที` : '📷 สแกนใบเสร็จ'}
           </button>
-          <input type="file" accept="image/*" ref={fileRef} onChange={handleFile} style={{ display: 'none' }} />
+          <input type="file" accept="image/*" capture="environment" ref={camRef} data-scan-camera onChange={handleFile} style={{ display: 'none' }} />
+          <input type="file" accept="image/*" ref={fileRef} data-scan-file onChange={handleFile} style={{ display: 'none' }} />
         </div>
       </div>
+
+      {menuOpen && (
+        <div data-scan-menu style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          <button type="button" className="btn btn-sm" data-scan-take onClick={() => { setMenuOpen(false); if (camRef.current) camRef.current.click(); }}>📷 ถ่ายรูปใบเสร็จ</button>
+          <button type="button" className="btn btn-sm btn-light" data-scan-pick onClick={() => { setMenuOpen(false); if (fileRef.current) fileRef.current.click(); }}>🖼 เลือกรูปจากเครื่อง</button>
+        </div>
+      )}
+
+      {scanning && (
+        <div data-scan-progress style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: '#4b5563' }}>
+          <span>{scanState === 'preparing' ? '📷 กำลังเตรียมรูป...' : '✨ AI กำลังอ่านใบเสร็จ ปกติ 10-20 วินาที บางครั้งนานได้ถึง 1-2 นาที (บริการฟรี) ไม่ต้องปิดหน้านี้ กดยกเลิกแล้วกรอกเองได้'}</span>
+          <button type="button" className="btn btn-sm btn-light" data-scan-cancel onClick={cancelScan}>ยกเลิก</button>
+        </div>
+      )}
 
       {!supported && (
         <div data-voice-unsupported style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
@@ -326,6 +412,20 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
       </div>
 
       {showPolicy && <PrivacyModal onClose={() => setShowPolicy(false)} />}
+      {consentFile && (
+        <AiConsentModal
+          scope="image"
+          engines={(aiStatus && aiStatus.receipt_engines) || []}
+          version={(aiStatus && aiStatus.image_consent_version) || '1.0'}
+          onAccepted={(data) => {
+            const f = consentFile;
+            setConsentFile(null);
+            if (onAiStatusChange) onAiStatusChange(data);
+            runScan(f);
+          }}
+          onDeclined={() => setConsentFile(null)}
+        />
+      )}
     </form>
   );
 }

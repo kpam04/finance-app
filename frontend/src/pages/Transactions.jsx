@@ -330,6 +330,8 @@ export default function Transactions() {
         <AiQuickInput
           categories={activeCats}
           onDraftGenerated={(d) => setAiQueue(Array.isArray(d) ? d : [d])}
+          aiStatus={aiStatus}
+          onAiStatusChange={setAiStatus}
         />
       </div>
 
