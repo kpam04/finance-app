@@ -16,6 +16,11 @@ const schema = new mongoose.Schema({
   policyAcceptedAt: { type: Date, default: null },   // วันเวลาที่ยอมรับนโยบายความเป็นส่วนตัว
   policyVersion:    { type: String, default: '' },   // เวอร์ชันของนโยบายที่ยอมรับ
 
+  // --- ผู้ช่วย AI (ส่งข้อความไปบริการ AI ภายนอก) ผู้ใช้ต้องเปิดเอง ค่าเริ่มต้นปิด ---
+  aiEnabled:        { type: Boolean, default: false },
+  aiConsentAt:      { type: Date, default: null },
+  aiConsentVersion: { type: String, default: '' },
+
   // --- ผู้ดูแลระบบ (รอบ A) ---
   role:            { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },
   status:          { type: String, enum: ['active', 'suspended'], default: 'active' },

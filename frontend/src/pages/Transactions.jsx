@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AiQuickInput from '../components/AiQuickInput.jsx';
 import AiConfirmModal from '../components/AiConfirmModal.jsx';
+import { editedFields } from '../utils/aiDrafts.js';
 import CategorySelect, { orderForPicker } from '../components/CategorySelect.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
@@ -72,7 +73,10 @@ export default function Transactions() {
   const [busy, setBusy] = useState(false);
 
   // ข้อมูลที่ AI วิเคราะห์และรอผู้ใช้ยืนยัน
-  const [aiDraft, setAiDraft] = useState(null);
+  // คิวร่างรายการจาก AI/กฎ (ข้อความเดียวอาจได้หลายรายการ ตรวจยืนยันทีละรายการ)
+  const [aiQueue, setAiQueue] = useState([]);
+  const aiDraft = aiQueue[0] || null;
+  const [aiStatus, setAiStatus] = useState(null); // สถานะผู้ช่วย AI (มีคีย์ไหม ผู้ใช้เปิดไหม) ใช้ตัดสินว่าจะแสดงปุ่ม "ให้ AI ช่วยตรวจ" ในหน้ายืนยัน
 
   // โหลดหมวดหมู่จาก API
   useEffect(() => {
@@ -206,10 +210,41 @@ export default function Transactions() {
   };
 
   // ยืนยันรายการที่ได้จาก AI และบันทึกลงระบบ
-  const confirmAiDraft = async (data) => {
+  // รายงานผลตอบรับของผู้ใช้ต่อรายการที่ AI สกัด (ไม่ส่งเนื้อหา ใช้วัดความแม่นยำ) ล้มเหลวก็ไม่กระทบการใช้งาน
+  const reportAi = (draft, action, data) => {
+    if (!draft || !draft.ai || !draft.ai.event_id || !api.aiFeedback) return;
+    const body = { action };
+    if (action === 'confirmed' && data) body.edited = editedFields(draft, data);
+    Promise.resolve(api.aiFeedback(draft.ai.event_id, body)).catch(() => {});
+  };
+
+  const skipAiDraft = () => {
+    reportAi(aiDraft, 'skipped');
+    setAiQueue((q) => q.slice(1));
+  };
+
+  useEffect(() => {
+    let live = true;
+    if (api && typeof api.aiStatus === 'function') {
+      api.aiStatus().then((r) => { if (live) setAiStatus(r.data); }).catch(() => { if (live) setAiStatus({ configured: false }); });
+    }
+    return () => { live = false; };
+  }, []);
+
+  const closeAiQueue = () => {
+    aiQueue.forEach((d) => reportAi(d, 'cancelled'));
+    setAiQueue([]);
+  };
+
+  const confirmAiDraft = async (data, meta) => {
     await api.createTransaction(data);
 
-    setAiDraft(null);
+    reportAi(aiDraft, 'confirmed', data);
+    // ผู้ใช้เคยให้ AI ตรวจแล้วเลือกเก็บค่าของกฎ: รายงานว่าแก้ฟิลด์ไหนจากที่กฎอ่านได้ (วัดความแม่นของกฎเทียบกับ AI)
+    if (meta && meta.keptEventId && api.aiFeedback) {
+      Promise.resolve(api.aiFeedback(meta.keptEventId, { action: 'rules_confirmed', edited: editedFields(aiDraft, data) })).catch(() => {});
+    }
+    setAiQueue((q) => q.slice(1));
     setError('');
 
     await load();
@@ -294,7 +329,7 @@ export default function Transactions() {
       <div className="ai-quick-section">
         <AiQuickInput
           categories={activeCats}
-          onDraftGenerated={setAiDraft}
+          onDraftGenerated={(d) => setAiQueue(Array.isArray(d) ? d : [d])}
         />
       </div>
 
@@ -639,11 +674,16 @@ export default function Transactions() {
 
       {aiDraft && (
         <AiConfirmModal
+          key={aiDraft.ai ? `${aiDraft.ai.event_id}-${aiDraft.ai.index}` : 'single'}
           draft={aiDraft}
           categories={activeCats}
           onCategoryCreated={addCat}
           onConfirm={confirmAiDraft}
-          onClose={() => setAiDraft(null)}
+          onSkip={skipAiDraft}
+          onClose={closeAiQueue}
+          aiStatus={aiStatus}
+          onAiStatusChange={setAiStatus}
+          onUseAiDrafts={(ds) => setAiQueue((q) => [...ds, ...q.slice(1)])}
         />
       )}
 

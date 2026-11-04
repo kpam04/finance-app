@@ -1,0 +1,90 @@
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../api.js';
+import AiConsentModal from './AiConsentModal.jsx';
+
+// การ์ด "ผู้ช่วย AI" ในหน้าโปรไฟล์: เปิด/ปิดการส่งข้อความไปบริการ AI ภายนอก (ปิดอยู่เป็นค่าเริ่มต้น) และดูโควต้าวันนี้
+const css = `
+.as-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.as-row h3 { margin: 0 0 4px; }
+.as-desc { margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6; }
+.as-meta { margin: 8px 0 0; font-size: 12px; color: #8A8177; }
+.as-switch { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #4b5563; }
+.as-switch input { position: absolute; opacity: 0; width: 44px; height: 24px; margin: 0; cursor: pointer; }
+.as-track { width: 44px; height: 24px; border-radius: 999px; background: #d1d5db; transition: background 0.2s; position: relative; flex: 0 0 44px; }
+.as-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+.as-switch input:checked + .as-track { background: #7E9677; }
+.as-switch input:checked + .as-track::after { transform: translateX(20px); }
+.as-switch input:focus-visible + .as-track { outline: 2px solid #91A68A; outline-offset: 2px; }
+.as-switch input:disabled + .as-track { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 520px) { .as-row { flex-direction: column; } }
+`;
+
+export default function AiSettingsCard() {
+  const [status, setStatus] = useState(null);
+  const [showConsent, setShowConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.aiStatus();
+      setStatus(res.data);
+    } catch (e) {
+      setStatus({ configured: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  if (!status) return null;
+
+  const toggle = async (e) => {
+    setMsg('');
+    if (e.target.checked) {
+      setShowConsent(true); // เปิดต้องผ่านหน้าต่างขอความยินยอมก่อนเสมอ
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.aiConsent({ enabled: false });
+      setStatus(res.data);
+    } catch (err) {
+      setMsg(err.message || 'ปิดการใช้ AI ไม่สำเร็จ');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card" data-ai-settings>
+      <style>{css}</style>
+      <div className="as-row">
+        <div>
+          <h3>ผู้ช่วย AI</h3>
+          <p className="as-desc">
+            ปกติระบบแยกข้อความด้วยกฎในเครื่องเราทันที (ไม่ส่งข้อมูลออกไป) ถ้าเปิดไว้ จะมีปุ่ม “✨ ให้ AI ช่วยตรวจ” ในหน้ายืนยันรายการ เมื่อกดข้อความจะถูกส่งไปบริการ AI ภายนอกเพื่อเทียบผลกับกฎ (ปิดอยู่เป็นค่าเริ่มต้น)
+          </p>
+          {!status.configured && <p className="as-meta" data-ai-unconfigured>ระบบนี้ยังไม่เปิดให้บริการ AI ภายนอก (ใช้การแยกแบบกฎอยู่)</p>}
+          {status.configured && status.enabled && (
+            <p className="as-meta" data-ai-usage>วันนี้ใช้ AI ไปแล้ว {status.used_today}/{status.daily_limit} ครั้ง (นับเมื่อส่งข้อความให้ AI)</p>
+          )}
+        </div>
+        <label className="as-switch" data-ai-switch>
+          <input type="checkbox" role="switch" aria-label="เปิดใช้ผู้ช่วย AI" checked={!!status.enabled} disabled={!status.configured || busy} onChange={toggle} />
+          <span className="as-track" />
+          <span>{status.enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+        </label>
+      </div>
+      {msg && <div className="alert" data-ai-settings-error style={{ marginTop: 10 }}>{msg}</div>}
+      {showConsent && (
+        <AiConsentModal
+          version={status.consent_version}
+          onAccepted={(data) => { setStatus(data); setShowConsent(false); }}
+          onDeclined={() => setShowConsent(false)}
+        />
+      )}
+    </div>
+  );
+}

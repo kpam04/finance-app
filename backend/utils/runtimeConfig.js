@@ -21,6 +21,7 @@ function validateEnv(env) {
   }
 
   if (isProd && !env.CONTACT_EMAIL) warnings.push('ไม่ได้ตั้ง CONTACT_EMAIL (อีเมลติดต่อที่แสดงให้ผู้ใช้เห็น)');
+  if (isProd && !(env.AI_API_KEY || env.TYPHOON_API_KEY)) warnings.push('ไม่ได้ตั้ง AI_API_KEY หรือ TYPHOON_API_KEY (ฟีเจอร์ AI ภายนอกจะปิด ระบบใช้การแยกแบบกฎแทน)');
   for (const k of ['TOKEN_HOURS_USER', 'TOKEN_HOURS_ADMIN']) {
     if (env[k] !== undefined && !(Number(env[k]) > 0)) warnings.push(`${k} ต้องเป็นตัวเลขมากกว่า 0 (ตอนนี้ใช้ค่าเริ่มต้นแทน)`);
   }

@@ -77,6 +77,12 @@ export const api = {
   deleteCategory: (id) => request(`/categories/${id}`, { method: 'DELETE' }),
   restoreCategory: (id) => request(`/categories/${id}/restore`, { method: 'POST' }),
 
+  // ผู้ช่วย AI (ข้อความถูกส่งไปบริการ AI ภายนอกเมื่อผู้ใช้เปิดใช้เท่านั้น)
+  aiStatus: () => request('/ai/status'),
+  aiConsent: (data) => request('/ai/consent', { method: 'PUT', body: data }),
+  aiParseText: (data) => request('/ai/parse-text', { method: 'POST', body: data }),
+  aiFeedback: (eventId, data) => request(`/ai/events/${eventId}/feedback`, { method: 'PUT', body: data }),
+
   // transactions
   getTransactions: (params) => request('/transactions', { params }),
   createTransaction: (data) => request('/transactions', { method: 'POST', body: data }),
