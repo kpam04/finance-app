@@ -33,8 +33,9 @@ const linkBtn = {
 //  คอมพิวเตอร์: [ ช่องพิมพ์ ➤ ] [🎤 พูด] [📷 สแกน] แถวเดียวกัน
 //  มือถือ (ไม่เกิน 640px): แถวบน = ช่องพิมพ์ / แถวล่าง = ปุ่มพูดและปุ่มสแกนเท่ากัน (กฎกลางของ .form-row เรียงเป็นคอลัมน์อยู่แล้ว)
 const css = `
-.ai-title { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ai-title { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ai-title h3 { margin: 0; }
+.ai-sub { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #6b7280; }
 .ai-info-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; padding: 0;
@@ -49,7 +50,7 @@ const css = `
 .ai-info-pop {
   display: none;
   position: absolute; left: 0; top: calc(100% + 8px); z-index: 30;
-  width: min(400px, calc(100vw - 24px));
+  width: min(400px, calc(100vw - 44px));
   padding: 16px 20px;
   background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -62,6 +63,15 @@ const css = `
 .ai-title.open .ai-info-pop { display: block; }
 @media (hover: hover) {
   .ai-info-btn:hover + .ai-info-pop, .ai-info-btn:focus-visible + .ai-info-pop, .ai-info-pop:hover { display: block; }
+}
+.ai-info-anchor { display: inline-flex; }
+/* คอมพิวเตอร์ (มีเมาส์ และจอกว้างพอ): กล่องตัวอย่างแสดงที่ด้านขวาล่างของไอคอน i (ห่าง 6px)
+   แถบโปร่งใสต่อระหว่าง i กับกล่อง เมาส์เลื่อนไปทางไหนก็ไม่หายกลางทาง โดยไม่ทับตัวไอคอน i เอง */
+@media (hover: hover) and (min-width: 700px) {
+  .ai-info-anchor { position: relative; }
+  .ai-info-pop { left: calc(100% + 6px); top: calc(100% + 6px); }
+  .ai-info-pop::before { left: -6px; right: 0; top: -26px; width: auto; height: 26px; }
+  .ai-info-pop::after { content: ''; position: absolute; left: -26px; top: -6px; bottom: 0; width: 26px; }
 }
 
 .ai-input { position: relative; }
@@ -109,7 +119,8 @@ function AiTitle() {
 
   return (
     <div className={`ai-title${open ? ' open' : ''}`} ref={ref}>
-      <h3>🤖 AI บันทึกด่วน</h3>
+      <h3>➕ เพิ่มรายการใหม่</h3>
+      <span className="ai-info-anchor">
       <button
         type="button"
         className="ai-info-btn"
@@ -126,15 +137,14 @@ function AiTitle() {
         <ul>
           <li>“เมื่อวาน ค่ากาแฟ 65”</li>
           <li>“วันที่ 25 ก.ย. ได้รับเงินเดือน 38000”</li>
-          <li>“เมื่อ 2 วันก่อน เติมน้ำมัน 800”</li>
-          <li>“วันที่ 10 เดือน 5 ซื้ออาหารแมว 350”</li>
         </ul>
       </div>
+      </span>
     </div>
   );
 }
 
-export default function AiQuickInput({ categories, onDraftGenerated, speechEngine, aiStatus, onAiStatusChange, prepareImage = prepareReceiptImage }) {
+export default function AiQuickInput({ categories, onDraftGenerated, speechEngine, aiStatus, onAiStatusChange, onManualAdd, prepareImage = prepareReceiptImage }) {
   const [text, setText] = useState('');
   const [msg, setMsg] = useState('');
   const [scanState, setScanState] = useState('idle'); // idle | preparing | reading (สแกนใบเสร็จ: เตรียมรูป -> AI อ่าน)
@@ -290,7 +300,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     setMsg('');
     const st = statusRef.current;
     if (!receiptReady(st)) {
-      setMsg('ยังสแกนใบเสร็จไม่ได้ เพราะระบบนี้ยังไม่ได้เปิดบริการ AI อ่านรูป (ต้องตั้งค่าคีย์ AI ที่เซิร์ฟเวอร์) กรุณากรอกรายการเอง');
+      setMsg('ยังสแกนใบเสร็จไม่ได้ในตอนนี้ (ฟีเจอร์นี้ยังไม่เปิดให้ใช้งาน) กรุณาเพิ่มรายการด้วยการพิมพ์ พูด หรือกรอกรายการเอง');
       return;
     }
     const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -317,6 +327,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     <form className="card" onSubmit={handleText}>
       <style>{css}</style>
       <AiTitle />
+      <p className="ai-sub" data-ai-sub>เลือกวิธีที่สะดวก: พิมพ์หรือพูดให้ AI ช่วยแยกรายการ สแกนใบเสร็จ หรือกรอกเอง ระบบจะให้ตรวจก่อนบันทึกทุกครั้ง</p>
       <div className="form-row ai-row">
         {/* ช่องพิมพ์: ปุ่มส่ง (ลูกศร) อยู่ในช่อง ใช้ได้เมื่อมีข้อความ หรือกด Enter ก็ได้เหมือนกัน */}
         <div className="grow ai-input">
@@ -369,6 +380,12 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
           </button>
           <input type="file" accept="image/*" capture="environment" ref={camRef} data-scan-camera onChange={handleFile} style={{ display: 'none' }} />
           <input type="file" accept="image/*" ref={fileRef} data-scan-file onChange={handleFile} style={{ display: 'none' }} />
+          {/* กรอกเอง: เปิดฟอร์มเพิ่มรายการ (ย้ายมาไว้ในการ์ดนี้ เพื่อให้ทุกวิธีเพิ่มรายการอยู่ที่เดียวกัน) */}
+          {onManualAdd && (
+            <button type="button" className="btn btn-light" data-manual disabled={scanning || listening} onClick={onManualAdd} title="เปิดฟอร์มกรอกรายการเอง">
+              ✏️ กรอกเอง
+            </button>
+          )}
         </div>
       </div>
 

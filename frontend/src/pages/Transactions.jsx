@@ -1,12 +1,14 @@
 
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import AiQuickInput from '../components/AiQuickInput.jsx';
 import AiConfirmModal from '../components/AiConfirmModal.jsx';
 import { editedFields } from '../utils/aiDrafts.js';
-import CategorySelect, { orderForPicker } from '../components/CategorySelect.jsx';
+import CategorySelect from '../components/CategorySelect.jsx';
+import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
+import InfoTitle from '../components/InfoTitle.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
 const today = () => {
@@ -40,6 +42,63 @@ const refreshBell = () => {
     /* การรีเฟรชกระดิ่งล้มเหลวต้องไม่กระทบการบันทึก */
   }
 };
+
+
+// ไอคอนปุ่มแก้ไข/ลบ (แสดงบนมือถือแทนตัวหนังสือเพื่อประหยัดที่ บนคอมยังเป็นตัวหนังสือเหมือนเดิม)
+const IconEdit = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 6h18" />
+    <path d="M8 6V4h8v2" />
+    <path d="M19 6l-1 14H6L5 6" />
+    <path d="M10 11v6M14 11v6" />
+  </svg>
+);
+
+const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ่าย'], ['income', 'รายรับ']];
+
+// สไตล์เฉพาะหน้านี้ (เพิ่มชื่อโซน ป้ายกำกับช่องกรอง และกันช่องวันที่ล้นขอบบนมือถือ) ไม่แตะ index.css
+const txCss = `
+.ai-quick-section > .card { border: 1px solid var(--primary, #9AAB91); }
+.tx-list-head { margin-bottom: 14px; }
+.tx-list-head h3 { margin: 0; font-size: 17px; }
+.tx-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #4b5563; }
+.tx-clear { padding: 0; border: none; background: none; font: inherit; font-size: 13px; font-weight: 400; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
+.tx-filter-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; margin-bottom: 14px; }
+.tx-seg { display: flex; border: 1px solid var(--border, #E9E1D6); border-radius: 10px; overflow: hidden; background: #fff; }
+.tx-seg button { flex: 1; min-height: 42px; padding: 8px 6px; border: none; background: #fff; color: #6b7280; font: inherit; font-size: 14px; cursor: pointer; }
+.tx-seg button + button { border-left: 1px solid var(--border, #E9E1D6); }
+.tx-seg button.on { background: #E8EDE4; color: #40563C; font-weight: 600; }
+.tx-seg button:focus-visible { outline: 2px solid var(--primary, #9AAB91); outline-offset: -2px; }
+.tx-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; }
+.tx-field > span { font-size: 12px; font-weight: 400; color: #6b7280; }
+.tx-field select, .tx-field input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; margin: 0; }
+.transactions-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.transactions-table td.actions { display: table-cell; vertical-align: middle; text-align: center; white-space: nowrap; }
+.tx-actions { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.tx-empty strong { display: block; margin-bottom: 4px; color: #3F3A34; font-weight: 600; }
+.tx-empty .btn { margin-top: 10px; }
+.tx-scroll-hint { margin: 6px 0 0; font-size: 12px; color: #8A8177; text-align: center; }
+@media (max-width: 760px) { .tx-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tx-field.tx-wide { grid-column: 1 / -1; } }
+.tx-act .tx-ico { display: none; }
+@media (max-width: 640px) {
+  .ai-actions .btn { font-size: 13px; padding-left: 6px; padding-right: 6px; }
+  .transactions-page .transaction-card { width: auto; margin-left: -8px; margin-right: -8px; padding-left: 8px; padding-right: 8px; }
+  .tx-act .tx-txt { display: none; }
+  .tx-act .tx-ico { display: inline-flex; }
+  .transactions-table td.actions .tx-act { width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; }
+  .transactions-table { display: table; width: 100%; overflow: visible; white-space: normal; }
+  .transactions-table th, .transactions-table td { padding: 10px 4px; font-size: 13px; }
+  .transactions-table th { font-size: 12px; }
+  .transactions-table td[data-label="วันที่"], .transactions-table td[data-label="จำนวนเงิน"], .transactions-table td.actions, .transactions-table th { white-space: nowrap; }
+  .tx-actions { gap: 4px; }
+}
+`;
 
 export default function Transactions() {
   // ข้อมูลหมวดหมู่และรายการธุรกรรม
@@ -284,6 +343,47 @@ export default function Transactions() {
     }
   };
 
+  // ตารางกว้างกว่าจอ (จอแคบมาก) ถึงต้องเลื่อนไปทางขวา: ตรวจจริงทุกครั้งที่รายการหรือขนาดจอเปลี่ยน แล้วค่อยบอกผู้ใช้ให้เลื่อน
+  const wrapRef = useRef(null);
+  const [scrollable, setScrollable] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const el = wrapRef.current;
+      setScrollable(!!el && el.scrollWidth > el.clientWidth + 6);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [rows]);
+
+  // มีตัวกรองที่ใช้อยู่หรือไม่ (ใช้ขึ้นปุ่ม "ล้างตัวกรอง" และเลือกข้อความหน้าว่าง)
+  const hasFilter = !!(filter.type || filter.category_id || filter.start || filter.end);
+  const clearFilters = () => {
+    setPage(1);
+    setFilter({ type: '', category_id: '', start: '', end: '' });
+  };
+
+  // เลือกประเภท: ถ้าหมวดที่เลือกค้างอยู่เป็นของอีกประเภท ให้ล้างกลับเป็น "ทุกหมวดหมู่" (รายการหมวดแสดงเฉพาะประเภทที่เลือก)
+  const setType = (val) => {
+    setPage(1);
+    setFilter((f) => {
+      const cat = cats.find((c) => String(c.category_id) === String(f.category_id));
+      const keep = !val || !cat || cat.type === val;
+      return { ...f, type: val, category_id: keep ? f.category_id : '' };
+    });
+  };
+  const setCategory = (id) => {
+    setPage(1);
+    setFilter((f) => ({ ...f, category_id: id }));
+  };
+  const typeKey = (e) => {
+    const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    if (!(e.key in keys)) return;
+    e.preventDefault();
+    const i = TYPE_OPTIONS.findIndex(([v]) => v === filter.type);
+    setType(TYPE_OPTIONS[(i + keys[e.key] + TYPE_OPTIONS.length) % TYPE_OPTIONS.length][0]);
+  };
+
   // เปลี่ยนค่าตัวกรองและกลับไปหน้าแรก
   const setF = (key) => (e) => {
     setPage(1);
@@ -302,6 +402,7 @@ export default function Transactions() {
 
   return (
     <div className="transactions-page">
+      <style>{txCss}</style>
 
       {/* =================================
           PAGE HEADER
@@ -309,10 +410,6 @@ export default function Transactions() {
 
       <div className="transaction-heading">
         <h2>รายการรายรับ-รายจ่าย</h2>
-
-        <button className="btn" onClick={openAdd}>
-          + เพิ่มรายการ
-        </button>
       </div>
 
       {/* แจ้งเตือนข้อผิดพลาด */}
@@ -332,6 +429,7 @@ export default function Transactions() {
           onDraftGenerated={(d) => setAiQueue(Array.isArray(d) ? d : [d])}
           aiStatus={aiStatus}
           onAiStatusChange={setAiStatus}
+          onManualAdd={openAdd}
         />
       </div>
 
@@ -341,58 +439,82 @@ export default function Transactions() {
 
       <div className="card transaction-card">
 
-        {/* ตัวกรองรายการ */}
-        <div className="form-row transaction-filters">
+        {/* ชื่อโซน: บอกว่าข้างล่างคือรายการที่บันทึกแล้ว คำอธิบายอยู่ในไอคอน i (ไม่ให้การ์ดแน่น) */}
+        <div className="tx-list-head" data-tx-list-head>
+          <InfoTitle title="📋 รายการที่บันทึกแล้ว" label="คำอธิบายส่วนนี้" popId="tx-info-pop">
+            <p>ใช้ตัวกรองเพื่อค้นหาเท่านั้น ไม่ได้ใช้เพิ่มรายการ ถ้าจะเพิ่มรายการใช้กล่อง “เพิ่มรายการใหม่” ด้านบน</p>
+          </InfoTitle>
+        </div>
 
-          <select
-            value={filter.type}
-            onChange={setF('type')}
-            aria-label="กรองตามประเภท"
-          >
-            <option value="">ทุกประเภท</option>
-            <option value="expense">รายจ่าย</option>
-            <option value="income">รายรับ</option>
-          </select>
+        {/* ตัวกรองรายการ (มีป้ายชื่อทุกช่อง) */}
+        <div className="tx-filter-head" data-tx-filter-head>
+          <span>🔎 กรองรายการ</span>
+          {hasFilter && (
+            <button type="button" className="tx-clear" data-tx-clear onClick={clearFilters}>
+              ล้างตัวกรอง
+            </button>
+          )}
+        </div>
 
-          <select
-            value={filter.category_id}
-            onChange={setF('category_id')}
-            aria-label="กรองตามหมวดหมู่"
-          >
-            <option value="">ทุกหมวดหมู่</option>
+        <div className="transaction-filters tx-filter-grid">
 
-            {orderForPicker(cats).map((c) => (
-              <option
-                key={c.category_id}
-                value={c.category_id}
-              >
-                {c.name}{c.hidden ? ' (ซ่อนอยู่)' : ''}
-              </option>
-            ))}
-          </select>
+          <div className="tx-field tx-wide">
+            <span>ประเภท</span>
+            <div className="tx-seg" role="radiogroup" aria-label="กรองตามประเภท" data-tx-type onKeyDown={typeKey}>
+              {TYPE_OPTIONS.map(([v, label]) => (
+                <button
+                  key={v || 'all'}
+                  type="button"
+                  role="radio"
+                  aria-checked={filter.type === v}
+                  tabIndex={filter.type === v ? 0 : -1}
+                  className={filter.type === v ? 'on' : ''}
+                  data-tx-type-opt={v || 'all'}
+                  onClick={() => setType(v)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <input
-            type="date"
-            value={filter.start}
-            onChange={setF('start')}
-            title="ตั้งแต่วันที่"
-            aria-label="ตั้งแต่วันที่"
-          />
+          <div className="tx-field tx-wide">
+            <span data-tx-cat-label>หมวดหมู่{filter.type ? ` (เฉพาะ${filter.type === 'income' ? 'รายรับ' : 'รายจ่าย'})` : ''}</span>
+            <CategoryFilterSelect
+              categories={cats}
+              type={filter.type}
+              value={filter.category_id}
+              onChange={setCategory}
+              ariaLabel="กรองตามหมวดหมู่"
+            />
+          </div>
 
-          <input
-            type="date"
-            value={filter.end}
-            onChange={setF('end')}
-            title="ถึงวันที่"
-            aria-label="ถึงวันที่"
-          />
+          <label className="tx-field">
+            <span>ตั้งแต่วันที่</span>
+            <input
+              type="date"
+              value={filter.start}
+              onChange={setF('start')}
+              aria-label="ตั้งแต่วันที่"
+            />
+          </label>
+
+          <label className="tx-field">
+            <span>ถึงวันที่</span>
+            <input
+              type="date"
+              value={filter.end}
+              onChange={setF('end')}
+              aria-label="ถึงวันที่"
+            />
+          </label>
 
         </div>
 
         {/* ตารางรายการรายรับ-รายจ่าย */}
-        <div className="transactions-table-wrap">
+        <div className="transactions-table-wrap" ref={wrapRef}>
 
-          <table className="table transactions-table">
+          <table className={`table transactions-table${rows.length > 0 ? ' has-rows' : ''}`}>
 
             <thead>
               <tr>
@@ -409,8 +531,22 @@ export default function Transactions() {
               {/* กรณีไม่มีข้อมูล */}
               {rows.length === 0 && (
                 <tr className="empty-row">
-                  <td colSpan="5" className="center-msg">
-                    ยังไม่มีรายการ
+                  <td colSpan="5" className="center-msg tx-empty" data-tx-empty>
+                    {hasFilter ? (
+                      <>
+                        <strong>ไม่พบรายการตามตัวกรอง</strong>
+                        ลองเปลี่ยนหรือล้างตัวกรอง
+                        <br />
+                        <button type="button" className="btn btn-sm btn-light" data-tx-empty-clear onClick={clearFilters}>
+                          ล้างตัวกรอง
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <strong>ยังไม่มีรายการที่บันทึก</strong>
+                        เพิ่มรายการได้ที่กล่อง “เพิ่มรายการใหม่” ด้านบน
+                      </>
+                    )}
                   </td>
                 </tr>
               )}
@@ -447,21 +583,28 @@ export default function Transactions() {
                   </td>
 
                   <td data-label="จัดการ" className="actions">
+                    {/* ครอบปุ่มด้วย span (ไม่ใช้ display:flex ที่ตัว td) เส้นขอบแถวจึงต่อเนื่องไม่เหลื่อม */}
+                    <span className="tx-actions">
+                      <button
+                        className="btn btn-sm btn-light tx-act"
+                        aria-label="แก้ไข"
+                        title="แก้ไข"
+                        onClick={() => startEdit(t)}
+                      >
+                        <span className="tx-ico"><IconEdit /></span>
+                        <span className="tx-txt">แก้ไข</span>
+                      </button>
 
-                    <button
-                      className="btn btn-sm btn-light"
-                      onClick={() => startEdit(t)}
-                    >
-                      แก้ไข
-                    </button>
-
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => remove(t)}
-                    >
-                      ลบ
-                    </button>
-
+                      <button
+                        className="btn btn-sm btn-danger tx-act"
+                        aria-label="ลบ"
+                        title="ลบ"
+                        onClick={() => remove(t)}
+                      >
+                        <span className="tx-ico"><IconTrash /></span>
+                        <span className="tx-txt">ลบ</span>
+                      </button>
+                    </span>
                   </td>
 
                 </tr>
@@ -471,6 +614,9 @@ export default function Transactions() {
           </table>
 
         </div>
+
+        {/* จอแคบมากจนตารางไม่พอดี: บอกให้เลื่อนไปทางขวา (ขึ้นเฉพาะเมื่อกว้างกว่าจอจริง ๆ) */}
+        {rows.length > 0 && scrollable && <p className="tx-scroll-hint" data-tx-scroll-hint>เลื่อนตารางไปทางขวาเพื่อดูจำนวนเงินและปุ่มแก้ไข/ลบ</p>}
 
         {/* =================================
             PAGINATION

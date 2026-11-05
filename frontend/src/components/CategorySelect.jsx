@@ -45,6 +45,7 @@ const css = `
 .transaction-modal .cs-wrap.open .cs-button, .transaction-modal .cs-button:focus-visible { border-color: #91A68A; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(145, 166, 138, 0.15); }
 @media (max-width: 640px) { .cs-button { min-height: 44px; font-size: 16px; } .cs-option { padding: 11px 10px; font-size: 15px; } }
 `;
+export const categorySelectCss = css; // ให้ช่องกรอง (CategoryFilterSelect) ใช้หน้าตาเดียวกัน
 
 // ช่องเลือกหมวดหมู่: แสดงเฉพาะหมวดของประเภทที่กำหนดและไม่ถูกซ่อน (เรียงให้ "อื่นๆ" อยู่ท้ายสุด)
 //  - กดแล้วเปิดรายการแบบมีแถบเลื่อน ความสูงไม่เกินการ์ดที่เปิดอยู่ (ถ้าด้านล่างไม่พอจะเปิดขึ้นด้านบน) มีจุดสีของหมวด
