@@ -90,6 +90,17 @@ export const api = {
   aiFeedback: (eventId, data) => request(`/ai/events/${eventId}/feedback`, { method: 'PUT', body: data }),
   aiParseReceipt: (data, signal) => request('/ai/parse-receipt', { method: 'POST', body: data, signal }), // ส่งรูปใบเสร็จ (ย่อแล้ว) ให้ AI อ่าน
 
+  // วางแผน: วิเคราะห์พฤติกรรม + เป้าหมายการออม + ให้ AI เขียนคำแนะนำจากตัวเลขสรุป (ผู้ใช้กดเอง)
+  getPlanOverview: (month) => request('/plan/overview', { params: { month } }),
+  getPlanSummary: () => request('/plan/summary'),
+  planAdvice: (signal) => request('/plan/advice', { method: 'POST', body: {}, signal }),
+  planAdviceFeedback: (data) => request('/plan/advice/feedback', { method: 'PUT', body: data }),
+  deletePlanAdvice: (month) => request('/plan/advice', { method: 'DELETE', params: { month } }),
+  createGoal: (data) => request('/plan/goals', { method: 'POST', body: data }),
+  updateGoal: (id, data) => request(`/plan/goals/${id}`, { method: 'PUT', body: data }),
+  deleteGoal: (id) => request(`/plan/goals/${id}`, { method: 'DELETE' }),
+  planSimulate: (adjustments) => request('/plan/simulate', { method: 'POST', body: { adjustments } }),
+
   // transactions
   getTransactions: (params) => request('/transactions', { params }),
   createTransaction: (data) => request('/transactions', { method: 'POST', body: data }),

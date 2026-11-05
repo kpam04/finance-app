@@ -22,7 +22,7 @@ const css = `
 
 export default function AiSettingsCard() {
   const [status, setStatus] = useState(null);
-  const [showConsent, setShowConsent] = useState(null); // null | 'text' | 'image' (หน้าต่างขอความยินยอมที่เปิดอยู่)
+  const [showConsent, setShowConsent] = useState(null); // null | 'text' | 'image' | 'plan' (หน้าต่างขอความยินยอมที่เปิดอยู่)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -49,7 +49,7 @@ export default function AiSettingsCard() {
     }
     setBusy(true);
     try {
-      const res = await api.aiConsent({ enabled: false, ...(scope === 'image' ? { scope: 'image' } : {}) });
+      const res = await api.aiConsent({ enabled: false, ...(scope === 'image' || scope === 'plan' ? { scope } : {}) });
       setStatus(res.data);
     } catch (err) {
       setMsg(err.message || 'ปิดการใช้ AI ไม่สำเร็จ');
@@ -97,12 +97,28 @@ export default function AiSettingsCard() {
           <span>{status.image_enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
         </label>
       </div>
+      <div className="as-row" data-ai-plan-row style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #E9E1D6' }}>
+        <div>
+          <h3 style={{ fontSize: 16 }}>ให้ AI วิเคราะห์แผนการเงิน</h3>
+          <p className="as-desc">
+            หน้า “วางแผน”: ให้ AI เขียนคำแนะนำจากตัวเลขสรุปของคุณ (ไม่ส่งรายการรายตัวหรือบันทึกช่วยจำ) ระบบตรวจตัวเลขทุกตัวก่อนแสดง และคุณกดขอเองทุกครั้ง ปิดอยู่เป็นค่าเริ่มต้น
+          </p>
+          {status.configured && status.plan_enabled && (
+            <p className="as-meta" data-ai-plan-usage>วันนี้ขอคำแนะนำจาก AI ไปแล้ว {status.plans_used_today}/{status.plan_daily_limit} ครั้ง</p>
+          )}
+        </div>
+        <label className="as-switch" data-ai-plan-switch>
+          <input type="checkbox" role="switch" aria-label="เปิดให้ AI วิเคราะห์แผนการเงิน" checked={!!status.plan_enabled} disabled={!status.configured || busy} onChange={toggleScope('plan')} />
+          <span className="as-track" />
+          <span>{status.plan_enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+        </label>
+      </div>
       {msg && <div className="alert" data-ai-settings-error style={{ marginTop: 10 }}>{msg}</div>}
       {showConsent && (
         <AiConsentModal
           scope={showConsent}
           engines={status.receipt_engines || []}
-          version={showConsent === 'image' ? status.image_consent_version : status.consent_version}
+          version={showConsent === 'image' ? status.image_consent_version : showConsent === 'plan' ? status.plan_consent_version : status.consent_version}
           onAccepted={(data) => { setStatus(data); setShowConsent(null); }}
           onDeclined={() => setShowConsent(null)}
         />

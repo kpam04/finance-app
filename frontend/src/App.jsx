@@ -1,3 +1,4 @@
+
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 // Layout และระบบตรวจสอบสิทธิ์
@@ -10,6 +11,7 @@ import Register from './pages/Register.jsx';
 import Transactions from './pages/Transactions.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Budgets from './pages/Budgets.jsx';
+import Plan from './pages/Plan.jsx';
 import Recurring from './pages/Recurring.jsx';
 import Profile from './pages/Profile.jsx';
 
@@ -31,8 +33,10 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/transactions" element={<Transactions />} />
+        {/* หน้าหมวดหมู่เดิมถูกยกเลิก: จัดการหมวดที่โปรไฟล์ > หมวดหมู่ของฉัน (ลิงก์เก่าพาไปที่นั่น) */}
         <Route path="/categories" element={<Navigate to="/profile" replace />} />
         <Route path="/budgets" element={<Budgets />} />
+        <Route path="/plan" element={<Plan />} />
         <Route path="/recurring" element={<Recurring />} />
         <Route path="/profile" element={<Profile />} />
 

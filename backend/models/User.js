@@ -24,6 +24,10 @@ const schema = new mongoose.Schema({
   aiImageEnabled:        { type: Boolean, default: false },
   aiImageConsentAt:      { type: Date, default: null },
   aiImageConsentVersion: { type: String, default: '' },
+  // ให้ AI วิเคราะห์ตัวเลขสรุปการเงินและเขียนคำแนะนำ (ส่งเฉพาะตัวเลขสรุป ไม่ส่งรายการดิบ) แยกความยินยอม ค่าเริ่มต้นปิด
+  aiPlanEnabled:        { type: Boolean, default: false },
+  aiPlanConsentAt:      { type: Date, default: null },
+  aiPlanConsentVersion: { type: String, default: '' },
 
   // --- ผู้ดูแลระบบ (รอบ A) ---
   role:            { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },

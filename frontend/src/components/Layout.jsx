@@ -35,6 +35,7 @@ export default function Layout() {
           <NavLink to="/dashboard">แดชบอร์ด</NavLink>
           <NavLink to="/transactions">รายการ</NavLink>
           <NavLink to="/budgets">งบประมาณ</NavLink>
+          <NavLink to="/plan">วางแผน</NavLink>
           <NavLink to="/recurring">รายการซ้ำ</NavLink>
         </nav>
 

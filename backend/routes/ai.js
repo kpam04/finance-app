@@ -10,7 +10,8 @@ const { parseTextWithAi } = require('../services/ai/parseText');
 const { parseReceiptWithEngines } = require('../services/ai/parseReceipt');
 const { geminiConfig } = require('../services/ai/geminiClient');
 const { checkReceiptImage } = require('../services/ai/imageCheck');
-const { checkAndBump, dailyLimit, receiptDailyLimit, usedToday, globalAllow, ocrGlobalAllow, geminiGlobalAllow } = require('../services/ai/quota');
+const { PLAN_CONSENT_VERSION } = require('../services/plan/constants');
+const { checkAndBump, dailyLimit, receiptDailyLimit, planDailyLimit, usedToday, globalAllow, ocrGlobalAllow, geminiGlobalAllow } = require('../services/ai/quota');
 
 const router = express.Router();
 router.use(auth);
@@ -51,7 +52,7 @@ function receiptEngines() {
 
 async function statusFor(userId) {
   const cfg = aiConfig();
-  const u = await User.findById(userId).select('aiEnabled aiConsentAt aiConsentVersion aiImageEnabled aiImageConsentAt aiImageConsentVersion').lean();
+  const u = await User.findById(userId).select('aiEnabled aiConsentAt aiConsentVersion aiImageEnabled aiImageConsentAt aiImageConsentVersion aiPlanEnabled aiPlanConsentAt aiPlanConsentVersion').lean();
   return {
     configured: cfg.configured, // ฝั่งเซิร์ฟเวอร์มีคีย์ AI หรือไม่ (ไม่เปิดเผยคีย์หรือที่อยู่)
     enabled: !!(u && u.aiEnabled),
@@ -69,6 +70,11 @@ async function statusFor(userId) {
     ocr_model: cfg.ocrModel,
     receipt_daily_limit: receiptDailyLimit(),
     receipts_used_today: await usedToday(userId, new Date(), 'receipts'),
+    // ให้ AI วิเคราะห์ตัวเลขสรุปการเงิน (หน้า "วางแผน") แยกความยินยอมและโควต้า
+    plan_enabled: !!(u && u.aiPlanEnabled && u.aiPlanConsentVersion === PLAN_CONSENT_VERSION),
+    plan_consent_version: PLAN_CONSENT_VERSION,
+    plan_daily_limit: planDailyLimit(),
+    plans_used_today: await usedToday(userId, new Date(), 'plans'),
   };
 }
 
@@ -86,15 +92,16 @@ router.get('/status', async (req, res) => {
 router.put('/consent', async (req, res) => {
   try {
     const { enabled, accept_version: acceptVersion } = req.body || {};
-    const scope = req.body && req.body.scope === 'image' ? 'image' : 'text';
+    const scope = req.body && ['image', 'plan'].includes(req.body.scope) ? req.body.scope : 'text';
     if (typeof enabled !== 'boolean') return fail(res, 400, 'ข้อมูลไม่ถูกต้อง');
-    const need = scope === 'image' ? AI_IMAGE_CONSENT_VERSION : AI_CONSENT_VERSION;
+    const need = scope === 'image' ? AI_IMAGE_CONSENT_VERSION : scope === 'plan' ? PLAN_CONSENT_VERSION : AI_CONSENT_VERSION;
     if (enabled && acceptVersion !== need) return fail(res, 400, 'กรุณาอ่านและยอมรับข้อความการใช้ AI ก่อนเปิดใช้', 'AI_CONSENT_VERSION');
     let set;
     if (scope === 'image') set = enabled ? { aiImageEnabled: true, aiImageConsentAt: new Date(), aiImageConsentVersion: need } : { aiImageEnabled: false };
+    else if (scope === 'plan') set = enabled ? { aiPlanEnabled: true, aiPlanConsentAt: new Date(), aiPlanConsentVersion: need } : { aiPlanEnabled: false };
     else set = enabled ? { aiEnabled: true, aiConsentAt: new Date(), aiConsentVersion: need } : { aiEnabled: false };
     await User.updateOne({ _id: req.userId }, { $set: set });
-    const label = scope === 'image' ? 'การอ่านรูปใบเสร็จด้วย AI' : 'การใช้ AI';
+    const label = scope === 'image' ? 'การอ่านรูปใบเสร็จด้วย AI' : scope === 'plan' ? 'การให้ AI วิเคราะห์แผนการเงิน' : 'การใช้ AI';
     res.json({ success: true, message: enabled ? `เปิด${label}แล้ว` : `ปิด${label}แล้ว`, data: await statusFor(req.userId) });
   } catch (e) {
     console.error('[ai/consent]', e.message);

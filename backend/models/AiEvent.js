@@ -4,14 +4,20 @@ const mongoose = require('mongoose');
 // อัตราสำเร็จ ความหน่วง และอัตราที่ผู้ใช้ต้องแก้ไขรายการที่ AI สกัดได้ (แยกตามฟิลด์)
 const schema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  kind: { type: String, enum: ['parse-text', 'parse-receipt'], default: 'parse-text' },
-  inputSource: { type: String, enum: ['typed', 'voice', 'image'], default: 'typed' },
+  kind: { type: String, enum: ['parse-text', 'parse-receipt', 'plan-advice'], default: 'parse-text' },
+  inputSource: { type: String, enum: ['typed', 'voice', 'image', 'plan'], default: 'typed' },
   model: { type: String, default: '' },
   ok: { type: Boolean, default: true },
   errorCode: { type: String, default: '' },
   latencyMs: { type: Number, default: 0 },
   ocrMs: { type: Number, default: 0 }, // เฉพาะอ่านใบเสร็จ: เวลาส่วนที่โมเดล OCR อ่านรูป (latencyMs = รวมทั้งหมด)
   docType: { type: String, default: '' }, // receipt | bill | other
+  // เฉพาะคำแนะนำจาก AI: ตัวเลขในข้อความที่ตรวจ/ผ่าน (วัดความตรงของ AI กับที่ระบบคำนวณ) จำนวนข้อที่ถูกตัดทิ้ง และคะแนนชอบ/ไม่ชอบ
+  numbersChecked: { type: Number, default: 0 },
+  numbersOk: { type: Number, default: 0 },
+  itemsDropped: { type: Number, default: 0 },
+  ratedUp: { type: Number, default: 0 },
+  ratedDown: { type: Number, default: 0 },
   engine: { type: String, default: '' }, // ตัวอ่านใบเสร็จที่ได้ผลจริง: typhoon | gemini
   fallbackUsed: { type: Boolean, default: false }, // ต้องสลับไปตัวสำรองหรือไม่
   attemptsLog: [{ _id: false, engine: String, ok: Boolean, ms: Number, code: String }], // ความพยายามแต่ละตัว (ไม่มีเนื้อหา) ใช้วัดความน่าเชื่อถือของบริการ

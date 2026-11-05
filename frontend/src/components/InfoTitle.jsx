@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 //  คอมพิวเตอร์: เมาส์ชี้/โฟกัสก็เปิด / ทุกอุปกรณ์: คลิกหรือแตะเพื่อเปิด-ปิด Esc หรือแตะที่อื่นเพื่อปิด
 const css = `
 .it-title { position: relative; display: flex; align-items: center; gap: 8px; }
-.it-title h3 { margin: 0; }
+.it-title h2, .it-title h3 { margin: 0; }
 .it-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; padding: 0;
@@ -41,7 +41,7 @@ const css = `
 }
 `;
 
-export default function InfoTitle({ title, label, popId, children }) {
+export default function InfoTitle({ title, label, popId, children, as: Tag = 'h3' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -66,7 +66,7 @@ export default function InfoTitle({ title, label, popId, children }) {
   return (
     <div className={`it-title${open ? ' open' : ''}`} ref={ref}>
       <style>{css}</style>
-      <h3>{title}</h3>
+      <Tag>{title}</Tag>
       <span className="it-anchor">
         <button
           type="button"

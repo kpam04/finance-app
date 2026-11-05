@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
+import PlanSummary from '../components/PlanSummary.jsx';
 
 const fmt = (n) =>
   (n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -462,6 +463,7 @@ export default function Dashboard() {
   const [year, setYear] = useState(now.getFullYear());
   const [summary, setSummary] = useState(null);
   const [insights, setInsights] = useState([]);
+  const [planSummary, setPlanSummary] = useState(null); // สรุปการวางแผน (เฉพาะเดือนปัจจุบัน) โหลดแยก ถ้าโหลดไม่ได้ก็ไม่กระทบแดชบอร์ด
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -487,6 +489,18 @@ export default function Dashboard() {
     };
     load();
   }, [month, year]);
+
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  useEffect(() => {
+    if (month !== curMonth || year !== curYear) {
+      setPlanSummary(null);
+      return undefined;
+    }
+    let live = true;
+    api.getPlanSummary().then((r) => { if (live) setPlanSummary(r.data); }).catch(() => { if (live) setPlanSummary(null); });
+    return () => { live = false; };
+  }, [month, year, curMonth, curYear]);
 
   const selectStyle = { padding: '6px 12px', borderRadius: 6, border: '1px solid #ccc', fontSize: 14 };
   const cardStyle = { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' };
@@ -590,15 +604,15 @@ export default function Dashboard() {
         <div style={{ ...cardStyle, borderLeft: '4px solid #dc2626' }}>
           <div style={{ fontSize: 13, color: '#6b7280' }}>รายจ่ายรวมประจำเดือน</div>
           <div style={{ fontSize: 24, fontWeight: 700, color: '#dc2626' }}>฿{fmt(summary.total_expense)}</div>
-          {/* เทียบกับเดือนก่อน: อยู่บรรทัดเดียวกัน แยกด้วยสี (ลดลง = เขียว, เพิ่มขึ้น = แดง) การ์ดแคบจะห่อลงบรรทัดใหม่เอง */}
+          {/* เทียบกับเดือนก่อน: ใช้ลูกศรและคำแทนเครื่องหมาย (ลดลง = เขียว, เพิ่มขึ้น = แดง) */}
           {changeLabel && (
-            <div data-expense-line style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 4, fontSize: 12 }}>
-              <span data-expense-change style={{ fontWeight: 600, color: changeLabel.color }}>
-                {changeLabel.text}
-              </span>
-              <span data-expense-prev style={{ color: '#6b7280' }}>
-                เดือนก่อน ฿{fmt(prevExpense)}
-              </span>
+            <div data-expense-change style={{ fontSize: 12, fontWeight: 600, color: changeLabel.color, marginTop: 4 }}>
+              {changeLabel.text}
+            </div>
+          )}
+          {prevExpense > 0 && (
+            <div data-expense-prev style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              เดือนก่อน ฿{fmt(prevExpense)}
             </div>
           )}
         </div>
@@ -668,6 +682,7 @@ export default function Dashboard() {
 
         <div style={cardStyle}>
           <h3 style={{ marginTop: 0, fontSize: 16 }}>💡 บทวิเคราะห์อัตโนมัติ (Insight)</h3>
+          <PlanSummary summary={planSummary} />
           <ul style={{ paddingLeft: 20, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
             {insights.map((text, i) => (
               <li key={i}>{text}</li>

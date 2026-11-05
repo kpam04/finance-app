@@ -6,6 +6,7 @@ const dayKey = (now = new Date()) => new Date(now.getTime() + 7 * 3600 * 1000).t
 
 const dailyLimit = () => intEnv(process.env.AI_DAILY_LIMIT, 100);
 const receiptDailyLimit = () => intEnv(process.env.AI_RECEIPT_DAILY_LIMIT, 15);
+const planDailyLimit = () => intEnv(process.env.AI_PLAN_DAILY_LIMIT, 10);
 
 async function usedToday(userId, now = new Date(), field = 'calls') {
   const row = await AiUsage.findOne({ user: userId, day: dayKey(now) }).lean();
@@ -57,4 +58,4 @@ function geminiGlobalAllow(now = Date.now()) {
   return true;
 }
 
-module.exports = { dayKey, dailyLimit, receiptDailyLimit, usedToday, checkAndBump, globalAllow, ocrGlobalAllow, geminiGlobalAllow, resetGlobal };
+module.exports = { dayKey, dailyLimit, receiptDailyLimit, planDailyLimit, usedToday, checkAndBump, globalAllow, ocrGlobalAllow, geminiGlobalAllow, resetGlobal };

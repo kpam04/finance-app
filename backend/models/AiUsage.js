@@ -5,6 +5,7 @@ const schema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   day: { type: String, required: true }, // YYYY-MM-DD (เวลาไทย)
   calls: { type: Number, default: 0 }, // จำนวนครั้งที่ส่งข้อความให้ AI
+  plans: { type: Number, default: 0 }, // จำนวนครั้งที่ให้ AI วิเคราะห์แผนการเงิน (แยกโควต้า)
   receipts: { type: Number, default: 0 }, // จำนวนใบเสร็จที่ส่งให้ AI อ่าน (แยกโควต้าจากข้อความ)
 }, { timestamps: true });
 

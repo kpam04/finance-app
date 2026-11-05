@@ -18,6 +18,7 @@ const css = `
 
 export default function AiConsentModal({ version = '1.0', scope = 'text', engines = [], onAccepted, onDeclined }) {
   const image = scope === 'image';
+  const plan = scope === 'plan'; // ให้ AI วิเคราะห์แผนการเงินจากตัวเลขสรุป (ไม่ส่งรายการดิบ)
   const hasGemini = image && engines.includes('gemini'); // ตัวอ่านสำรอง: รูปอาจถูกส่งให้ Google Gemini ด้วย
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +39,7 @@ export default function AiConsentModal({ version = '1.0', scope = 'text', engine
     setBusy(true);
     setError('');
     try {
-      const res = await api.aiConsent({ enabled: true, accept_version: version, ...(image ? { scope: 'image' } : {}) });
+      const res = await api.aiConsent({ enabled: true, accept_version: version, ...(image || plan ? { scope } : {}) });
       onAccepted(res.data);
     } catch (e) {
       setError(e.message || 'เปิดใช้ AI ไม่สำเร็จ');
@@ -50,7 +51,27 @@ export default function AiConsentModal({ version = '1.0', scope = 'text', engine
     <div className="ac-overlay" data-ai-consent data-scope={scope} onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget && !busy) onDeclined(); }}>
       <style>{css}</style>
       <div className="ac-box" role="dialog" aria-modal="true" aria-labelledby="ac-title" onClick={(e) => e.stopPropagation()}>
-        {image ? (
+        {plan ? (
+          <>
+            <h3 id="ac-title">ให้ AI วิเคราะห์แผนการเงินไหม?</h3>
+            <p className="ac-lead">AI เขียนคำแนะนำภาษาไทยจากตัวเลขสรุปของคุณ (เช่น ยอดรวมต่อเดือน ยอดแต่ละหมวด เป้าหมายการออม) คุณกดขอเองทุกครั้ง และระบบตรวจตัวเลขทุกตัวในคำแนะนำก่อนแสดง ข้อที่ตัวเลขไม่ตรงกับที่ระบบคำนวณจะไม่แสดง</p>
+
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>ข้อมูลที่ถูกส่งไปบริการ AI ภายนอก</div>
+            <ul className="ac-list" data-ai-sent>
+              <li><strong>ตัวเลขสรุป</strong> เช่น รายรับ/รายจ่ายเดือนนี้ ค่าเฉลี่ยของเดือนก่อนหน้า ยอดและชื่อหมวดที่สูงผิดปกติ วันที่ใช้จ่ายสูงสุดของสัปดาห์ จำนวนรายจ่ายเล็ก ๆ</li>
+              <li><strong>เป้าหมายการออม</strong> (สูงสุด 3 เป้าหมายแรก): ชื่อเป้าหมาย ยอดที่ยังขาด วันที่อยากถึง ยอดที่ต้องออมต่อเดือน</li>
+            </ul>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>ข้อมูลที่ไม่ถูกส่ง</div>
+            <ul className="ac-list" data-ai-not-sent>
+              <li>รายการรายตัว บันทึกช่วยจำ วันที่ของแต่ละรายการ ชื่อ อีเมล รหัสผู้ใช้ รหัสผ่าน และรูปโปรไฟล์</li>
+              <li>ชื่อหมวดและชื่อเป้าหมายผ่านตัวปิดเลขยาว/อีเมล/เบอร์โทรอัตโนมัติก่อนส่ง</li>
+            </ul>
+
+            <div className="ac-note" data-ai-free-note>
+              ตัวเลขการเงินสรุปอ่อนไหวกว่าข้อความทั่วไป ควรตั้งชื่อหมวดและเป้าหมายโดยไม่ใส่ข้อมูลส่วนตัว และบริการ AI ที่ใช้เป็นแผนฟรี ผู้ให้บริการอาจเก็บข้อมูลการใช้งานเพื่อปรับปรุงโมเดล คำแนะนำเป็นเพียงแนวทางทั่วไปเรื่องงบประมาณและการออม ไม่ใช่คำแนะนำทางการเงินจากผู้เชี่ยวชาญ
+            </div>
+          </>
+        ) : image ? (
           <>
             <h3 id="ac-title">ให้ AI อ่านรูปใบเสร็จไหม?</h3>
             <p className="ac-lead">ถ่ายหรือเลือกรูปใบเสร็จ แล้ว AI อ่านยอดที่ชำระ วันที่ ชื่อร้าน และเลือกหมวดหมู่ให้ คุณต้องตรวจเทียบกับรูปและกดยืนยันทุกครั้งก่อนบันทึก</p>
@@ -93,15 +114,15 @@ export default function AiConsentModal({ version = '1.0', scope = 'text', engine
         )}
 
         <p className="ac-lead" style={{ marginBottom: 6 }}>
-          {image ? 'ถ้าไม่เปิด คุณกรอกรายการจากใบเสร็จเองได้ตามปกติ ไม่มีอะไรถูกส่งออกไป ' : 'ถ้าไม่เปิด ระบบยังแยกข้อความให้ด้วยกฎในระบบเราเอง ไม่ส่งข้อมูลออกไปไหน '}คุณเปลี่ยนใจปิด/เปิดได้ที่หน้าโปรไฟล์ทุกเมื่อ{' '}
+          {plan ? 'ถ้าไม่เปิด คุณยังเห็นการวิเคราะห์และคำแนะนำจากระบบ เป้าหมายการออม และลองปรับแผนได้ตามปกติ ไม่มีอะไรถูกส่งออกไป ' : image ? 'ถ้าไม่เปิด คุณกรอกรายการจากใบเสร็จเองได้ตามปกติ ไม่มีอะไรถูกส่งออกไป ' : 'ถ้าไม่เปิด ระบบยังแยกข้อความให้ด้วยกฎในระบบเราเอง ไม่ส่งข้อมูลออกไปไหน '}คุณเปลี่ยนใจปิด/เปิดได้ที่หน้าโปรไฟล์ทุกเมื่อ{' '}
           <button type="button" className="ac-link" onClick={() => setShowPolicy(true)}>อ่านนโยบายความเป็นส่วนตัว</button>
         </p>
 
         {error && <div className="alert" data-ai-consent-error style={{ marginTop: 10 }}>{error}</div>}
 
         <div className="ac-actions">
-          <button type="button" className="btn btn-light" data-ai-decline onClick={onDeclined} disabled={busy}>{image ? 'ไม่ใช้ ฉันกรอกเอง' : 'ไม่เปิด ใช้แบบกฎ'}</button>
-          <button type="button" className="btn" data-ai-accept onClick={accept} disabled={busy}>{busy ? 'กำลังเปิดใช้...' : image ? 'เปิดให้ AI อ่านใบเสร็จ' : 'เปิดใช้ AI'}</button>
+          <button type="button" className="btn btn-light" data-ai-decline onClick={onDeclined} disabled={busy}>{plan ? 'ไม่ใช้ ดูแต่คำแนะนำจากระบบ' : image ? 'ไม่ใช้ ฉันกรอกเอง' : 'ไม่เปิด ใช้แบบกฎ'}</button>
+          <button type="button" className="btn" data-ai-accept onClick={accept} disabled={busy}>{busy ? 'กำลังเปิดใช้...' : plan ? 'เปิดให้ AI วิเคราะห์แผน' : image ? 'เปิดให้ AI อ่านใบเสร็จ' : 'เปิดใช้ AI'}</button>
         </div>
       </div>
       {showPolicy && <PrivacyModal onClose={() => setShowPolicy(false)} />}
