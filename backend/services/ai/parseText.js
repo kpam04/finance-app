@@ -9,7 +9,12 @@ const FALLBACK_NAME = { expense: 'อื่นๆ', income: 'รายได้�
 const norm = (s) => String(s === undefined || s === null ? '' : s).normalize('NFC').replace(/\s+/g, '').toLowerCase();
 const bangkokToday = (now = new Date()) => new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 const addDaysIso = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
-const validIso = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+// รูปแบบ YYYY-MM-DD ที่เป็นวันที่จริง (เดือน 13 หรือวันที่ 45 ต้องได้ false ไม่ใช่ error)
+const validIso = (s) => {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+};
 
 function buildSystemPrompt({ today, expenseNames, incomeNames }) {
   const weekday = WEEKDAYS[new Date(`${today}T00:00:00Z`).getUTCDay()];
