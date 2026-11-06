@@ -86,7 +86,7 @@ export const api = {
   // ผู้ช่วย AI (ข้อความถูกส่งไปบริการ AI ภายนอกเมื่อผู้ใช้เปิดใช้เท่านั้น)
   aiStatus: () => request('/ai/status'),
   aiConsent: (data) => request('/ai/consent', { method: 'PUT', body: data }),
-  aiParseText: (data) => request('/ai/parse-text', { method: 'POST', body: data }),
+  aiParseText: (data, signal) => request('/ai/parse-text', { method: 'POST', body: data, signal }), // signal: ยกเลิกได้ (ผู้ใช้กดยกเลิก หรือรอเกินเวลา)
   aiFeedback: (eventId, data) => request(`/ai/events/${eventId}/feedback`, { method: 'PUT', body: data }),
   aiParseReceipt: (data, signal) => request('/ai/parse-receipt', { method: 'POST', body: data, signal }), // ส่งรูปใบเสร็จ (ย่อแล้ว) ให้ AI อ่าน
 
