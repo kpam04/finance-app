@@ -9,9 +9,10 @@ const css = `
 .as-row h3 { margin: 0 0 4px; }
 .as-desc { margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6; }
 .as-meta { margin: 8px 0 0; font-size: 12px; color: #8A8177; }
-.as-switch { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #4b5563; }
+/* label กลางใน index.css เรียงแนวตั้ง (flex-direction: column) บังคับให้สวิตช์เรียงแนวนอนและไม่ยืดเต็มความกว้าง */
+.as-switch { position: relative; flex: 0 0 auto; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; width: auto; margin: 0; cursor: pointer; font-size: 13px; color: #4b5563; white-space: nowrap; }
 .as-switch input { position: absolute; opacity: 0; width: 44px; height: 24px; margin: 0; cursor: pointer; }
-.as-track { width: 44px; height: 24px; border-radius: 999px; background: #d1d5db; transition: background 0.2s; position: relative; flex: 0 0 44px; }
+.as-track { width: 44px; height: 24px; min-width: 44px; min-height: 24px; box-sizing: border-box; border-radius: 999px; background: #d1d5db; transition: background 0.2s; position: relative; flex: 0 0 auto; }
 .as-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 .as-switch input:checked + .as-track { background: #7E9677; }
 .as-switch input:checked + .as-track::after { transform: translateX(20px); }
@@ -65,7 +66,7 @@ export default function AiSettingsCard() {
         <div>
           <h3>ผู้ช่วย AI</h3>
           <p className="as-desc">
-            ปกติระบบแยกข้อความด้วยกฎในเครื่องเราทันที (ไม่ส่งข้อมูลออกไป) ถ้าเปิดไว้ จะมีปุ่ม “✨ ให้ AI ช่วยตรวจ” ในหน้ายืนยันรายการ เมื่อกดข้อความจะถูกส่งไปบริการ AI ภายนอกเพื่อเทียบผลกับกฎ (ปิดอยู่เป็นค่าเริ่มต้น)
+            ถ้าเปิดไว้ ข้อความที่พิมพ์หรือพูดในช่อง “เพิ่มรายการใหม่” จะถูกส่งไปบริการ AI ภายนอกเพื่อแยกรายการให้แม่นขึ้น ถ้า AI ไม่ตอบภายใน 10 วินาที ระบบจะใช้การแยกแบบกฎแทน ถ้าปิดไว้ ระบบจะแยกด้วยกฎในเครื่องทันที (ไม่ส่งข้อมูลออกไป) ปิดอยู่เป็นค่าเริ่มต้น
           </p>
           {!status.configured && <p className="as-meta" data-ai-unconfigured>ระบบนี้ยังไม่เปิดให้บริการ AI ภายนอก (ใช้การแยกแบบกฎอยู่)</p>}
           {status.configured && status.enabled && (
