@@ -33,7 +33,7 @@ async function ocrImage(dataUrl, { config = aiConfig(), fetchImpl = globalThis.f
       model: config.ocrModel,
       messages: [{ role: 'user', content: [{ type: 'text', text: config.ocrPrompt || DEFAULT_OCR_PROMPT }, { type: 'image_url', image_url: { url: dataUrl } }] }],
       max_tokens: 4096,
-      temperature: 0.1,
+      temperature: 0, // ผลคงที่: รูปเดิมควรได้ข้อความเดิม
       top_p: 0.6,
       repetition_penalty: 1.2,
     },

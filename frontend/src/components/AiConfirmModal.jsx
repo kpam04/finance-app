@@ -38,10 +38,18 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
   const total = ai ? ai.total : 1;
   const tone = ai ? confTone(ai.confidence) : null;
   const flagCategory = !!ai && ai.flags.category_guessed && form.category_id === (draft.category_id || '');
-  const flagDate = !!ai && ai.flags.date_defaulted && form.transaction_date === draft.transaction_date;
+  const flagDate = !!ai && (ai.flags.date_defaulted || ai.flags.date_conflict) && form.transaction_date === draft.transaction_date;
   const isReceipt = !!draft.receipt; // ร่างที่ได้จากการสแกนใบเสร็จ (แสดงแผงใบเสร็จ รูปย่อ และธงเตือนเฉพาะใบเสร็จ)
   const amountUntouched = form.amount === (draft.amount === '' || draft.amount == null ? '' : String(draft.amount));
-  const amountFlag = !ai ? null : ai.flags.total_mismatch ? 'mismatch' : ai.flags.amount_from_items ? 'items' : ai.confidence < 0.6 ? 'low' : null;
+  // ช่องจำนวนเงิน: ไฮไลต์เมื่อยอดน่าสงสัย (ใบเสร็จใช้เกณฑ์ความมั่นใจ 80% ข้อความพิมพ์ใช้ 60%)
+  // ยอดตรงกับตัวเลขหลังคำว่า ยอดสุทธิ/รวม แล้ว (total_checked) ไม่ต้องเตือนเพราะรายการสินค้าไม่ตรง (แค่ซ่อนรายการ)
+  const lowConf = isReceipt ? 0.8 : 0.6;
+  const amountFlag = !ai ? null
+    : ai.flags.total_conflict ? 'conflict'
+    : ai.flags.amount_from_rules ? 'rules'
+    : ai.flags.amount_from_items ? 'items'
+    : ai.flags.total_mismatch && !ai.flags.total_checked ? 'mismatch'
+    : !ai.flags.total_checked && ai.confidence < lowConf ? 'low' : null;
   const flagAmount = !!amountFlag && amountUntouched;
 
   const submit = async (e) => {
@@ -159,12 +167,12 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
             <div>
               <label style={label}>จำนวนเงิน</label>
               <input style={flagAmount ? { ...field, ...warnRing } : field} type="number" min="0.01" step="0.01" value={form.amount} onChange={set('amount')} required />
-              {flagAmount && <div data-flag-amount style={hint}>{amountFlag === 'mismatch' ? 'ยอดรวมไม่ตรงกับผลรวมรายการสินค้า ตรวจกับรูปใบเสร็จ' : amountFlag === 'items' ? 'อ่านยอดรวมไม่ชัด ใช้ผลรวมรายการแทน ตรวจกับรูปใบเสร็จ' : 'AI ไม่ค่อยมั่นใจ ตรวจจำนวนเงินอีกครั้ง'}</div>}
+              {flagAmount && <div data-flag-amount style={hint}>{amountFlag === 'conflict' ? 'ระบบใช้ตัวเลขหลังคำว่า ยอดสุทธิ/รวม แทนค่าที่ AI อ่าน ตรวจกับรูปใบเสร็จ' : amountFlag === 'rules' ? 'ยอดนี้ได้จากการค้นหาคำว่า ยอดสุทธิ/รวม ในใบเสร็จ ตรวจกับรูปใบเสร็จ' : amountFlag === 'mismatch' ? 'ยอดรวมไม่ตรงกับผลรวมรายการสินค้า ตรวจกับรูปใบเสร็จ' : amountFlag === 'items' ? 'อ่านยอดรวมไม่ชัด ใช้ผลรวมรายการแทน ตรวจกับรูปใบเสร็จ' : 'AI ไม่ค่อยมั่นใจ ตรวจจำนวนเงินอีกครั้ง'}</div>}
             </div>
             <div>
               <label style={label}>วันที่</label>
               <input style={flagDate ? { ...field, ...warnRing } : field} type="date" value={form.transaction_date} onChange={set('transaction_date')} required />
-              {flagDate && <div data-flag-date style={hint}>{isReceipt ? 'AI ไม่พบวันที่ในใบเสร็จ ใช้วันนี้ให้' : 'AI ไม่พบวันที่ในข้อความ ใช้วันนี้ให้'}</div>}
+              {flagDate && <div data-flag-date style={hint}>{ai.flags.date_conflict ? 'วันที่ที่ AI อ่าน ไม่ตรงกับวันที่ที่พบในใบเสร็จ ตรวจอีกครั้ง' : isReceipt ? 'AI ไม่พบวันที่ในใบเสร็จ ใช้วันนี้ให้' : 'AI ไม่พบวันที่ในข้อความ ใช้วันนี้ให้'}</div>}
             </div>
           </div>
 

@@ -16,3 +16,6 @@ src_backup_*
 .DS_Store
 Thumbs.db
 npm-debug.log*
+
+# ชุดรูปทดสอบ OCR (อาจมีใบเสร็จจริง/ข้อมูลส่วนตัว) เก็บในเครื่องเท่านั้น
+ocr-test/

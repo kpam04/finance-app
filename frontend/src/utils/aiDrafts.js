@@ -79,7 +79,7 @@ export function compareWithAi(form, aiItem, categories = []) {
 export function receiptToDraft(data, { thumb, clientMs } = {}) {
   const it = data.items[0];
   const flags = it.flags || {};
-  const sure = it.confidence >= 0.8 && !flags.category_guessed && !flags.date_defaulted && !flags.total_mismatch && !flags.amount_from_items;
+  const sure = it.confidence >= 0.8 && !flags.category_guessed && !flags.date_defaulted && !flags.date_conflict && !(flags.total_mismatch && !flags.total_checked) && !flags.amount_from_items && !flags.total_conflict && !flags.amount_from_rules;
   return {
     type: 'expense',
     amount: it.amount,

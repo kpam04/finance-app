@@ -38,7 +38,9 @@ export default function ReceiptPanel({ receipt, image, flags = {}, itemsSumLabel
     return () => window.removeEventListener('keydown', onKey, true);
   }, [zoom]);
 
-  const items = (receipt && receipt.items) || [];
+  // ผลรวมรายการไม่ตรงยอด = OCR อ่านรายการสินค้าไม่ชัด (ชื่อ/ราคาอาจเพี้ยน) ไม่แสดงรายการ กันผู้ใช้เห็นข้อมูลที่ผิด
+  const itemsUnreliable = !!flags.total_mismatch;
+  const items = itemsUnreliable ? [] : (receipt && receipt.items) || [];
   const docType = (receipt && receipt.document_type) || 'receipt';
   return (
     <div className="rp-box" data-receipt-panel>
@@ -54,9 +56,13 @@ export default function ReceiptPanel({ receipt, image, flags = {}, itemsSumLabel
           <span className="rp-pill" data-receipt-doctype>{DOC_TH[docType] || DOC_TH.other}</span>
         </div>
         {flags.is_bill && <p className="rp-note" data-flag-bill>นี่คือใบแจ้งหนี้ (ยังไม่ใช่หลักฐานการชำระเงิน) ตรวจวันที่ให้ตรงกับวันที่จ่ายจริง</p>}
-        {flags.total_mismatch && (
-          <p className="rp-note" data-flag-mismatch>ยอดรวมไม่ตรงกับผลรวมรายการสินค้า ({money(receipt.items_sum)} บาท) ตรวจยอดกับรูปอีกครั้ง</p>
+        {itemsUnreliable && (
+          <p className="rp-info-note" data-flag-mismatch>อ่านรายการสินค้าได้ไม่ชัด จึงไม่แสดงรายการ (ไม่กระทบยอดที่บันทึก)</p>
         )}
+        {flags.total_conflict && <p className="rp-note" data-flag-total-conflict>ยอดที่ AI อ่านไม่ตรงกับตัวเลขหลังคำว่า “ยอดสุทธิ/รวม” ในใบเสร็จ ระบบใช้ตัวเลขจากใบเสร็จแทน ตรวจกับรูปอีกครั้ง</p>}
+        {flags.amount_from_rules && <p className="rp-note" data-flag-amount-rules>AI หายอดไม่เจอ ระบบใช้ตัวเลขหลังคำว่า “ยอดสุทธิ/รวม” แทน ตรวจกับรูปอีกครั้ง</p>}
+        {flags.total_checked && <p className="rp-info-note" data-flag-total-checked>✓ ยอดเงินตรงกับตัวเลขหลังคำว่า “ยอดสุทธิ/รวม” ในใบเสร็จ</p>}
+        {flags.date_from_rules && <p className="rp-info-note" data-flag-date-rules>วันที่ได้จากการค้นหาในข้อความใบเสร็จ</p>}
         {flags.amount_from_items && <p className="rp-note" data-flag-from-items>อ่านยอดรวมไม่ชัด จึงใช้ผลรวมรายการสินค้าแทน ตรวจยอดกับรูป</p>}
         {flags.date_converted_be && <p className="rp-info-note" data-flag-be>แปลงปี พ.ศ. ในใบเสร็จเป็น ค.ศ. ให้แล้ว</p>}
         {engineLabel(engine, attempts) && <p className="rp-info-note" data-receipt-engine>{engineLabel(engine, attempts)}</p>}

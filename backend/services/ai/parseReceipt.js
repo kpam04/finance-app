@@ -3,6 +3,7 @@ const { ocrImage } = require('./ocrClient');
 const { geminiJSON } = require('./geminiClient');
 const { redactSensitive } = require('./redact');
 const { parseAmount, cleanNote, MAX_NOTE } = require('../../utils/inputRules');
+const { extractTotals, extractDates } = require('./receiptRules');
 
 const MAX_ITEMS = 60;
 const FALLBACK_CATEGORY = 'อื่นๆ';
@@ -26,17 +27,21 @@ function buildReceiptPrompt({ today, expenseNames }) {
     'Reply with ONLY one JSON object: {"document_type":"receipt"|"bill"|"other","merchant":string|null,"date":"YYYY-MM-DD"|null,"total":number|null,"items":[{"name":string,"qty":number|null,"amount":number}],"category":string,"confidence":number}',
     '- total: the final amount the customer paid or must pay in total (labels such as ยอดสุทธิ, รวมสุทธิ, ยอดรวม, TOTAL, รวมเงินที่ต้องชำระทั้งสิ้น, Amount). NOT: cash tendered, change, VAT only, subtotal before VAT, points, card or reference numbers.',
     '- date: the date of the purchase or the bill date. Thai documents often use the Buddhist Era: a 2-digit year such as 69 means 2569 BE = 2026 CE; any 4-digit year of 2400 or more is BE, subtract 543. Output the Gregorian date YYYY-MM-DD. null if no date.',
+    '- date: dates often look like "31/10/69 | 11:02", "31/10/2569" or "31 ต.ค. 69" and may be at the very top of the text.',
     '- items: product or charge lines with their line total in baht (qty x unit price already multiplied). Skip lines with amount 0 (stamps, points, free items), payment lines, and totals.',
+    '- item amount: the price is the right-most money number of the line. Numbers inside a product name (e.g. 450 and 60 in "นมพาสฯเมจิ 450", "น้ำดื่มเพียวไลฟ์ 60") are sizes or pack counts, NOT prices.',
+    '- Copy item names and the merchant exactly as written in the OCR text. Never invent, translate or "correct" words; if a name is unreadable copy it as is.',
     '- document_type: "bill" for an invoice not yet paid (e.g. electricity or water bill), "receipt" for proof of payment.',
     `- category: copy exactly from this list: ${expenseNames.join(', ')}. If nothing fits use "${FALLBACK_CATEGORY}".`,
-    '- merchant: the shop or company name in Thai if present. confidence: 0 to 1 for total, date and category together.',
+    '- merchant: the shop or company name (with branch if shown, e.g. "7-Eleven สาขาสุขสวัสดิ์ 78"). confidence: 0 to 1 for total, date and category together.',
     'Example: 7-Eleven app receipt dated 23/10/69, items มาการอง 45.00 and มาการอง 45.00, ยอดสุทธิ 90.00',
     `Reply: {"document_type":"receipt","merchant":"7-Eleven","date":"2026-10-23","total":90,"items":[{"name":"มาการอง","qty":1,"amount":45},{"name":"มาการอง","qty":1,"amount":45}],"category":"อาหาร","confidence":0.9}`,
   ].join('\n');
 }
 
 // ตรวจผลที่ AI จัดโครงสร้างจากข้อความ OCR (ห้ามเชื่อโดยไม่ตรวจ) แล้วสร้างร่างรายการ "ยอดที่ชำระ" 1 รายการ
-function validateReceipt(raw, { categories, today }) {
+// ocrText = ข้อความ OCR (ถ้ามี) ใช้ตรวจยอดและวันที่ซ้ำด้วยกฎ (receiptRules) ไม่มี = ตรวจแบบเดิม (เช่น ตัวอ่าน Gemini)
+function validateReceipt(raw, { categories, today, ocrText = '' }) {
   if (!raw || typeof raw !== 'object') return null;
   const docType = DOC_TYPES.includes(raw.document_type) ? raw.document_type : 'receipt';
 
@@ -56,9 +61,20 @@ function validateReceipt(raw, { categories, today }) {
 
   // ยอดที่ชำระ: ใช้ total ถ้าอ่านได้ ไม่งั้นใช้ผลรวมรายการ (ติดธงและลดความมั่นใจ)
   const tot = parseAmount(raw.total);
-  const flags = { category_guessed: false, date_defaulted: false, total_mismatch: false, amount_from_items: false, is_bill: docType === 'bill', date_converted_be: false };
+  const flags = {
+    category_guessed: false, date_defaulted: false, total_mismatch: false, amount_from_items: false, is_bill: docType === 'bill', date_converted_be: false,
+    total_checked: false, total_conflict: false, amount_from_rules: false, date_from_rules: false, date_conflict: false,
+  };
+  const rules = ocrText ? extractTotals(ocrText) : { best: null, candidates: [] };
+  const ruleTotal = rules.best !== null && !parseAmount(rules.best).error ? rules.best : null;
   let amount;
-  if (!tot.error) amount = tot.value;
+  if (!tot.error) {
+    amount = tot.value;
+    if (ruleTotal !== null) {
+      if (Math.abs(amount - ruleTotal) < 0.005 || rules.candidates.some((c) => Math.abs(c - amount) < 0.005)) flags.total_checked = true; // กฎกับ LLM เห็นตรงกัน
+      else { amount = ruleTotal; flags.total_conflict = true; } // ไม่ตรง: เชื่อตัวเลขหลังคำว่า ยอดสุทธิ/รวม และเตือนผู้ใช้
+    }
+  } else if (ruleTotal !== null) { amount = ruleTotal; flags.amount_from_rules = true; }
   else if (itemsSum > 0 && !parseAmount(itemsSum).error) { amount = itemsSum; flags.amount_from_items = true; }
   else return null;
 
@@ -76,10 +92,19 @@ function validateReceipt(raw, { categories, today }) {
     const fixed = `${Number(date.slice(0, 4)) - 543}${date.slice(4)}`;
     if (validIso(fixed)) { date = fixed; flags.date_converted_be = true; }
   }
+  const ruleDates = ocrText ? extractDates(ocrText, today) : [];
   if (!validIso(date) || date > addDaysIso(today, 1) || date < addDaysIso(today, -800)) {
-    date = today;
-    flags.date_defaulted = true;
-    flags.date_converted_be = false;
+    if (ruleDates.length) { // LLM หาวันที่ไม่เจอ แต่กฎเจอในข้อความ OCR
+      date = ruleDates[0].iso;
+      flags.date_from_rules = true;
+      flags.date_converted_be = ruleDates[0].be;
+    } else {
+      date = today;
+      flags.date_defaulted = true;
+      flags.date_converted_be = false;
+    }
+  } else if (ruleDates.length && !ruleDates.some((d) => d.iso === date)) {
+    flags.date_conflict = true; // วันที่ของ LLM ไม่ตรงกับวันที่ใด ๆ ในข้อความ OCR
   }
 
   // หมวด: ต้องตรงกับหมวดรายจ่ายของผู้ใช้ ไม่ตรง = หมวดสำรอง "อื่นๆ" ติดธงเดา
@@ -95,6 +120,10 @@ function validateReceipt(raw, { categories, today }) {
   if (flags.category_guessed) confidence = Math.min(confidence, 0.4);
   if (flags.total_mismatch || flags.amount_from_items) confidence = Math.min(confidence, 0.5);
   if (flags.date_defaulted) confidence = Math.min(confidence, 0.6);
+  if (flags.total_conflict) confidence = Math.min(confidence, 0.5);
+  if (flags.amount_from_rules) confidence = Math.min(confidence, 0.7);
+  if (flags.date_conflict) confidence = Math.min(confidence, 0.6);
+  if (flags.date_from_rules) confidence = Math.min(confidence, 0.8);
 
   const merchantRaw = typeof raw.merchant === 'string' ? raw.merchant : '';
   const mn = cleanNote(merchantRaw);
@@ -129,9 +158,10 @@ async function readWithTyphoon(dataUrl, { categories, today, budgetMs, ocr = ocr
     system: buildReceiptPrompt({ today, expenseNames: names }),
     user: `Receipt OCR text:\n${safe.slice(0, 12000)}`,
     maxTokens: 1500,
+    temperature: 0, // ผลคงที่: รูปเดิมควรได้ผลเดิม
     ...(left ? { timeoutMs: left } : {}),
   });
-  return { json, model, ocrModel: o.model, ocrMs, redactions: count };
+  return { json, model, ocrModel: o.model, ocrMs, redactions: count, ocrText: safe }; // ocrText ใช้ตรวจซ้ำในคำขอนี้เท่านั้น ไม่เก็บ ไม่ส่งกลับ
 }
 
 // ตัวอ่านที่ 2: Gemini = รูป -> อ่านและจัดโครงสร้างในคำขอเดียว (ไม่ผ่าน Typhoon เลย จึงเป็นอิสระจากความช้าของ Typhoon)
@@ -155,7 +185,7 @@ async function parseReceiptWithEngines(dataUrl, { categories, now = new Date(), 
       const raw = eng.name === 'gemini'
         ? await readWithGemini(dataUrl, { categories, today, budgetMs: eng.budgetMs, gemini: deps.gemini })
         : await readWithTyphoon(dataUrl, { categories, today, budgetMs: eng.budgetMs, ocr: deps.ocr, chat: deps.chat });
-      const result = validateReceipt(raw.json, { categories, today });
+      const result = validateReceipt(raw.json, { categories, today, ocrText: raw.ocrText || '' });
       if (!result) throw new AiError('NO_TOTAL', 'อ่านยอดเงินจากใบเสร็จไม่ได้');
       attempts.push({ engine: eng.name, ok: true, ms: Date.now() - t0, code: '' });
       return { ...result, engine: eng.name, attempts, redactions: raw.redactions, model: raw.model, ocrModel: raw.ocrModel, ocrMs: raw.ocrMs, latencyMs: Date.now() - started };
