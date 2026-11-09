@@ -65,7 +65,8 @@ const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ�
 // สไตล์เฉพาะหน้านี้ (เพิ่มชื่อโซน ป้ายกำกับช่องกรอง และกันช่องวันที่ล้นขอบบนมือถือ) ไม่แตะ index.css
 const txCss = `
 .ai-quick-section > .card { border: 1px solid var(--primary, #9AAB91); }
-.tx-list-head { margin-bottom: 14px; }
+.tx-list-head { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tx-export { white-space: nowrap; }
 .tx-list-head h3 { margin: 0; font-size: 17px; }
 .tx-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #4b5563; }
 .tx-clear { padding: 0; border: none; background: none; font: inherit; font-size: 13px; font-weight: 400; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
@@ -127,6 +128,7 @@ export default function Transactions() {
   const [editingId, setEditingId] = useState(null);
 
   // สถานะการแจ้งเตือนและการบันทึก
+  const [exporting, setExporting] = useState(false); // กำลังส่งออก CSV
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -165,6 +167,27 @@ export default function Transactions() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // ส่งออก CSV ตามตัวกรองที่เลือกอยู่ (ไม่กรอง = ทุกรายการ) ได้ไฟล์ตรงกับที่เห็นในตาราง
+  const exportCsv = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const blob = await api.exportTransactionsCsv(filter);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `รายรับรายจ่าย_${today()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // หมวดที่ใช้เลือกได้ (ไม่รวมหมวดที่ซ่อน) สำหรับฟอร์มและ AI
   const activeCats = useMemo(() => cats.filter((c) => !c.hidden), [cats]);
@@ -443,7 +466,18 @@ export default function Transactions() {
         <div className="tx-list-head" data-tx-list-head>
           <InfoTitle title="📋 รายการที่บันทึกแล้ว" label="คำอธิบายส่วนนี้" popId="tx-info-pop">
             <p>ใช้ตัวกรองเพื่อค้นหาเท่านั้น ไม่ได้ใช้เพิ่มรายการ ถ้าจะเพิ่มรายการใช้กล่อง “เพิ่มรายการใหม่” ด้านบน</p>
+            <p>ปุ่ม “ส่งออก CSV” ดาวน์โหลดรายการตามตัวกรองที่เลือกอยู่ (ไม่กรอง = ทุกรายการ) เปิดด้วย Excel ได้</p>
           </InfoTitle>
+          <button
+            type="button"
+            className="btn btn-sm btn-light tx-export"
+            data-tx-export
+            onClick={exportCsv}
+            disabled={exporting || !pagination.total}
+            title={pagination.total ? 'ดาวน์โหลดรายการตามตัวกรองที่เลือกเป็นไฟล์ CSV' : 'ไม่มีรายการให้ส่งออก'}
+          >
+            {exporting ? 'กำลังส่งออก...' : '⬇️ ส่งออก CSV'}
+          </button>
         </div>
 
         {/* ตัวกรองรายการ (มีป้ายชื่อทุกช่อง) */}

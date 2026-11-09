@@ -66,6 +66,35 @@ async function request(path, { method = 'GET', body, params, signal } = {}) {
   return json;
 }
 
+// ดาวน์โหลดไฟล์ (เช่น CSV) แนบ token แบบเดียวกับ request() คืน Blob; ข้อผิดพลาดจากหลังบ้าน (JSON) แปลงเป็น Error ภาษาไทย
+async function download(path, params) {
+  let url = `/api${path}`;
+  const qs = new URLSearchParams();
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.append(k, v);
+  });
+  if (qs.toString()) url += `?${qs}`;
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetch(url, { headers });
+  } catch {
+    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+  }
+  if (!res.ok) {
+    let json = null;
+    try { json = await res.json(); } catch { /* ไม่ใช่ JSON */ }
+    if (res.status === 401) {
+      clearToken();
+      window.dispatchEvent(new Event('auth:logout'));
+    }
+    throw new Error((json && json.message) || `ดาวน์โหลดไม่สำเร็จ (${res.status})`);
+  }
+  return res.blob();
+}
+
 export const api = {
   // auth
   register: (data) => request('/auth/register', { method: 'POST', body: data }),
@@ -103,6 +132,7 @@ export const api = {
 
   // transactions
   getTransactions: (params) => request('/transactions', { params }),
+  exportTransactionsCsv: (params) => download('/transactions/export', params), // params: ตัวกรองเดียวกับ getTransactions (ไม่ส่ง page/limit)
   createTransaction: (data) => request('/transactions', { method: 'POST', body: data }),
   updateTransaction: (id, data) => request(`/transactions/${id}`, { method: 'PUT', body: data }),
   deleteTransaction: (id) => request(`/transactions/${id}`, { method: 'DELETE' }),

@@ -35,28 +35,44 @@ const categoryAllowed = async (categoryId, userId, type) => {
   return !!c;
 };
 
+// ตัวกรองรายการ (ใช้ร่วมกันระหว่างหน้ารายการและการส่งออก CSV) คืน { q } หรือ { error }
+function buildFilter(req) {
+  const q = { user: req.userId };
+  if (req.query.start || req.query.end) {
+    q.date = {};
+    if (req.query.start) {
+      const d = parseDate(req.query.start);
+      if (!d) return { error: 'รูปแบบวันที่เริ่มต้นไม่ถูกต้อง' };
+      q.date.$gte = d;
+    }
+    if (req.query.end) {
+      const d = parseDate(req.query.end);
+      if (!d) return { error: 'รูปแบบวันที่สิ้นสุดไม่ถูกต้อง' };
+      q.date.$lte = d;
+    }
+  }
+  if (['income', 'expense'].includes(req.query.type)) q.type = req.query.type;
+  if (req.query.category_id && mongoose.isValidObjectId(req.query.category_id)) {
+    q.category = req.query.category_id;
+  }
+  return { q };
+}
+
+// ช่อง CSV: กันสูตรอันตรายตอนเปิดใน Excel (ขึ้นต้นด้วย = + - @ tab) และครอบด้วย "..." เมื่อมี , " หรือขึ้นบรรทัดใหม่
+const csvCell = (v) => {
+  let s = String(v === undefined || v === null ? '' : v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (/[",\r\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+const EXPORT_MAX = 10000;
+const TYPE_TH = { income: 'รายรับ', expense: 'รายจ่าย' };
+
 // ดูรายการ (กรอง + แบ่งหน้า)
 router.get('/', async (req, res) => {
   try {
-    const q = { user: req.userId };
-
-    if (req.query.start || req.query.end) {
-      q.date = {};
-      if (req.query.start) {
-        const d = parseDate(req.query.start);
-        if (!d) return res.status(400).json({ success: false, message: 'รูปแบบวันที่เริ่มต้นไม่ถูกต้อง' });
-        q.date.$gte = d;
-      }
-      if (req.query.end) {
-        const d = parseDate(req.query.end);
-        if (!d) return res.status(400).json({ success: false, message: 'รูปแบบวันที่สิ้นสุดไม่ถูกต้อง' });
-        q.date.$lte = d;
-      }
-    }
-    if (['income', 'expense'].includes(req.query.type)) q.type = req.query.type;
-    if (req.query.category_id && mongoose.isValidObjectId(req.query.category_id)) {
-      q.category = req.query.category_id;
-    }
+    const { q, error } = buildFilter(req);
+    if (error) return res.status(400).json({ success: false, message: error });
 
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 20));
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -71,6 +87,36 @@ router.get('/', async (req, res) => {
     ]);
 
     res.json({ success: true, data: rows.map(toDto), pagination: { page, limit, total } });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// ส่งออก CSV ตามตัวกรองเดียวกับหน้ารายการ (UTF-8 + BOM ให้ Excel อ่านภาษาไทยถูก) ต้องอยู่ก่อน /:id
+router.get('/export', async (req, res) => {
+  try {
+    const { q, error } = buildFilter(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+    const total = await Transaction.countDocuments(q);
+    if (total > EXPORT_MAX) {
+      return res.status(400).json({ success: false, message: `มี ${total.toLocaleString('en-US')} รายการ เกิน ${EXPORT_MAX.toLocaleString('en-US')} รายการต่อไฟล์ กรุณากรองช่วงวันที่ให้แคบลง` });
+    }
+    const rows = await Transaction.find(q).populate('category', 'name').sort({ date: -1, _id: -1 }).lean();
+    const lines = [['วันที่', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ'].map(csvCell).join(',')];
+    for (const t of rows) {
+      lines.push([
+        t.date.toISOString().slice(0, 10),
+        TYPE_TH[t.type] || t.type,
+        (t.category && t.category.name) || '',
+        Number(t.amount).toFixed(2),
+        t.note || '',
+      ].map(csvCell).join(','));
+    }
+    const day = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); // วันที่ตามเวลาไทย
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="transactions_${day}.csv"; filename*=UTF-8''${encodeURIComponent(`รายรับรายจ่าย_${day}.csv`)}`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(`\uFEFF${lines.join('\r\n')}\r\n`);
   } catch (e) {
     console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
   }
