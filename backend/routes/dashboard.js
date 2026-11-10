@@ -4,6 +4,8 @@ const Transaction = require('../models/Transaction');
 const Budget = require('../models/Budget');
 const Category = require('../models/Category');
 const auth = require('../middleware/auth');
+const { spendableFor } = require('../services/spendable');
+const { ensureCurrentMonthBudgets } = require('../services/budgetAlert');
 
 const router = express.Router();
 router.use(auth);
@@ -51,6 +53,20 @@ function expenseByCategory(userObjId, start, end) {
     { $sort: { total: -1 } },
   ]);
 }
+
+// ---------- เงินที่ใช้ได้จริงของเดือนปัจจุบัน (แถบใต้การ์ดสรุป) ----------
+router.get('/spendable', async (req, res) => {
+  try {
+    try {
+      await ensureCurrentMonthBudgets(req.userId); // งบที่ยกจากเดือนก่อนต้องมีก่อนคำนวณ (ปกติสร้างตอนเปิดหน้างบ)
+    } catch (e) {
+      console.error('ensureCurrentMonthBudgets error:', e.message);
+    }
+    res.json({ success: true, data: await spendableFor(req.userId) });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
 
 // ---------- สรุปข้อมูลแดชบอร์ด ----------
 router.get('/summary', async (req, res) => {

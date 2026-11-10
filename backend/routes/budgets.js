@@ -9,6 +9,7 @@ const { parseAmount } = require('../utils/inputRules');
 const { syncBudget, ensureCurrentMonthBudgets } = require('../services/budgetAlert');
 const { forecastFor } = require('../services/budgetForecast');
 const { thaiPeriod } = require('../services/budgetCarry');
+const { reservedByCategory, lumpyCategories, paceStatus, elapsedPct, groupItems, PAY_STYLES } = require('../services/spendable');
 
 const router = express.Router();
 router.use(auth);
@@ -50,6 +51,19 @@ router.get('/', async (req, res) => {
     const cats = catIds.length ? await Category.find({ _id: { $in: catIds } }).lean() : [];
     const catMap = new Map(cats.map((c) => [String(c._id), c]));
 
+    // ไฟสถานะ: % ของเดือนที่ผ่านไป, หมวดจ่ายเป็นก้อน (เดาจากประวัติเมื่อ payStyle = auto), เงินที่กันไว้ (เดือนปัจจุบันเท่านั้น)
+    const isCurrent = month === def.month && year === def.year;
+    const elapsed = elapsedPct(year, month);
+    const needGuess = budgets.some((b) => !b.payStyle || b.payStyle === 'auto');
+    let lumpySet = new Set();
+    let reservedMap = new Map();
+    try {
+      if (needGuess) lumpySet = await lumpyCategories(req.userId, year, month);
+      if (isCurrent) reservedMap = await reservedByCategory(req.userId, budgets.filter((b) => b.enabled !== false).map((b) => b.category));
+    } catch (e) {
+      console.error('budget pace error:', e.message); // ไฟสถานะล้มเหลวต้องไม่ทำให้หน้างบใช้ไม่ได้
+    }
+
     const data = [];
     for (const b of budgets) {
       const cat = catMap.get(String(b.category));
@@ -58,6 +72,9 @@ router.get('/', async (req, res) => {
       const percent = b.amountLimit > 0 ? round1((spent / b.amountLimit) * 100) : 0;
       const enabled = b.enabled !== false;
       const forecast = enabled ? await forecastFor(b) : null;
+      const payStyle = PAY_STYLES.includes(b.payStyle) ? b.payStyle : 'auto';
+      const lumpy = payStyle === 'lump' || (payStyle === 'auto' && lumpySet.has(String(b.category)));
+      const reserved = reservedMap.get(String(b.category)) || null;
       data.push({
         budget_id: b._id,
         amount_limit: b.amountLimit,
@@ -72,6 +89,11 @@ router.get('/', async (req, res) => {
         enabled,
         repeat: b.repeat !== false,
         status: !enabled ? 'off' : percent >= 100 ? 'over' : percent >= b.alertThreshold ? 'warning' : 'ok',
+        pay_style: payStyle,
+        lumpy,
+        pace_status: paceStatus({ enabled, spent, limit: b.amountLimit, lumpy, elapsed }),
+        elapsed_pct: elapsed,
+        reserved: reserved ? { total: reserved.total, groups: groupItems(reserved.items).slice(0, 5) } : null,
         forecast: forecast
           ? { projected: forecast.projected, over: forecast.over, will_exceed: forecast.will_exceed, reach_day: forecast.reach_day }
           : null,
@@ -108,6 +130,9 @@ router.post('/', async (req, res) => {
     if (req.body.repeat !== undefined && typeof req.body.repeat !== 'boolean') {
       return res.status(400).json({ success: false, message: 'ค่า "ใช้ต่อเนื่องทุกเดือน" ไม่ถูกต้อง' });
     }
+    if (req.body.pay_style !== undefined && !PAY_STYLES.includes(req.body.pay_style)) {
+      return res.status(400).json({ success: false, message: 'ค่า "วิธีจ่าย" ไม่ถูกต้อง' });
+    }
 
     const cat = await Category.findOne({ _id: categoryId, $or: [{ user: null }, { user: req.userId }] });
     if (!cat) return res.status(400).json({ success: false, message: 'หมวดหมู่ไม่ถูกต้อง' });
@@ -123,6 +148,7 @@ router.post('/', async (req, res) => {
 
     const set = { amountLimit: limit, alertThreshold: threshold };
     if (typeof req.body.repeat === 'boolean') set.repeat = req.body.repeat;
+    if (req.body.pay_style !== undefined) set.payStyle = req.body.pay_style;
     const budget = await Budget.findOneAndUpdate(
       key,
       { $set: set },
@@ -158,6 +184,10 @@ router.put('/:id', async (req, res) => {
         }
         set[field] = b[field];
       }
+    }
+    if ('pay_style' in b) {
+      if (!PAY_STYLES.includes(b.pay_style)) return res.status(400).json({ success: false, message: 'ค่า "วิธีจ่าย" ไม่ถูกต้อง' });
+      set.payStyle = b.pay_style;
     }
     if (Object.keys(set).length === 0) {
       return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });

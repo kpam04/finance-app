@@ -12,6 +12,7 @@ const schema = new mongoose.Schema({
   repeat:         { type: Boolean, default: true },   // ยกงบนี้ไปเดือนถัดไปอัตโนมัติ
   stopped:        { type: Boolean, default: false },  // หยุดใช้งบนี้ (ซ่อนจากรายการ และไม่ยกต่อ ตั้งใหม่ได้ภายหลัง)
   forecastNotified: { type: Boolean, default: false }, // แจ้งเตือนเชิงพยากรณ์ในเดือนนี้ไปแล้ว (ครั้งเดียวต่องบต่อเดือน)
+  payStyle:       { type: String, enum: ['auto', 'lump', 'spread'], default: 'auto' }, // วิธีจ่าย: auto = ระบบเดาจากประวัติ / lump = จ่ายเป็นก้อน / spread = ทยอยจ่าย (ใช้กับไฟสถานะ)
 }, { timestamps: true });
 
 schema.index({ user: 1, category: 1, month: 1, year: 1 }, { unique: true });

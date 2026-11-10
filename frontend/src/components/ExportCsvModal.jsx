@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import MonthPicker from './MonthPicker.jsx';
 
 // หน้าต่าง "ส่งออก CSV": เลือกช่วงเดือน (เดือนเดียวหรือหลายเดือน) / ทั้งหมด / ตามตัวกรองที่เลือกอยู่ + ประเภท
 // ช่วงเดือนเลือก เดือน + ปี (พ.ศ.) แยกกัน: ปีมีตั้งแต่ปีของรายการแรกถึงปีนี้ / เดือนของปีแรกเริ่มที่เดือนของรายการแรก
@@ -29,7 +30,7 @@ const splitYm = (ym) => ym.split('-').map(Number);
 
 const css = `
 .xm-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.45); }
-.xm-box { width: 460px; max-width: 100%; max-height: 92vh; overflow-y: auto; padding: 22px; border-radius: 14px; background: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
+.xm-box { width: 460px; max-width: 100%; max-height: 92vh; overflow: visible; padding: 22px; border-radius: 14px; background: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
 .xm-box h3 { margin: 0 0 14px; }
 .xm-sec { margin-bottom: 14px; }
 .xm-label { display: block; margin-bottom: 6px; font-size: 13px; color: #4b5563; font-weight: 600; }
@@ -39,15 +40,17 @@ const css = `
 .xm-opt small { display: block; color: #8A8177; font-size: 12px; margin-top: 2px; }
 .xm-range { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; margin-top: 10px; }
 .xm-range > span { font-size: 13px; color: #8A8177; }
-.xm-range select { width: 100%; margin: 0; }
-.xm-range select.xm-year { width: 96px; }
+.xm-range .xm-month { min-width: 0; }
+.xm-range .xm-year { width: 110px; }
 .xm-seg { display: flex; background: #EEE7DC; border-radius: 10px; padding: 3px; }
 .xm-seg button { flex: 1; border: none; background: none; padding: 7px 0; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer; color: #4b5563; }
 .xm-seg button.on { background: #FFFDFA; color: var(--primary-dark, #74896F); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .xm-seg button:disabled { cursor: not-allowed; opacity: 0.6; }
 .xm-count { margin: 4px 0 14px; font-size: 13px; color: #4b5563; }
 .xm-actions { display: flex; gap: 10px; }
-@media (max-width: 420px) { .xm-range select.xm-year { width: 84px; } }
+@media (max-width: 420px) { .xm-range .xm-year { width: 92px; } }
+/* จอเตี้ยมาก (เช่น มือถือแนวนอน) ให้เลื่อนภายในหน้าต่างได้ */
+@media (max-height: 640px) { .xm-box { overflow-y: auto; } }
 `;
 
 export default function ExportCsvModal({ filter, filterSummary, onClose }) {
@@ -101,14 +104,27 @@ export default function ExportCsvModal({ filter, filterSummary, onClose }) {
   const pickTo = (v) => { setTo(v); if (v < from) setFrom(v); };
   const ymSelects = (value, onPick, label) => {
     const [y, m] = splitYm(value);
+    // ช่องเลือกแบบเดียวกับช่องเลือกหมวด (แถบเลื่อนมินิมอล) เดือนปัจจุบันมีป้าย "(เดือนนี้)"
     return (
       <>
-        <select aria-label={`${label}: เดือน`} value={m} onChange={(e) => onPick(clampYm(y, Number(e.target.value)))}>
-          {monthsOf(y).map((mm) => <option key={mm} value={mm}>{MONTH_TH[mm - 1]}</option>)}
-        </select>
-        <select className="xm-year" aria-label={`${label}: ปี พ.ศ.`} value={y} onChange={(e) => onPick(clampYm(Number(e.target.value), m))}>
-          {years.map((yy) => <option key={yy} value={yy}>{yy + 543}</option>)}
-        </select>
+        <div className="xm-month">
+          <MonthPicker
+            options={monthsOf(y).map((mm) => ({ value: mm, label: MONTH_TH[mm - 1] }))}
+            value={m}
+            currentValue={y === curY ? curM : null}
+            onChange={(v) => onPick(clampYm(y, Number(v)))}
+            ariaLabel={`${label}: เดือน`}
+          />
+        </div>
+        <div className="xm-year">
+          <MonthPicker
+            options={years.slice().reverse().map((yy) => ({ value: yy, label: String(yy + 543) }))}
+            value={y}
+            currentValue={null}
+            onChange={(v) => onPick(clampYm(Number(v), m))}
+            ariaLabel={`${label}: ปี พ.ศ.`}
+          />
+        </div>
       </>
     );
   };

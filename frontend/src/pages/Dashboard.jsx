@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
+import { Link } from 'react-router-dom';
 import PlanSummary from '../components/PlanSummary.jsx';
+
+// ตัวเลขแบบไม่มีทศนิยม (ใช้ในแถบ "ใช้ได้อีก") ถ้ามีสตางค์จริงยังแสดงทศนิยม
+const baht0 = (n) => (n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
 
 const fmt = (n) =>
   (n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -457,6 +461,48 @@ function ExpensePieChart({ data }) {
 }
 
 
+// แถบ "ใช้ได้อีก" + รายการยอดเหลือแยกหมวด (เลื่อนขยายด้วย grid-template-rows 0fr ↔ 1fr)
+const spendCss = `
+  .sp-strip { margin: -4px 0 16px; padding: 10px 14px; border-radius: 12px; font-size: 14px; background: #fff; color: #4F6B47; border: 1px solid #E3E8DE; border-left: 4px solid #9AAB91; box-shadow: 0 1px 4px rgba(0,0,0,0.06); transition: border-color 0.2s, box-shadow 0.2s; }
+  .sp-strip:hover { border-color: #D5DECF; border-left-color: #74896F; box-shadow: 0 2px 8px rgba(79,107,71,0.10); }
+  .sp-strip.neg { color: #A2522A; border-color: #F3E1D5; border-left-color: #E2A27E; }
+  .sp-strip.neg:hover { border-color: #F1CDB7; border-left-color: #D08A60; box-shadow: 0 2px 8px rgba(162,82,42,0.10); }
+  .sp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .sp-muted { color: #8A8177; font-size: 13px; }
+  .sp-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+  .sp-link { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; background: #fff; border: 1px solid #C9D4C2; color: #5E7558; font-size: 13px; font-weight: 500; text-decoration: none; transition: border-color 0.2s, color 0.2s, box-shadow 0.2s; }
+  .sp-link svg { transition: transform 0.2s ease; }
+  .sp-link:hover { border-color: #9AAB91; color: #4F6B47; box-shadow: 0 1px 3px rgba(79,107,71,0.12); }
+  .sp-link:hover svg { transform: translateX(2px); }
+  .sp-strip.neg .sp-link { border-color: #EDC7AE; color: #A2522A; }
+  .sp-strip.neg .sp-link:hover { border-color: #E2A27E; }
+  .sp-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 999px; border: none; background: transparent; color: #74896F; cursor: pointer; transition: background 0.2s, color 0.2s; }
+  .sp-toggle:hover { background: rgba(116,137,111,0.12); color: #4F6B47; }
+  .sp-strip.neg .sp-toggle { color: #B9764F; }
+  .sp-chev { transition: transform 0.25s ease; }
+  .sp-chev.open { transform: rotate(180deg); }
+  .sp-details { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.25s ease, opacity 0.2s ease; }
+  .sp-details.open { grid-template-rows: 1fr; opacity: 1; }
+  .sp-details-inner { overflow: hidden; min-height: 0; }
+  .sp-list { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #E6EAE2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; row-gap: 12px; }
+  .sp-strip.neg .sp-list { border-top-color: #F3E1D5; }
+  .sp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 10px; row-gap: 5px; font-size: 13px; color: #4B4740; }
+  .sp-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+  .sp-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+  .sp-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-bar { grid-column: 1 / -1; grid-row: 2; height: 6px; border-radius: 999px; background: #F0F2EE; overflow: hidden; }
+  .sp-bar > span { display: block; height: 100%; border-radius: 999px; opacity: 0.85; }
+  .sp-amt { white-space: nowrap; text-align: right; color: #4F6B47; font-weight: 500; }
+  .sp-amt.over { color: #B9622F; }
+  .sp-amt .sp-muted { font-weight: 400; font-size: 12px; }
+  .sp-more { grid-column: 1 / -1; font-size: 12px; color: #74896F; text-decoration: none; justify-self: start; }
+  .sp-more:hover { text-decoration: underline; }
+  @media (max-width: 620px) {
+    .sp-list { grid-template-columns: 1fr; row-gap: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .sp-chev, .sp-details, .sp-link svg { transition: none; } }
+`;
+
 export default function Dashboard() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -464,6 +510,8 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const [insights, setInsights] = useState([]);
   const [planSummary, setPlanSummary] = useState(null); // สรุปการวางแผน (เฉพาะเดือนปัจจุบัน) โหลดแยก ถ้าโหลดไม่ได้ก็ไม่กระทบแดชบอร์ด
+  const [spendOpen, setSpendOpen] = useState(false); // แถบ "ใช้ได้อีก": เปิดดูยอดเหลือแยกหมวด (เปิดหน้ามาหุบไว้ก่อน)
+  const [spendable, setSpendable] = useState(null); // "ใช้ได้อีก" ตามงบ (เฉพาะเดือนปัจจุบัน) โหลดแยก ไม่กระทบแดชบอร์ดถ้าล้มเหลว
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -499,6 +547,18 @@ export default function Dashboard() {
     }
     let live = true;
     api.getPlanSummary().then((r) => { if (live) setPlanSummary(r.data); }).catch(() => { if (live) setPlanSummary(null); });
+    return () => { live = false; };
+  }, [month, year, curMonth, curYear]);
+
+  useEffect(() => {
+    if (month !== curMonth || year !== curYear) {
+      setSpendable(null);
+      return undefined;
+    }
+    let live = true;
+    api.get('/dashboard/spendable')
+      .then((r) => { if (live) setSpendable(r.data.data); })
+      .catch(() => { if (live) setSpendable(null); });
     return () => { live = false; };
   }, [month, year, curMonth, curYear]);
 
@@ -582,6 +642,7 @@ export default function Dashboard() {
 
   return (
     <div>
+      <style>{spendCss}</style>
       {header}
 
       {/* การ์ดสรุปยอด 3 ใบ: รายรับ (+ ยอดยกมา) / รายจ่าย / ยอดคงเหลือ */}
@@ -630,6 +691,79 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* แถบ "ใช้ได้อีก" ตามงบ (เฉพาะเดือนปัจจุบัน และมีงบอย่างน้อย 1 หมวด) กดลูกศรเพื่อดูยอดเหลือแยกหมวด */}
+      {spendable && spendable.has_budget && (() => {
+        const neg = spendable.available < 0;
+        const cats = spendable.categories || [];
+        const shown = cats.slice(0, 5);
+        const more = cats.length - shown.length;
+        return (
+          <div data-spendable className={`sp-strip${neg ? ' neg' : ''}`}>
+            <div className="sp-head">
+              <span className="sp-text">
+                {!neg
+                  ? <>💰 ใช้ได้อีก <strong>฿{baht0(spendable.available)}</strong> ตามงบ</>
+                  : <>ใช้เกินแผนไป <strong>฿{baht0(-spendable.available)}</strong> ลองดูหมวดที่ยังเหลือ</>}
+                {spendable.reserved > 0 && (
+                  <span className="sp-muted"> (กันค่าประจำไว้แล้ว ฿{baht0(spendable.reserved)})</span>
+                )}
+              </span>
+              <span className="sp-actions">
+                <Link to="/budgets" className="sp-link" data-spendable-link>
+                  ดูงบ
+                  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M2.5 6h7M6.5 3l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Link>
+                {cats.length > 0 && (
+                  <button
+                    type="button"
+                    className="sp-toggle"
+                    data-spendable-toggle
+                    aria-expanded={spendOpen}
+                    aria-label={spendOpen ? 'ซ่อนยอดแยกหมวด' : 'ดูยอดเหลือแยกหมวด'}
+                    title={spendOpen ? 'ซ่อนยอดแยกหมวด' : 'ดูยอดเหลือแยกหมวด'}
+                    onClick={() => setSpendOpen((v) => !v)}
+                  >
+                    <svg className={`sp-chev${spendOpen ? ' open' : ''}`} width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
+                      <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </span>
+            </div>
+            {cats.length > 0 && (
+              <div className={`sp-details${spendOpen ? ' open' : ''}`} data-spendable-details data-open={spendOpen ? 'true' : 'false'} aria-hidden={!spendOpen} inert={spendOpen ? undefined : ''}>
+                <div className="sp-details-inner">
+                  <div className="sp-list">
+                    {shown.map((c) => {
+                      const used = c.limit > 0 ? Math.min(100, ((c.spent + c.reserved) / c.limit) * 100) : 100;
+                      const over = c.remaining < 0;
+                      return (
+                        <div key={c.category_id} className="sp-row" data-spendable-row>
+                          <span className="sp-name">
+                            <span className="sp-dot" style={{ background: c.color }} />
+                            <span className="sp-ellipsis">{c.name}</span>
+                          </span>
+                          <span className="sp-bar"><span style={{ width: `${used}%`, background: over ? '#E2A27E' : c.color }} /></span>
+                          <span className={`sp-amt${over ? ' over' : ''}`}>
+                            {over ? `เกิน ฿${baht0(-c.remaining)}` : `เหลือ ฿${baht0(c.remaining)}`}
+                            {c.reserved > 0 && <span className="sp-muted"> (กันไว้ ฿{baht0(c.reserved)})</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {more > 0 && (
+                      <Link to="/budgets" className="sp-more">อีก {more} หมวด · ดูที่หน้างบ</Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {hasCarry && (
         <p data-carry-note style={{ fontSize: 12, color: '#9ca3af', margin: '-4px 0 16px' }}>

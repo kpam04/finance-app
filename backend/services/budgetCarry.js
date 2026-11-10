@@ -42,6 +42,7 @@ async function ensureCurrentMonth(userId, { now = Date.now() } = {}) {
         year: cur.year,
         amountLimit: src.amountLimit,
         alertThreshold: src.alertThreshold,
+        payStyle: src.payStyle || 'auto',
         enabled: true,
         repeat: true,
         stopped: false,

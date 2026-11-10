@@ -28,10 +28,12 @@ const css = `
 .cs-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; }
 .cs-panel { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; background: #fff; border: 1px solid var(--border, #E9E1D6); border-radius: 12px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16); }
 .cs-panel.up { top: auto; bottom: calc(100% + 4px); }
-.cs-list { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 4px; scrollbar-width: thin; scrollbar-color: #cfc8ba transparent; }
-.cs-list::-webkit-scrollbar { width: 8px; }
-.cs-list::-webkit-scrollbar-thumb { background: #cfc8ba; border-radius: 8px; }
-.cs-list::-webkit-scrollbar-track { background: transparent; }
+/* แถบเลื่อนมินิมอล: แคปซูลลอยสีเสจ ไม่มีราง ห่างขอบและมุมกล่อง (Firefox ใช้ได้แค่ความบาง + สี) */
+.cs-list { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 4px; scrollbar-width: thin; scrollbar-color: #9AAB91 transparent; }
+.cs-list::-webkit-scrollbar { width: 11px; }
+.cs-list::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+.cs-list::-webkit-scrollbar-thumb { background: #9AAB91; border-radius: 999px; border: 2px solid transparent; border-left-width: 3px; background-clip: padding-box; min-height: 28px; }
+.cs-list::-webkit-scrollbar-thumb:hover { background: #74896F; border: 2px solid transparent; border-left-width: 3px; background-clip: padding-box; }
 .cs-option { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; line-height: 1.4; color: var(--text, #3F3A34); }
 .cs-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .cs-option.active { background: #F3EFE6; }

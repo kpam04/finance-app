@@ -13,6 +13,27 @@ const STATUS = {
   over: { label: 'เกินงบ', color: '#dc2626' },
 };
 
+// ไฟสถานะตามจังหวะการใช้ (สีอ่อน ไม่ใช้สีแดง) — สำรองไว้ใช้ STATUS เดิมถ้า backend รุ่นเก่าไม่ส่ง pace_status
+const PACE = {
+  easy: { label: 'สบาย ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
+  careful: { label: 'ระวังนิดนึง', bg: '#FBF0D5', fg: '#946A12', bar: '#E5C36B' },
+  pause: { label: 'พักก่อน', bg: '#FBE4D6', fg: '#A2522A', bar: '#E8A07A' },
+  over: { label: 'เกินงบ', bg: '#FBE4D6', fg: '#A2522A', bar: '#E8A07A' },
+  within: { label: 'อยู่ในงบ ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
+  paid: { label: 'จ่ายแล้ว ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
+  unpaid: { label: 'ยังไม่จ่าย', bg: '#EEE7DC', fg: '#6B6258', bar: '#CFC5B6' },
+};
+const PAY_STYLE_TH = { auto: 'อัตโนมัติ', lump: 'จ่ายเป็นก้อน', spread: 'ทยอยจ่าย' };
+const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+// กลุ่มเงินที่กันไว้: "Netflix 25 พ.ย." / "ทดสอบรายวัน ×4 · 12–15 พ.ย."
+const groupText = (g) => {
+  const name = g.note || 'รายการประจำ';
+  if (g.count <= 1) return `${name} ${shortDate(g.first)}`;
+  const sameMonth = g.first.slice(0, 7) === g.last.slice(0, 7);
+  const range = sameMonth ? `${Number(g.first.slice(8))}–${shortDate(g.last)}` : `${shortDate(g.first)}–${shortDate(g.last)}`;
+  return `${name} ×${g.count} · ${range}`;
+};
+
 const money = (n) =>
   Number(n).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -31,6 +52,14 @@ const field = { width: '100%', boxSizing: 'border-box' };
 //  คอมพิวเตอร์: ชื่อ ซ้าย | เดือน ปี ปุ่ม ขวา ในแถวเดียว
 //  มือถือ (ไม่เกิน 640px): แถว 1 = ชื่อ ซ้าย + ปุ่มตั้งงบ ขวา / แถว 2 = เดือนและปีในแถวเดียวกัน
 const css = `
+  .bd-toggle { display: inline-flex; align-items: center; gap: 4px; border: none; background: none; padding: 2px 0; font: inherit; font-size: 12px; color: #74896F; cursor: pointer; white-space: nowrap; }
+  .bd-toggle:hover { color: #4F6B47; }
+  .bd-chev { transition: transform 0.25s ease; }
+  .bd-chev.open { transform: rotate(180deg); }
+  .bd-details { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.25s ease, opacity 0.2s ease; }
+  .bd-details.open { grid-template-rows: 1fr; opacity: 1; }
+  .bd-details-inner { overflow: hidden; min-height: 0; }
+  @media (prefers-reduced-motion: reduce) { .bd-chev, .bd-details { transition: none; } }
 .bd-head {
   display: flex;
   align-items: center;
@@ -96,7 +125,7 @@ const css = `
 }
 `;
 
-const emptyForm = () => ({ category_id: '', amount_limit: '', alert_threshold: '80', repeat: true });
+const emptyForm = () => ({ category_id: '', amount_limit: '', alert_threshold: '80', repeat: true, pay_style: 'auto' });
 
 // แจ้งให้กระดิ่งแจ้งเตือนโหลดใหม่ทันที (ไม่ต้องรอรอบ 60 วินาที)
 const refreshBell = () => {
@@ -181,6 +210,12 @@ export default function Budgets() {
   const [deleteTarget, setDeleteTarget] = useState(null); // งบที่กำลังจะลบ (เปิดป๊อปอัปยืนยัน)
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [openIds, setOpenIds] = useState(() => new Set()); // การ์ดงบที่เปิดดูรายละเอียดอยู่
+  const toggleOpen = (id) => setOpenIds((s) => {
+    const n = new Set(s);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
 
   // กดการแจ้งเตือนตอนอยู่หน้านี้อยู่แล้ว: URL เปลี่ยนแต่หน้าไม่โหลดใหม่ ให้ปรับเดือน/ปีตาม URL
   const urlMonth = fromUrl ? fromUrl.month : null;
@@ -254,6 +289,7 @@ export default function Budgets() {
       amount_limit: String(b.amount_limit),
       alert_threshold: String(b.alert_threshold),
       repeat: b.repeat !== false,
+      pay_style: b.pay_style || 'auto',
     });
     setFormError('');
     setShowForm(true);
@@ -270,6 +306,7 @@ export default function Budgets() {
         amount_limit: Number(form.amount_limit),
         alert_threshold: Number(form.alert_threshold),
         repeat: form.repeat,
+        pay_style: form.pay_style,
         period_month: month,
         period_year: year,
       });
@@ -355,14 +392,26 @@ export default function Budgets() {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, margin: '14px 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14, margin: '14px 0', alignItems: 'start' }}>
           {budgets.map((b) => {
             // backend รุ่นเก่าไม่ส่ง enabled/repeat: ถือว่าเปิดใช้และต่อเนื่อง
             const enabled = b.enabled !== false;
             const repeat = b.repeat !== false;
-            const st = enabled ? STATUS[b.status] || STATUS.ok : { label: 'ปิดไว้เดือนนี้', color: '#9ca3af' };
+            const old = enabled ? STATUS[b.status] || STATUS.ok : { label: 'ปิดไว้เดือนนี้', color: '#9ca3af' };
+            const pace = enabled && b.pace_status ? PACE[b.pace_status] : null;
+            const st = pace ? { label: pace.label, color: pace.bar } : old;
+            const chip = pace ? { background: pace.bg, color: pace.fg } : { background: old.color, color: '#fff' };
             const over = b.spent - b.amount_limit;
             const f = b.forecast;
+            const isOpen = openIds.has(b.budget_id);
+            const forecastLine = f ? (
+              <div data-forecast style={{ fontSize: 12, marginTop: 4, color: f.will_exceed ? '#b45309' : '#6b7280' }}>
+                คาดการณ์สิ้นเดือน ฿{money(f.projected)}{' '}
+                {f.will_exceed
+                  ? `(เกินงบ ฿${money(f.over)}${f.reach_day ? ` · คาดว่าถึงวงเงินประมาณวันที่ ${f.reach_day}` : ''})`
+                  : '(ไม่เกินงบ)'}
+              </div>
+            ) : null;
             return (
               <div
                 key={b.budget_id}
@@ -378,8 +427,9 @@ export default function Budgets() {
                     {b.category_name}
                   </strong>
                   <span
+                    data-pace={b.pace_status || b.status}
                     style={{
-                      fontSize: 12, padding: '2px 10px', borderRadius: 999, color: '#fff', background: st.color,
+                      fontSize: 12, padding: '2px 10px', borderRadius: 999, fontWeight: 600, ...chip,
                     }}
                   >
                     {st.label}
@@ -396,29 +446,59 @@ export default function Budgets() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 14 }}>
                   <span>฿{money(b.spent)} / ฿{money(b.amount_limit)}</span>
-                  <strong style={{ color: st.color }}>{b.percent_used}%</strong>
+                  <strong style={{ color: pace ? pace.fg : st.color }}>{b.percent_used}%</strong>
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                  {enabled
-                    ? `${over > 0 ? `เกินงบ ฿${money(over)}` : `เหลือ ฿${money(-over)}`} · แจ้งเตือนที่ ${b.alert_threshold}%`
-                    : 'ปิดงบนี้ไว้ในเดือนนี้ (ไม่คำนวณและไม่แจ้งเตือน เดือนหน้ากลับมาเปิดเอง)'}
-                </div>
-
-                {/* คาดการณ์สิ้นเดือน (แสดงเมื่อผ่านไปอย่างน้อย 7 วันและมีรายจ่ายอย่างน้อย 3 รายการ) */}
-                {f && (
-                  <div
-                    data-forecast
-                    style={{ fontSize: 12, marginTop: 4, color: f.will_exceed ? '#b45309' : '#6b7280' }}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  <span>
+                    {enabled
+                      ? (over > 0 ? `เกินงบ ฿${money(over)}` : `เหลือ ฿${money(-over)}`)
+                      : 'ปิดงบนี้ไว้ในเดือนนี้ (ไม่คำนวณและไม่แจ้งเตือน เดือนหน้ากลับมาเปิดเอง)'}
+                  </span>
+                  <button
+                    type="button"
+                    data-detail-toggle
+                    aria-expanded={isOpen}
+                    onClick={() => toggleOpen(b.budget_id)}
+                    className="bd-toggle"
                   >
-                    คาดการณ์สิ้นเดือน ฿{money(f.projected)}{' '}
-                    {f.will_exceed
-                      ? `(เกินงบ ฿${money(f.over)}${f.reach_day ? ` · คาดว่าถึงวงเงินประมาณวันที่ ${f.reach_day}` : ''})`
-                      : '(ไม่เกินงบ)'}
-                  </div>
-                )}
+                    {isOpen ? 'ซ่อนรายละเอียด' : 'รายละเอียด'}
+                    <svg className={`bd-chev${isOpen ? ' open' : ''}`} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                      <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
 
-                <div data-repeat-note style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                  {repeat ? 'ต่อเนื่องทุกเดือน' : 'เฉพาะเดือนนี้ (ไม่ยกไปเดือนถัดไป)'}
+                {/* คาดการณ์ว่าจะเกินงบ = คำเตือน แสดงตลอด (ไม่ซ่อนในรายละเอียด) */}
+                {f && f.will_exceed && forecastLine}
+
+                {/* รายละเอียด: เลื่อนขยาย/หุบด้วย grid-template-rows (0fr ↔ 1fr) */}
+                <div className={`bd-details${isOpen ? ' open' : ''}`} data-budget-details data-open={isOpen ? 'true' : 'false'} aria-hidden={!isOpen} inert={isOpen ? undefined : ''}>
+                  <div className="bd-details-inner">
+                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #E9E1D6' }}>
+                    {/* จังหวะการใช้ (ทยอยจ่าย) / วิธีจ่าย (จ่ายเป็นก้อน) */}
+                    {enabled && b.pace_status && (b.lumpy || b.elapsed_pct < 100) && (
+                      <div data-pace-note style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                        {b.lumpy
+                          ? `จ่ายเป็นก้อน${b.pay_style === 'auto' ? ' (ระบบดูจากประวัติ)' : ''}`
+                          : `ผ่านไป ${Math.round(b.elapsed_pct)}% ของเดือน · ใช้ไป ${b.percent_used}% ของงบ`}
+                      </div>
+                    )}
+
+                    {/* เงินที่กันไว้: รายการเกิดซ้ำในหมวดนี้ที่ยังไม่ถึงวันจ่ายในเดือนนี้ (รวมรอบของรายการเดียวกัน) */}
+                    {enabled && b.reserved && b.reserved.total > 0 && (
+                      <div data-reserved style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                        กันไว้ ฿{money(b.reserved.total)} ({(b.reserved.groups || []).map(groupText).join(', ')})
+                      </div>
+                    )}
+
+                    {/* คาดการณ์สิ้นเดือนกรณีไม่เกินงบ (แสดงเมื่อผ่านไปอย่างน้อย 7 วันและมีรายจ่ายอย่างน้อย 3 รายการ) */}
+                    {f && !f.will_exceed && forecastLine}
+
+                    <div data-repeat-note style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                      {enabled ? `แจ้งเตือนที่ ${b.alert_threshold}% · ` : ''}{repeat ? 'ต่อเนื่องทุกเดือน' : 'เฉพาะเดือนนี้ (ไม่ยกไปเดือนถัดไป)'}
+                    </div>
+                  </div>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
@@ -526,6 +606,23 @@ export default function Budgets() {
                     onChange={(e) => setForm({ ...form, alert_threshold: e.target.value })}
                     required
                   />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={label}>วิธีจ่าย</label>
+                <select
+                  style={field}
+                  data-pay-style
+                  value={form.pay_style}
+                  onChange={(e) => setForm({ ...form, pay_style: e.target.value })}
+                >
+                  <option value="auto">อัตโนมัติ (ให้ระบบดูจากประวัติ)</option>
+                  <option value="lump">จ่ายเป็นก้อน (เช่น ค่าเช่า ค่าไฟ ค่าเทอม)</option>
+                  <option value="spread">ทยอยจ่าย (เช่น ค่าอาหาร ค่าเดินทาง)</option>
+                </select>
+                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                  ใช้กับไฟสถานะ: จ่ายเป็นก้อนจะแสดง “จ่ายแล้ว / ยังไม่จ่าย” แทนการเทียบกับจำนวนวันที่ผ่านไป
                 </div>
               </div>
 
