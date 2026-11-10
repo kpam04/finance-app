@@ -535,7 +535,7 @@ export default function Dashboard() {
         </select>
         <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
           {[now.getFullYear() - 2, now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
-            <option key={y} value={y}>{y + 543} ({y})</option>
+            <option key={y} value={y}>{y + 543}</option>
           ))}
         </select>
       </div>

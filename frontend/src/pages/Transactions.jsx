@@ -1,5 +1,3 @@
-
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
@@ -9,6 +7,7 @@ import { editedFields } from '../utils/aiDrafts.js';
 import CategorySelect from '../components/CategorySelect.jsx';
 import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
 import InfoTitle from '../components/InfoTitle.jsx';
+import ExportCsvModal from '../components/ExportCsvModal.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
 const today = () => {
@@ -128,7 +127,7 @@ export default function Transactions() {
   const [editingId, setEditingId] = useState(null);
 
   // สถานะการแจ้งเตือนและการบันทึก
-  const [exporting, setExporting] = useState(false); // กำลังส่งออก CSV
+  const [showExport, setShowExport] = useState(false); // หน้าต่างส่งออก CSV
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -168,26 +167,6 @@ export default function Transactions() {
     load();
   }, [load]);
 
-  // ส่งออก CSV ตามตัวกรองที่เลือกอยู่ (ไม่กรอง = ทุกรายการ) ได้ไฟล์ตรงกับที่เห็นในตาราง
-  const exportCsv = async () => {
-    setExporting(true);
-    setError('');
-    try {
-      const blob = await api.exportTransactionsCsv(filter);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `รายรับรายจ่าย_${today()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setExporting(false);
-    }
-  };
 
   // หมวดที่ใช้เลือกได้ (ไม่รวมหมวดที่ซ่อน) สำหรับฟอร์มและ AI
   const activeCats = useMemo(() => cats.filter((c) => !c.hidden), [cats]);
@@ -381,6 +360,21 @@ export default function Transactions() {
 
   // มีตัวกรองที่ใช้อยู่หรือไม่ (ใช้ขึ้นปุ่ม "ล้างตัวกรอง" และเลือกข้อความหน้าว่าง)
   const hasFilter = !!(filter.type || filter.category_id || filter.start || filter.end);
+
+  // สรุปตัวกรองที่เลือกอยู่ (แสดงในหน้าต่างส่งออก CSV)
+  const filterSummary = useMemo(() => {
+    const th = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { dateStyle: 'medium' });
+    const parts = [];
+    if (filter.type) parts.push(filter.type === 'income' ? 'รายรับ' : 'รายจ่าย');
+    if (filter.category_id) {
+      const c = cats.find((x) => String(x.category_id) === String(filter.category_id));
+      if (c) parts.push(c.name);
+    }
+    if (filter.start && filter.end) parts.push(`${th(filter.start)} – ${th(filter.end)}`);
+    else if (filter.start) parts.push(`ตั้งแต่ ${th(filter.start)}`);
+    else if (filter.end) parts.push(`ถึง ${th(filter.end)}`);
+    return parts.join(' · ');
+  }, [filter, cats]);
   const clearFilters = () => {
     setPage(1);
     setFilter({ type: '', category_id: '', start: '', end: '' });
@@ -466,17 +460,16 @@ export default function Transactions() {
         <div className="tx-list-head" data-tx-list-head>
           <InfoTitle title="📋 รายการที่บันทึกแล้ว" label="คำอธิบายส่วนนี้" popId="tx-info-pop">
             <p>ใช้ตัวกรองเพื่อค้นหาเท่านั้น ไม่ได้ใช้เพิ่มรายการ ถ้าจะเพิ่มรายการใช้กล่อง “เพิ่มรายการใหม่” ด้านบน</p>
-            <p>ปุ่ม “ส่งออก CSV” ดาวน์โหลดรายการตามตัวกรองที่เลือกอยู่ (ไม่กรอง = ทุกรายการ) เปิดด้วย Excel ได้</p>
+            <p>ปุ่ม “ส่งออก CSV” ดาวน์โหลดรายการเป็นไฟล์ที่เปิดด้วย Excel ได้ เลือกได้ทั้งช่วงเดือน ทั้งหมด หรือตามตัวกรองที่เลือกอยู่</p>
           </InfoTitle>
           <button
             type="button"
             className="btn btn-sm btn-light tx-export"
             data-tx-export
-            onClick={exportCsv}
-            disabled={exporting || !pagination.total}
-            title={pagination.total ? 'ดาวน์โหลดรายการตามตัวกรองที่เลือกเป็นไฟล์ CSV' : 'ไม่มีรายการให้ส่งออก'}
+            onClick={() => setShowExport(true)}
+            title="ดาวน์โหลดรายการเป็นไฟล์ CSV (เลือกช่วงเดือนได้)"
           >
-            {exporting ? 'กำลังส่งออก...' : '⬇️ ส่งออก CSV'}
+            ⬇️ ส่งออก CSV
           </button>
         </div>
 
@@ -853,6 +846,8 @@ export default function Transactions() {
       {/* =================================
           AI CONFIRMATION MODAL
       ================================= */}
+
+      {showExport && <ExportCsvModal filter={filter} filterSummary={filterSummary} onClose={() => setShowExport(false)} />}
 
       {aiDraft && (
         <AiConfirmModal
