@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
 // ป๊อปอัปเพิ่ม/แก้ไขเป้าหมายการออม (ชื่อ ยอดเป้าหมาย ยอดที่ออมแล้ว วันที่อยากถึง) ข้อความผิดพลาดจากหลังบ้านแสดงในป๊อปอัป
+// reopen = ย้ายเป้าที่สำเร็จแล้วกลับไปกำลังออม (กรณีกรอกยอดผิด) ต้องแก้ยอดที่ออมแล้วให้น้อยกว่ายอดเป้าหมาย
+// onSaved(goal, data): data.just_completed = ยอดออมถึงเป้า ระบบย้ายไป "สำเร็จแล้ว" ให้ (data.achievement)
 const css = `
 .gm-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.45); }
 .gm-box { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 20px; border-radius: 16px; background: #fff; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25); }
@@ -11,6 +13,7 @@ const css = `
 .gm-field > small { font-size: 12px; color: #8A8177; }
 .gm-field input { width: 100%; box-sizing: border-box; min-width: 0; }
 .gm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.gm-note { margin: -6px 0 12px; padding: 8px 12px; border-radius: 8px; background: #F6F1E3; color: #6E5520; font-size: 13px; line-height: 1.6; }
 .gm-error { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
 `;
 
@@ -19,7 +22,7 @@ const tomorrow = () => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function GoalModal({ goal, onClose, onSaved }) {
+export default function GoalModal({ goal, reopen = false, onClose, onSaved }) {
   const editing = !!goal;
   const [name, setName] = useState(editing ? goal.name : '');
   const [target, setTarget] = useState(editing ? String(goal.target_amount) : '');
@@ -42,9 +45,12 @@ export default function GoalModal({ goal, onClose, onSaved }) {
     setError('');
     setBusy(true);
     try {
-      const body = { name, target_amount: target, saved_amount: saved === '' ? 0 : saved, target_date: date };
+      const body = { name, target_amount: target, saved_amount: saved === '' ? 0 : saved };
+      // แก้ไข: ส่งวันที่เฉพาะเมื่อเปลี่ยน (เป้าที่เลยกำหนดแล้วแก้ช่องอื่นได้โดยไม่ต้องเลื่อนวันที่)
+      if (!editing || date !== goal.target_date) body.target_date = date;
+      if (reopen) body.reopen = true;
       const res = editing ? await api.updateGoal(goal.goal_id, body) : await api.createGoal(body);
-      onSaved(res.data.goal);
+      onSaved(res.data.goal, res.data);
     } catch (err) {
       setError(err.message || 'บันทึกไม่สำเร็จ');
     } finally {
@@ -56,7 +62,8 @@ export default function GoalModal({ goal, onClose, onSaved }) {
     <div className="gm-overlay" data-goal-modal onClick={onClose}>
       <style>{css}</style>
       <form className="gm-box" role="dialog" aria-modal="true" aria-labelledby="gm-title" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h3 id="gm-title">{editing ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมายการออม'}</h3>
+        <h3 id="gm-title">{reopen ? 'ย้ายกลับไปกำลังออม' : editing ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมายการออม'}</h3>
+        {reopen && <p className="gm-note" data-gm-reopen-note>แก้ “ออมไว้แล้ว” ให้เป็นยอดที่ถูกต้อง (ต้องน้อยกว่ายอดเป้าหมาย) แล้วกดบันทึก เป้าหมายจะกลับไปอยู่ใน “กำลังออม”</p>}
         {error && <p className="gm-error" data-form-error role="alert">{error}</p>}
         <label className="gm-field">
           <span>ชื่อเป้าหมาย</span>
@@ -69,11 +76,11 @@ export default function GoalModal({ goal, onClose, onSaved }) {
         <label className="gm-field">
           <span>ออมไว้แล้ว (บาท)</span>
           <input type="number" inputMode="decimal" min="0" step="any" value={saved} placeholder="ไม่บังคับ" onChange={(e) => setSaved(e.target.value)} data-gm-saved />
-          <small>ตอนนี้ระบบยังไม่ติดตามการออมให้อัตโนมัติ ถ้าออมไปเพิ่ม มาแก้ตัวเลขนี้เอง ระบบจะคำนวณใหม่</small>
+          <small>ตอนนี้ระบบยังไม่ติดตามการออมให้อัตโนมัติ ถ้าออมไปเพิ่ม มาแก้ตัวเลขนี้เอง ระบบจะคำนวณใหม่ ถ้าถึงยอดเป้าหมาย ระบบจะย้ายไป “สำเร็จแล้ว” ให้</small>
         </label>
         <label className="gm-field">
           <span>อยากถึงเป้าหมายภายในวันที่</span>
-          <input type="date" value={date} min={tomorrow()} required onChange={(e) => setDate(e.target.value)} data-gm-date />
+          <input type="date" value={date} min={editing && date === goal.target_date ? undefined : tomorrow()} required onChange={(e) => setDate(e.target.value)} data-gm-date />
         </label>
         <div className="gm-actions">
           <button type="button" className="btn btn-light" onClick={onClose} disabled={busy} data-gm-cancel>ยกเลิก</button>

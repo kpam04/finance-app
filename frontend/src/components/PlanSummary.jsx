@@ -65,7 +65,7 @@ export default function PlanSummary({ summary }) {
           <div>{GOAL_STATUS[g.status] || ''}{g.status === 'behind' && g.required_monthly ? ` (ต้องออมเดือนละ ${baht(g.required_monthly)})` : ''}</div>
         </div>
       ) : (
-        <SafeLink to="/plan" className="ps-link" data-ps-setgoal>ตั้งเป้าหมายการออม →</SafeLink>
+        <SafeLink to="/plan?tab=goals" className="ps-link" data-ps-setgoal>ตั้งเป้าหมายการออม →</SafeLink>
       )}
       <div><SafeLink to="/plan" className="ps-link" data-ps-link>ดูการวิเคราะห์ทั้งหมด →</SafeLink></div>
     </div>

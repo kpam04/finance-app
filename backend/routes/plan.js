@@ -43,6 +43,33 @@ function goalOut(g, analysis, todayIso) {
   return { goal_id: String(g._id), name: g.name, target_amount: g.target_amount, saved_amount: g.saved_amount, target_date, ...ev };
 }
 
+const isoDay = (d) => new Date(d).toISOString().slice(0, 10);
+const bkkDay = (d) => new Date(new Date(d).getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10); // วันที่ตามเวลาไทย
+const isDone = (g) => !!g.completed_at;
+const reachedTarget = (g) => Number(g.saved_amount) >= Number(g.target_amount);
+
+// เป้าที่ออมสำเร็จแล้ว (ประวัติ): ใช้เวลากี่วัน และเร็ว/ช้ากว่ากำหนดกี่วัน (บวก = เร็วกว่ากำหนด)
+function achievementOut(g) {
+  const start = bkkDay(g.createdAt || g.completed_at);
+  const done = bkkDay(g.completed_at);
+  const target = isoDay(g.target_date);
+  const days = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+  return {
+    goal_id: String(g._id), name: g.name, target_amount: g.target_amount, saved_amount: g.saved_amount,
+    target_date: target, started_at: start, completed_at: done,
+    duration_days: Math.max(0, days(start, done)), early_days: days(done, target),
+  };
+}
+
+// ย้ายเป้าที่ยอดออมถึงเป้าแล้ว (แต่ยังไม่ถูกปิด เช่น ข้อมูลก่อนมีระบบนี้) ไปเป็น "สำเร็จแล้ว" ใช้วันที่แก้ไขล่าสุดเป็นวันที่สำเร็จ
+async function autoComplete(goals) {
+  const pending = goals.filter((g) => !isDone(g) && reachedTarget(g));
+  for (const g of pending) {
+    g.completed_at = g.updatedAt || new Date();
+    await Goal.updateOne({ _id: g._id, completed_at: null }, { $set: { completed_at: g.completed_at } });
+  }
+}
+
 async function loadPlan(userId, monthParam) {
   const todayIso = bangkokToday();
   const pm = parseMonthKey(monthParam) || parseMonthKey(todayIso.slice(0, 7));
@@ -55,14 +82,17 @@ async function loadPlan(userId, monthParam) {
     Goal.find({ user: userId }).sort({ createdAt: 1 }).lean(),
   ]);
   const analysis = analyze({ txns, categories: cats, todayIso, month: monthKeyOf(pm.year, pm.month) });
+  await autoComplete(goals);
+  const active = goals.filter((g) => !isDone(g));
+  const achievements = goals.filter(isDone).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).map(achievementOut);
   // เป้าหมายการออมเป็นเรื่องระยะยาว ไม่ผูกกับเดือนที่ดู: ประเมิน ณ ปัจจุบันเสมอ (ดูเดือนที่ผ่านมาก็เห็นสถานะปัจจุบันของเป้าหมาย)
   // ส่วนข้อเท็จจริง/คำแนะนำของเดือนที่ผ่านมาไม่พูดถึงเป้าหมาย (ตัวเลขฐานเป็นของเดือนนั้น)
   let goalEvals;
-  if (analysis.is_current) goalEvals = goals.map((g) => goalOut(g, analysis, todayIso));
-  else if (goals.length === 0) goalEvals = [];
+  if (analysis.is_current) goalEvals = active.map((g) => goalOut(g, analysis, todayIso));
+  else if (active.length === 0) goalEvals = [];
   else goalEvals = (await loadPlan(userId)).goalEvals;
   const facts = buildFacts(analysis, analysis.is_current ? goalEvals : []);
-  return { todayIso, analysis, goalEvals, facts, currentMonth: todayIso.slice(0, 7) };
+  return { todayIso, analysis, goalEvals, achievements, facts, currentMonth: todayIso.slice(0, 7) };
 }
 
 const savedOut = (doc, stale = false) => (doc ? { items: doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: i.facts_used, rating: i.rating || 0, source: 'ai' })), generated_at: doc.generated_at, model: doc.model, stale } : null);
@@ -81,9 +111,9 @@ async function aiState(userId) {
 // ภาพรวมทั้งหมดของหน้า "วางแผน"
 router.get('/overview', async (req, res) => {
   try {
-    const { analysis, goalEvals, facts, currentMonth } = await loadPlan(req.userId, req.query.month);
+    const { analysis, goalEvals, achievements, facts, currentMonth } = await loadPlan(req.userId, req.query.month);
     const saved = await PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean();
-    res.json({ success: true, data: { month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, max_goals: MAX_GOALS, rules_advice: rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals)), ai: await aiState(req.userId) } });
+    res.json({ success: true, data: { month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, achievements, max_goals: MAX_GOALS, rules_advice: rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals)), ai: await aiState(req.userId) } });
   } catch (e) {
     console.error('[plan/overview]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
@@ -93,7 +123,7 @@ router.get('/overview', async (req, res) => {
 // สรุปย่อสำหรับการ์ดบนแดชบอร์ด (เฉพาะเดือนปัจจุบัน ไม่เรียก AI)
 router.get('/summary', async (req, res) => {
   try {
-    const { analysis, goalEvals, facts } = await loadPlan(req.userId);
+    const { analysis, goalEvals, achievements, facts } = await loadPlan(req.userId);
     const saved = await PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean();
     const g = goalEvals[0] || null;
     res.json({
@@ -109,6 +139,7 @@ router.get('/summary', async (req, res) => {
         ai_advice_first: saved && saved.items[0] ? { tag: saved.items[0].tag, text: saved.items[0].text, facts_used: saved.items[0].facts_used } : null,
         goal: g ? { goal_id: g.goal_id, name: g.name, target_amount: g.target_amount, saved_amount: g.saved_amount, progress_pct: g.progress_pct, status: g.status, required_monthly: g.required_monthly, capacity_monthly: g.capacity_monthly, target_date: g.target_date } : null,
         goal_count: goalEvals.length,
+        achieved_count: achievements.length,
       },
     });
   } catch (e) {
@@ -221,8 +252,8 @@ const toDate = (iso) => new Date(`${iso}T00:00:00.000Z`);
 
 router.get('/goals', async (req, res) => {
   try {
-    const { goalEvals } = await loadPlan(req.userId);
-    res.json({ success: true, data: { goals: goalEvals, max_goals: MAX_GOALS } });
+    const { goalEvals, achievements } = await loadPlan(req.userId);
+    res.json({ success: true, data: { goals: goalEvals, achievements, max_goals: MAX_GOALS } });
   } catch (e) {
     console.error('[plan/goals]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
@@ -241,10 +272,13 @@ router.post('/goals', async (req, res) => {
     if (saved.error) return fail(res, 400, saved.error);
     const date = parseTargetDate(b.target_date, todayIso);
     if (date.error) return fail(res, 400, date.error);
-    if ((await Goal.countDocuments({ user: req.userId })) >= MAX_GOALS) return fail(res, 400, `ตั้งเป้าหมายได้สูงสุด ${MAX_GOALS} เป้าหมาย ลบเป้าหมายเดิมก่อนถ้าต้องการเพิ่ม`);
-    const created = await Goal.create({ user: req.userId, name: name.value, target_amount: target.value, saved_amount: saved.value, target_date: toDate(date.value) });
+    if ((await Goal.countDocuments({ user: req.userId, completed_at: null })) >= MAX_GOALS) return fail(res, 400, `ตั้งเป้าหมายที่กำลังออมได้สูงสุด ${MAX_GOALS} เป้าหมาย`);
+    const done = saved.value >= target.value; // ออมครบตั้งแต่ตอนสร้าง → เป็น "สำเร็จแล้ว" ทันที
+    const created = await Goal.create({ user: req.userId, name: name.value, target_amount: target.value, saved_amount: saved.value, target_date: toDate(date.value), completed_at: done ? new Date() : null });
+    const obj = created.toObject ? created.toObject() : created;
+    if (done) return res.status(201).json({ success: true, message: 'เพิ่มเป้าหมายแล้ว', data: { goal: null, just_completed: true, achievement: achievementOut(obj) } });
     const { analysis } = await loadPlan(req.userId);
-    res.status(201).json({ success: true, message: 'เพิ่มเป้าหมายแล้ว', data: { goal: goalOut(created.toObject ? created.toObject() : created, analysis, todayIso) } });
+    res.status(201).json({ success: true, message: 'เพิ่มเป้าหมายแล้ว', data: { goal: goalOut(obj, analysis, todayIso) } });
   } catch (e) {
     console.error('[plan/goals/create]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
@@ -263,10 +297,25 @@ router.put('/goals/:id', async (req, res) => {
     if (b.target_amount !== undefined) { const r = parseAmount(b.target_amount, 'ยอดเป้าหมาย'); if (r.error) return fail(res, 400, r.error); set.target_amount = r.value; }
     if (b.saved_amount !== undefined) { const r = parseSaved(b.saved_amount); if (r.error) return fail(res, 400, r.error); set.saved_amount = r.value; }
     if (b.target_date !== undefined) { const r = parseTargetDate(b.target_date, todayIso); if (r.error) return fail(res, 400, r.error); set.target_date = toDate(r.value); }
-    if (Object.keys(set).length === 0) return fail(res, 400, 'ไม่มีข้อมูลที่จะแก้ไข');
+    const reopen = b.reopen === true; // ย้ายเป้าที่สำเร็จแล้วกลับไปกำลังออม (กรณีกรอกยอดผิด)
+    if (isDone(goal) && !reopen) return fail(res, 400, 'เป้าหมายนี้สำเร็จแล้ว ถ้าจะแก้ไข ให้ย้ายกลับไปกำลังออมก่อน');
+    if (!isDone(goal) && Object.keys(set).length === 0) return fail(res, 400, 'ไม่มีข้อมูลที่จะแก้ไข');
+    const next = { ...goal, ...set };
+    if (reopen && isDone(goal)) {
+      if (reachedTarget(next)) return fail(res, 400, 'ยอดที่ออมแล้วยังเท่ากับหรือมากกว่ายอดเป้าหมาย แก้ยอดที่ออมแล้วให้น้อยกว่าเป้าหมายก่อนย้ายกลับ');
+      if ((await Goal.countDocuments({ user: req.userId, completed_at: null })) >= MAX_GOALS) return fail(res, 400, `มีเป้าหมายที่กำลังออมครบ ${MAX_GOALS} เป้าแล้ว ย้ายกลับไม่ได้`);
+      set.completed_at = null;
+    }
+    // ยอดออมถึงเป้าแล้ว → ปิดเป้าเป็น "สำเร็จแล้ว" อัตโนมัติ
+    const justCompleted = !isDone(goal) && reachedTarget(next);
+    if (justCompleted) set.completed_at = new Date();
     await Goal.updateOne({ _id: goal._id }, { $set: set });
+    if (justCompleted) {
+      const fresh = await Goal.findById(goal._id).lean();
+      return res.json({ success: true, message: 'ออมครบตามเป้าหมายแล้ว', data: { goal: null, just_completed: true, achievement: achievementOut(fresh) } });
+    }
     const { goalEvals } = await loadPlan(req.userId);
-    res.json({ success: true, message: 'บันทึกการแก้ไขแล้ว', data: { goal: goalEvals.find((g) => g.goal_id === String(goal._id)) } });
+    res.json({ success: true, message: reopen ? 'ย้ายกลับไปกำลังออมแล้ว' : 'บันทึกการแก้ไขแล้ว', data: { goal: goalEvals.find((g) => g.goal_id === String(goal._id)) || null } });
   } catch (e) {
     console.error('[plan/goals/update]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
