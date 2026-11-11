@@ -41,7 +41,8 @@ function buildFacts(analysis, goalEvals = [], inst = null) {
     const nm = clip(c.name, 30);
     const sn = clip(c.name, 14);
     add(`cat${i}_amount`, `หมวด “${nm}” ${when}`, c.amount, 'บาท', sn);
-    add(`cat${i}_base`, c.lumpy ? `หมวด “${nm}” ค่าเฉลี่ยทั้งเดือน` : `หมวด “${nm}” ค่าเฉลี่ยตามสัดส่วนวัน`, c.expected_to_date, 'บาท', 'เฉลี่ย');
+    // หมวดจ่ายเป็นก้อนเทียบค่าเฉลี่ยทั้งเดือน / หมวดทั่วไปเทียบระดับปกติถึงวันนี้ (ป้ายสั้นต่างกัน จะได้ไม่สับสน)
+    add(`cat${i}_base`, c.lumpy ? `หมวด “${nm}” ค่าเฉลี่ยทั้งเดือน` : `หมวด “${nm}” ระดับปกติถึงวันนี้ (ค่าเฉลี่ยตามสัดส่วนวัน)`, c.expected_to_date, 'บาท', c.lumpy ? 'เฉลี่ย/เดือน' : 'ปกติถึงวันนี้');
     add(`cat${i}_pct`, `หมวด “${nm}” สูงกว่าปกติ`, c.pct_vs_expected, '%', '');
   });
   if (analysis.weekday.peak) {

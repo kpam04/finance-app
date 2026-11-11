@@ -32,7 +32,12 @@ function rulesAdvice(facts, goalEvalsIn = [], { current = true } = {}) {
   for (let i = 0; i < 2; i += 1) {
     if (val(`cat${i}_amount`) === null) continue;
     const nm = byId.get(`cat${i}_amount`).label.replace(/^หมวด “/, '').replace(/” เดือน(นี้|นั้น)$/, '');
-    push('watch', 'warning', `หมวด “${nm}” ${when} ${num(val(`cat${i}_amount`))} บาท สูงกว่าค่าเฉลี่ยของคุณ (${num(val(`cat${i}_base`))} บาท) อยู่ ${num(val(`cat${i}_pct`))}% ลองดูรายการในหมวดนี้ว่ามีอะไรลดหรือเลื่อนได้บ้าง`, [`cat${i}_amount`, `cat${i}_base`, `cat${i}_pct`]);
+    const lumpy = /ค่าเฉลี่ยทั้งเดือน$/.test(byId.get(`cat${i}_base`).label);
+    // ยอดที่จ่ายไปแล้วลดย้อนหลังไม่ได้: แนะนำสิ่งที่ยังทำได้ (ช่วงที่เหลือของเดือน / เดือนหน้า)
+    const tail = !current ? 'ลองดูว่าเดือนถัดไปมีอะไรลดหรือเลื่อนได้บ้าง'
+      : lumpy ? 'ช่วงที่เหลือของเดือนลองชะลอหมวดนี้ไว้ก่อน และตั้งงบไว้สำหรับเดือนหน้า'
+        : 'ช่วงที่เหลือของเดือนลองดูว่ามีรายการในหมวดนี้ที่ลดหรือเลื่อนได้บ้าง';
+    push('watch', 'warning', `หมวด “${nm}” ${when} ${num(val(`cat${i}_amount`))} บาท สูงกว่า${lumpy ? 'ค่าเฉลี่ยต่อเดือน' : 'ระดับปกติถึงวันนี้'}ของคุณ (${num(val(`cat${i}_base`))} บาท) อยู่ ${num(val(`cat${i}_pct`))}% ${tail}`, [`cat${i}_amount`, `cat${i}_base`, `cat${i}_pct`]);
   }
   // เป้าหมายที่ยังไม่ทัน
   const behind = goalEvals.findIndex((g) => g.status === 'behind');

@@ -261,6 +261,48 @@ const css = `
 @media (max-width: 480px) { .pl-cbar { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 8px; } .pl-cbar .am { min-width: 0; } .pl-cbar .am em { min-width: 0; } }
 /* ===== สิ่งที่ควรทำ ===== */
 .pl-side { display: grid; gap: 14px; }
+.pl-cap { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; background: #fff; border: 1px solid #C9D4C2; font: inherit; font-size: 12.5px; font-weight: 500; color: #5E7558; cursor: pointer; white-space: nowrap; transition: border-color 0.2s, color 0.2s, box-shadow 0.2s; }
+.pl-cap svg { transition: transform 0.2s ease; }
+.pl-cap:hover { border-color: #9AAB91; color: #4F6B47; box-shadow: 0 1px 3px rgba(79,107,71,0.12); }
+.pl-cap:hover svg { transform: translateX(2px); }
+.pl-cap:focus-visible { outline: 2px solid #9AAB91; outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .pl-cap svg { transition: none; } }
+.pl-card-head:has(.pl-cap) { flex-wrap: nowrap; }
+/* แยกส่วน AI / ระบบ */
+.pl-sec-h { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; padding: 2px 0 6px; }
+.pl-sec-t { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #4B4740; }
+.pl-sec-t.ai { color: #40563C; }
+.pl-sec-m { font-size: 12px; color: #9a9184; }
+.pl-sec-acts { display: inline-flex; gap: 2px; margin-left: auto; }
+.pl-sec-acts .pl-link { font-size: 12.5px; }
+.pl-aibox { margin-top: 12px; padding: 10px 14px 10px; border-radius: 12px; background: #F3F7F0; border: 1px solid #DCE6D5; }
+.pl-aibox .pl-item { border-top-color: #E2EADC; }
+.pl-aibox .pl-item:first-of-type { border-top: none; }
+.pl-aibox .pl-busy { margin: 4px 0 6px; }
+.pl-ai-usage { margin-top: 2px; text-align: right; }
+.pl-sysbox { margin-top: 12px; }
+.pl-collapse.sm { padding: 3px 8px 3px 10px; font-size: 12px; }
+.pl-sec .pl-chev { transform: rotate(180deg); transition: transform 0.25s; }
+.pl-sec.closed .pl-chev { transform: rotate(0deg); }
+.pl-sec-wrap { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.3s ease; }
+.pl-sec.closed .pl-sec-wrap { grid-template-rows: 0fr; }
+.pl-sec-inner { min-height: 0; overflow: hidden; }
+.pl-sec.closed .pl-sec-inner { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .pl-sec-wrap, .pl-sec .pl-chev { transition: none; } }
+.pl-sec-acts { align-items: center; gap: 6px; }
+.pl-sec-n { font-size: 12px; color: #9a9184; }
+.pl-mob-only { display: none; }
+.pl-aibox.closed { padding-bottom: 6px; }
+.pl-sysbox.closed .pl-sec-h { border-bottom-color: transparent; }
+@media (max-width: 480px) { .pl-sec-h { flex-wrap: nowrap; } .pl-sec-n, .pl-sec-m { display: none; } .pl-sec-acts .pl-link { white-space: nowrap; padding: 2px; } .pl-mob-only { display: inline !important; } .pl-sec-m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } .pl-sec-t { white-space: nowrap; } }
+.pl-sysbox .pl-sec-h { padding-bottom: 2px; border-bottom: 1px solid #f0ebe0; }
+.pl-sysbox .pl-item:first-of-type { border-top: none; }
+.pl-aicta { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px dashed #CFDBC8; background: #FAFCF8; }
+.pl-aicta-ic { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: #E8EFE3; color: #5E7558; }
+.pl-aicta-tx { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; color: #4B4740; }
+.pl-aicta-tx small { display: block; font-size: 11.5px; color: #9a9184; }
+.pl-aicta .pl-act { flex: none; }
+@media (max-width: 480px) { .pl-aicta { flex-wrap: wrap; } .pl-aicta .pl-act { width: 100%; } }
 .pl-side > .card { margin-bottom: 0; }
 .pl-head-acts { display: inline-flex; align-items: center; gap: 2px 8px; flex-wrap: wrap; }
 .pl-link.on { color: #40563C; font-weight: 600; }
@@ -368,11 +410,22 @@ function Chips({ facts }) {
 }
 
 const BEH_KEY = 'finance_plan_behavior_hidden';
+const AI_HIDE_KEY = 'finance_plan_ai_hidden';
+const SYS_HIDE_KEY = 'finance_plan_sys_hidden';
+// ปุ่มซ่อน/แสดงเล็ก ๆ ที่หัวแต่ละส่วน
+function SecToggle({ hidden, onClick, controls, label }) {
+  return (
+    <button type="button" className="pl-collapse sm" aria-expanded={!hidden} aria-controls={controls} aria-label={`${hidden ? 'แสดง' : 'ซ่อน'}${label}`} onClick={onClick}>
+      {hidden ? 'แสดง' : 'ซ่อน'}
+      <svg className="pl-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+    </button>
+  );
+}
 const GROUP_ORDER = ['watch', 'save', 'good'];
 const GROUP_LABEL = { watch: '⚠️ ระวัง', save: '💰 โอกาสออม', good: '👍 ทำได้ดี' };
 function actionLabel(a) {
   switch (a.type) {
-    case 'set_budget': return `ตั้งงบ ${baht(a.amount)}`;
+    case 'set_budget': return a.next ? `ตั้งงบเดือนหน้า ${baht(a.amount)}` : `ตั้งงบ ${baht(a.amount)}`;
     case 'view_budget': return 'ดูงบหมวดนี้';
     case 'view_txns': return a.category_id ? 'ดูรายการหมวดนี้' : 'ดูรายการเดือนนี้';
     case 'simulate': return 'ลองปรับเอง';
@@ -381,6 +434,14 @@ function actionLabel(a) {
     default: return '';
   }
 }
+const IconCard = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /><path d="M6.5 15h4" />
+  </svg>
+);
+const IconArrow = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+);
 const IconSliders = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" />
@@ -485,6 +546,11 @@ export default function Plan() {
     try { localStorage.setItem(BEH_KEY, v ? '0' : '1'); } catch { /* ignore */ }
     return !v;
   });
+  // ซ่อน/แสดงส่วน "AI วิเคราะห์" และ "ระบบวิเคราะห์" แยกกัน (จำไว้ในเบราว์เซอร์)
+  const readFlag = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
+  const [aiHidden, setAiHidden] = useState(() => readFlag(AI_HIDE_KEY));
+  const [sysHidden, setSysHidden] = useState(() => readFlag(SYS_HIDE_KEY));
+  const flip = (setter, key) => setter((v) => { try { localStorage.setItem(key, v ? '0' : '1'); } catch { /* ignore */ } return !v; });
   const [advFilter, setAdvFilter] = useState('all'); // กรองคำแนะนำ: all / watch / save / good
   const [simOpen, setSimOpen] = useState(false); // เปิดแผง "ลองปรับเอง"
   const [budgetAsk, setBudgetAsk] = useState(null); // { key, action } ยืนยันก่อนตั้งงบจากคำแนะนำ
@@ -644,7 +710,7 @@ export default function Plan() {
     const [y, m] = data.month.split('-').map(Number);
     switch (a.type) {
       case 'set_budget': setBudgetAsk({ key: it.key, action: a }); break;
-      case 'view_budget': navigate(`/budgets?month=${m}&year=${y}`); break;
+      case 'view_budget': navigate(`/budgets?month=${a.period ? a.period.month : m}&year=${a.period ? a.period.year : y}`); break;
       case 'view_txns': navigate(`/transactions?month=${data.month}${a.category_id ? `&category=${a.category_id}` : ''}`); break;
       case 'simulate':
         setSimOpen(true);
@@ -659,12 +725,14 @@ export default function Plan() {
     if (!budgetAsk) return;
     const a = budgetAsk.action;
     const [y, m] = data.month.split('-').map(Number);
+    const pm = a.period ? a.period.month : m;
+    const py = a.period ? a.period.year : y;
     setActBusy(true);
     try {
-      await api.createBudget({ category_id: a.category_id, amount_limit: a.amount, period_month: m, period_year: y, repeat: true });
+      await api.createBudget({ category_id: a.category_id, amount_limit: a.amount, period_month: pm, period_year: py, repeat: true });
       if (!alive.current) return;
       setBudgetAsk(null);
-      setActMsg(`ตั้งงบหมวด “${a.name}” เดือนละ ${baht(a.amount)} แล้ว`);
+      setActMsg(`ตั้งงบหมวด “${a.name}” เดือนละ ${baht(a.amount)} แล้ว${a.next ? ` เริ่ม ${thaiMonth(`${py}-${String(pm).padStart(2, '0')}`)}` : ''}`);
       await load();
     } catch (e) {
       if (alive.current) setActMsg(e.message || 'ตั้งงบไม่สำเร็จ');
@@ -874,6 +942,45 @@ export default function Plan() {
   const groupCounts = GROUP_ORDER.map((g) => [g, allItems.filter((it) => (it.group || 'save') === g).length]).filter(([, n]) => n > 0);
   const filterOn = advFilter !== 'all' && groupCounts.some(([g]) => g === advFilter) ? advFilter : 'all';
   const shownItems = filterOn === 'all' ? allItems : allItems.filter((it) => (it.group || 'save') === filterOn);
+  const shownAi = shownItems.filter((it) => it.source === 'ai');
+  const shownSys = shownItems.filter((it) => it.source !== 'ai');
+  // คำแนะนำ 1 ข้อ (ใช้ทั้งในกรอบ AI และส่วนของระบบ ไม่ต้องมีป้ายบอกที่มาแล้ว เพราะแยกกรอบชัดเจน)
+  const renderItem = (it) => (
+    <div className={`pl-item g-${it.group || 'save'}`} key={it.key} data-ai-item={it.source === 'ai' ? '' : undefined} data-rule-item={it.source === 'ai' ? undefined : ''} data-group={it.group || 'save'}>
+      <AdviceIcon tag={it.tag} />
+      <div className="tx">
+        <div>{it.text}</div>
+        {((it.facts_used && it.facts_used.length > 0) || it.source === 'ai') && (
+          <div className="pl-chips" data-chips>
+            <Chips facts={it.facts_used} />
+            {it.source === 'ai' && (
+              <span className="pl-rate">
+                <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(it.index, 1)}><IconThumb size={15} /></button>
+                <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(it.index, -1)}><IconThumb size={15} down /></button>
+              </span>
+            )}
+          </div>
+        )}
+        {it.actions && it.actions.length > 0 && (
+          budgetAsk && budgetAsk.key === it.key ? (
+            <div className="pl-ask" data-budget-ask>
+              <span>ตั้งงบหมวด “{budgetAsk.action.name}” เดือนละ <b>{baht(budgetAsk.action.amount)}</b> (ค่าเฉลี่ยของคุณ ปัดเป็นหลักร้อย){budgetAsk.action.next && budgetAsk.action.period ? <> เริ่ม <b>{thaiMonth(`${budgetAsk.action.period.year}-${String(budgetAsk.action.period.month).padStart(2, '0')}`)}</b> เพราะเดือนนี้ใช้เกินยอดนี้ไปแล้ว</> : ''} ใช้ต่อเนื่องทุกเดือน แก้ได้ทีหลังที่หน้างบประมาณ</span>
+              <span className="pl-ask-btns">
+                <button type="button" className="pl-act main" disabled={actBusy} data-budget-confirm onClick={confirmBudget}>{actBusy ? 'กำลังตั้งงบ...' : 'ตั้งงบ'}</button>
+                <button type="button" className="pl-act" disabled={actBusy} onClick={() => setBudgetAsk(null)}>ยกเลิก</button>
+              </span>
+            </div>
+          ) : (
+            <div className="pl-acts" data-acts>
+              {it.actions.map((a) => (
+                <button type="button" key={a.type} className={`pl-act${a.type === 'set_budget' || a.type === 'new_goal' ? ' main' : ''}`} data-act={a.type} onClick={() => runAction(it, a)}>{actionLabel(a)}</button>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="pl-page" data-plan-page>
@@ -988,17 +1095,12 @@ export default function Plan() {
         <div className="card" data-plan-advice>
           <div className="pl-card-head">
             <InfoTitle title={<><span className="pl-ti"><IconSpark size={18} /></span>{isCur ? 'สิ่งที่ควรทำเดือนนี้' : 'คำแนะนำของเดือนนั้น'}</>} label="คำอธิบายส่วนนี้" popId="pl-info-advice">
-              <p>ป้าย “AI” คือคำแนะนำที่ AI เขียนจากตัวเลขสรุปเมื่อคุณกดขอ (ไม่ส่งรายการรายตัว บันทึกช่วยจำ หรือชื่อรายการผ่อน) ระบบตรวจตัวเลขในข้อความทุกตัวก่อนแสดง ถ้าไม่ตรงกับที่ระบบคำนวณจะไม่แสดงข้อนั้น ป้าย “ระบบ” คำนวณด้วยกฎ ใช้ได้ตลอดแม้ไม่ใช้ AI ปุ่มใต้คำแนะนำช่วยลงมือทำได้ทันที เช่น ตั้งงบ (ถามยืนยันก่อนเสมอ) คำแนะนำเป็นแนวทางเรื่องงบประมาณและการออมเท่านั้น ไม่เกี่ยวกับการลงทุน</p>
+              <p>กรอบ “AI วิเคราะห์” คือคำแนะนำที่ AI เขียนจากตัวเลขสรุปเมื่อคุณกดขอ (ไม่ส่งรายการรายตัว บันทึกช่วยจำ หรือชื่อรายการผ่อน) ระบบตรวจตัวเลขในข้อความทุกตัวก่อนแสดง ถ้าไม่ตรงกับที่ระบบคำนวณจะไม่แสดงข้อนั้น ส่วน “ระบบวิเคราะห์” คำนวณด้วยกฎ ใช้ได้ตลอดแม้ไม่ใช้ AI ปุ่มใต้คำแนะนำช่วยลงมือทำได้ทันที เช่น ตั้งงบ (ถามยืนยันก่อนเสมอ) คำแนะนำเป็นแนวทางเรื่องงบประมาณและการออมเท่านั้น ไม่เกี่ยวกับการลงทุน</p>
             </InfoTitle>
             <span className="pl-head-acts">
               {canSim && (
                 <button type="button" className={`pl-link${simOpen ? ' on' : ''}`} data-sim-open aria-expanded={simOpen} onClick={() => setSimOpen((v) => !v)}>
                   <IconSliders size={14} />ลองปรับเอง
-                </button>
-              )}
-              {isCur && ai.configured && !aiBusy && (
-                <button type="button" className="pl-link" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>
-                  <IconSpark size={14} />{saved ? 'วิเคราะห์ใหม่' : 'ให้ AI วิเคราะห์'}
                 </button>
               )}
             </span>
@@ -1015,61 +1117,74 @@ export default function Plan() {
             </div>
           )}
 
-          {aiBusy && (
-            <div className="pl-busy" data-ai-busy-wrap>
-              <span data-ai-busy>AI กำลังเขียนคำแนะนำ... {aiElapsed} วินาที</span>
-              <button type="button" className="pl-link" data-ai-cancel onClick={cancelAdvice}>ยกเลิก</button>
-            </div>
-          )}
-          {aiMsg && <p className="pl-msg" role="alert" data-ai-msg>{aiMsg}</p>}
           {actMsg && <p className="pl-ok" role="status" data-act-msg>{actMsg}</p>}
 
-          {shownItems.map((it) => (
-            <div className={`pl-item g-${it.group || 'save'}`} key={it.key} data-ai-item={it.source === 'ai' ? '' : undefined} data-rule-item={it.source === 'ai' ? undefined : ''} data-group={it.group || 'save'}>
-              <AdviceIcon tag={it.tag} />
-              <div className="tx">
-                <div>{it.text}<span className={`pl-badge${it.source === 'ai' ? ' ai' : ''}`} data-badge>{it.source === 'ai' ? 'AI' : 'ระบบ'}</span></div>
-                {((it.facts_used && it.facts_used.length > 0) || it.source === 'ai') && (
-                  <div className="pl-chips" data-chips>
-                    <Chips facts={it.facts_used} />
-                    {it.source === 'ai' && (
-                      <span className="pl-rate">
-                        <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(it.index, 1)}><IconThumb size={15} /></button>
-                        <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(it.index, -1)}><IconThumb size={15} down /></button>
-                      </span>
-                    )}
-                  </div>
-                )}
-                {it.actions && it.actions.length > 0 && (
-                  budgetAsk && budgetAsk.key === it.key ? (
-                    <div className="pl-ask" data-budget-ask>
-                      <span>ตั้งงบหมวด “{budgetAsk.action.name}” เดือนละ <b>{baht(budgetAsk.action.amount)}</b> (ค่าเฉลี่ยของคุณ ปัดเป็นหลักร้อย) ใช้ต่อเนื่องทุกเดือน แก้ได้ทีหลังที่หน้างบประมาณ</span>
-                      <span className="pl-ask-btns">
-                        <button type="button" className="pl-act main" disabled={actBusy} data-budget-confirm onClick={confirmBudget}>{actBusy ? 'กำลังตั้งงบ...' : 'ตั้งงบ'}</button>
-                        <button type="button" className="pl-act" disabled={actBusy} onClick={() => setBudgetAsk(null)}>ยกเลิก</button>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="pl-acts" data-acts>
-                      {it.actions.map((a) => (
-                        <button type="button" key={a.type} className={`pl-act${a.type === 'set_budget' || a.type === 'new_goal' ? ' main' : ''}`} data-act={a.type} onClick={() => runAction(it, a)}>{actionLabel(a)}</button>
-                      ))}
-                    </div>
-                  )
+          {/* ----- ส่วนของ AI (กรอบสีเขียวอ่อน แยกจากของระบบชัดเจน) ----- */}
+          {(saved || aiBusy) && (filterOn === 'all' || shownAi.length > 0 || aiBusy) && (
+            <section className={`pl-aibox pl-sec${aiHidden && !aiBusy ? ' closed' : ''}`} data-ai-box aria-label="คำแนะนำจาก AI">
+              <div className="pl-sec-h">
+                <span className="pl-sec-t ai"><IconSpark size={15} />AI วิเคราะห์</span>
+                {saved && !aiBusy && <span className="pl-sec-m" data-ai-generated>{new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</span>}
+                {!aiBusy && (
+                  <span className="pl-sec-acts">
+                    {!aiHidden && isCur && ai.configured && <button type="button" className="pl-link" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>วิเคราะห์ใหม่</button>}
+                    {!aiHidden && saved && <button type="button" className="pl-link" data-ai-delete onClick={dropAdvice}>ลบ</button>}
+                    {aiHidden && <span className="pl-sec-n">{shownAi.length} ข้อ</span>}
+                    <SecToggle hidden={aiHidden} controls="pl-ai-body" label="คำแนะนำจาก AI" onClick={() => flip(setAiHidden, AI_HIDE_KEY)} />
+                  </span>
                 )}
               </div>
-            </div>
-          ))}
+              <div className="pl-sec-wrap" id="pl-ai-body" data-ai-body><div className="pl-sec-inner">
+              {aiBusy && (
+                <div className="pl-busy" data-ai-busy-wrap>
+                  <span data-ai-busy>AI กำลังเขียนคำแนะนำ... {aiElapsed} วินาที</span>
+                  <button type="button" className="pl-link" data-ai-cancel onClick={cancelAdvice}>ยกเลิก</button>
+                </div>
+              )}
+              {!aiBusy && shownAi.map(renderItem)}
+              {!aiBusy && saved && saved.stale && <p className="pl-stale" role="status" data-ai-stale>{isCur ? 'ข้อมูลของคุณเปลี่ยนไปหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว กด “วิเคราะห์ใหม่” เพื่ออัปเดต' : 'รายการของเดือนนั้นถูกแก้ไขหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว'}</p>}
+              {!aiBusy && aiDropped > 0 && <p className="pl-note" data-ai-dropped>AI เสนอเพิ่มอีก {aiDropped} ข้อที่ตัวเลขไม่ตรงกับที่ระบบคำนวณ ระบบจึงไม่แสดง</p>}
+              {(saved || (isCur && ai.configured)) && (
+                <p className="pl-note pl-ai-usage" data-ai-usage>
+                  {saved && <span className="pl-mob-only">เขียนเมื่อ {new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}{isCur && ai.configured ? ' · ' : ''}</span>}
+                  {isCur && ai.configured && `วันนี้ขอไปแล้ว ${ai.plans_used_today}/${ai.plan_daily_limit} ครั้ง`}
+                </p>
+              )}
+              </div></div>
+            </section>
+          )}
+          {aiMsg && <p className="pl-msg" role="alert" data-ai-msg>{aiMsg}</p>}
 
+          {/* ----- ส่วนของระบบ ----- */}
+          {shownSys.length > 0 && (
+            <section className={`pl-sysbox pl-sec${sysHidden ? ' closed' : ''}`} data-sys-box aria-label="คำแนะนำจากระบบ">
+              <div className="pl-sec-h">
+                <span className="pl-sec-t">ระบบวิเคราะห์</span>
+                <span className="pl-sec-m">คำนวณจากรายการของคุณ</span>
+                <span className="pl-sec-acts">
+                  {sysHidden && <span className="pl-sec-n">{shownSys.length} ข้อ</span>}
+                  <SecToggle hidden={sysHidden} controls="pl-sys-body" label="คำแนะนำจากระบบ" onClick={() => flip(setSysHidden, SYS_HIDE_KEY)} />
+                </span>
+              </div>
+              <div className="pl-sec-wrap" id="pl-sys-body" data-sys-body><div className="pl-sec-inner">
+                {shownSys.map(renderItem)}
+              </div></div>
+            </section>
+          )}
+
+          {/* ยังไม่มีคำแนะนำของ AI: แถบเชิญชวนเล็ก ๆ ท้ายการ์ด */}
+          {!saved && !aiBusy && isCur && ai.configured && (
+            <div className="pl-aicta" data-ai-cta>
+              <span className="pl-aicta-ic"><IconSpark size={16} /></span>
+              <span className="pl-aicta-tx">อยากได้มุมมองเพิ่ม ให้ AI ช่วยอ่านตัวเลขสรุปแล้วเขียนคำแนะนำ<small>วันนี้ขอได้อีก {Math.max(0, ai.plan_daily_limit - ai.plans_used_today)} ครั้ง</small></span>
+              <button type="button" className="pl-act main" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>ให้ AI วิเคราะห์</button>
+            </div>
+          )}
           {isCur && !ai.configured && <p className="pl-empty" data-ai-unavailable>ระบบนี้ยังไม่เปิดบริการ AI ดูคำแนะนำจากระบบได้</p>}
           {!isCur && !saved && <p className="pl-empty" data-ai-past-note>เดือนนั้นไม่มีคำแนะนำของ AI ที่เก็บไว้ ขอ AI วิเคราะห์ได้เฉพาะเดือนปัจจุบัน</p>}
-          {saved && saved.stale && <p className="pl-stale" role="status" data-ai-stale>{isCur ? 'ข้อมูลของคุณเปลี่ยนไปหลังจาก AI เขียน ตัวเลขในคำแนะนำอาจไม่ตรงแล้ว กด “วิเคราะห์ใหม่” เพื่ออัปเดต' : 'รายการของเดือนนั้นถูกแก้ไขหลังจาก AI เขียน ตัวเลขในคำแนะนำอาจไม่ตรงแล้ว (ขอ AI ใหม่ได้เฉพาะเดือนปัจจุบัน)'}</p>}
-          {saved && <p className="pl-note" data-ai-generated>AI เขียนเมื่อ {new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}{' '}<button type="button" className="pl-link" style={{ fontSize: 12 }} data-ai-delete onClick={dropAdvice}>ลบคำแนะนำของ AI</button></p>}
-          {aiDropped > 0 && <p className="pl-note" data-ai-dropped>AI เสนอเพิ่มอีก {aiDropped} ข้อที่ตัวเลขไม่ตรงกับที่ระบบคำนวณ ระบบจึงไม่แสดง</p>}
 
           <div className="pl-foot">
             <p className="pl-note" data-disclaimer>ตัวเลขทุกตัวคำนวณจากรายการของคุณโดยระบบ AI เป็นผู้เขียนคำอธิบาย ไม่ใช่คำแนะนำทางการเงินจากผู้เชี่ยวชาญ</p>
-            {isCur && ai.configured && <p className="pl-note" data-ai-usage>วันนี้ขอไปแล้ว {ai.plans_used_today}/{ai.plan_daily_limit} ครั้ง</p>}
           </div>
         </div>
 
@@ -1080,6 +1195,11 @@ export default function Plan() {
             <InfoTitle title={<><span className="pl-ti"><IconFlag size={18} /></span>เป้าหมายการออม</>} label="คำอธิบายส่วนนี้" popId="pl-info-goals-sum">
               <p>สรุปความคืบหน้าของเป้าหมาย (สถานะ ณ ปัจจุบัน ไม่ขึ้นกับเดือนที่ดู) ดูรายละเอียด แก้ไข หรือเพิ่มเป้าหมายได้ที่แท็บ “เป้าหมายออม”</p>
             </InfoTitle>
+            {data.goals.length > 0 && (
+              <button type="button" className="pl-cap" data-goal-sum-all onClick={() => pickTab('goals')}>
+                {data.goals.length > 3 ? `ดูทั้งหมด ${data.goals.length}` : 'ดูรายละเอียด'}<IconArrow />
+              </button>
+            )}
           </div>
           {data.goals.length === 0 ? (
             <>
@@ -1100,18 +1220,7 @@ export default function Plan() {
                   );
                 })}
               </div>
-              <div className="pl-gs-more">
-                <button type="button" className="pl-link" data-goal-sum-all onClick={() => pickTab('goals')}>
-                  {data.goals.length > 3 ? `ดูทั้งหมด ${data.goals.length} เป้าหมาย →` : 'ดูรายละเอียด →'}
-                </button>
-              </div>
             </>
-          )}
-          {(data.achievements || []).length > 0 && (
-            <button type="button" className="pl-ach-line" data-goal-sum-achieved onClick={() => { pickTab('goals'); setGoalView('done'); }}>
-              <span aria-hidden="true">🏆</span> สำเร็จแล้ว {data.achievements.length} เป้า · {baht(data.achievements.reduce((t, a) => t + a.target_amount, 0))}
-              <span className="pl-ach-go">→</span>
-            </button>
           )}
         </div>
 
@@ -1119,9 +1228,12 @@ export default function Plan() {
         {inst && (
           <div className="card" data-plan-inst-summary>
             <div className="pl-card-head">
-              <InfoTitle title={<><span className="pl-ti" aria-hidden="true">💳</span>ผ่อนเดือนนี้</>} label="คำอธิบายส่วนนี้" popId="pl-info-inst-sum">
+              <InfoTitle title={<><span className="pl-ti"><IconCard size={18} /></span>ผ่อนเดือนนี้</>} label="คำอธิบายส่วนนี้" popId="pl-info-inst-sum">
                 <p>งวดผ่อนที่ครบกำหนดเดือนนี้ (รวมที่ค้างชำระ) ไม่ขึ้นกับเดือนที่ดู จัดการรายการผ่อนได้ที่แท็บ “รายการผ่อน”</p>
               </InfoTitle>
+              {inst.plans.length > 0 && (
+                <button type="button" className="pl-cap" data-inst-sum-all onClick={() => { pickTab('installments'); setInstView('active'); }}>ดูรายการผ่อน<IconArrow /></button>
+              )}
             </div>
             {inst.plans.length === 0 ? (
               <>
@@ -1136,9 +1248,6 @@ export default function Plan() {
                   {inst.summary.next_bill && (
                     <div><span>บิลถัดไป</span><b className={inst.summary.next_bill.overdue ? 'over' : ''}>{inst.summary.next_bill.channel_label} · {thaiDate(inst.summary.next_bill.due_date)}{inst.summary.next_bill.overdue ? ' (ค้างชำระ)' : ''}</b></div>
                   )}
-                </div>
-                <div className="pl-gs-more">
-                  <button type="button" className="pl-link" data-inst-sum-all onClick={() => { pickTab('installments'); setInstView('active'); }}>ดูรายการผ่อน →</button>
                 </div>
               </>
             )}

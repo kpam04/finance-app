@@ -1,7 +1,8 @@
 // แนบ "ประเภท" (group) และ "ปุ่มลงมือทำ" (actions) ให้คำแนะนำทุกข้อ ทั้งของระบบและของ AI
 // ดูจากข้อเท็จจริงที่คำแนะนำข้อนั้นอ้างถึง (facts_used) จึงใช้ได้กับข้อความที่ AI เขียนด้วย
 // actions (สูงสุด 3 ปุ่ม):
-//   set_budget  { category_id, name, amount }  ตั้งงบหมวดที่ยังไม่มีงบ (ค่าเฉลี่ยต่อเดือนปัดขึ้นเป็นหลักร้อย) เฉพาะเดือนปัจจุบัน
+//   set_budget  { category_id, name, amount, next?, period? }  ตั้งงบหมวดที่ยังไม่มีงบ (ค่าเฉลี่ยต่อเดือนปัดขึ้นเป็นหลักร้อย) เฉพาะเดือนปัจจุบัน
+//               ถ้าเดือนนี้ใช้เกินยอดนั้นไปแล้ว → next: true, period: { month, year } ของเดือนหน้า
 //   view_budget { category_id }                 หมวดนี้มีงบแล้ว → ไปหน้างบ
 //   view_txns   { category_id? }                เปิดหน้ารายการ กรองหมวด (ถ้ามี) และเดือนที่ดู
 //   simulate    {}                               เปิด "ลองปรับเอง"
@@ -28,16 +29,24 @@ function groupOf(item, goalEvals) {
   return 'save';
 }
 
-function actionsOf(item, { current, anomalies = [], budgetCats = new Set(), goalEvals = [] }) {
+function actionsOf(item, { current, anomalies = [], budgetCats = new Set(), nextBudgetCats = new Set(), nextPeriod = null, goalEvals = [] }) {
   const ids = (item.facts_used || []).map((f) => f.id);
   const out = [];
   const add = (a) => { if (out.length < MAX_ACTIONS && !out.some((x) => x.type === a.type)) out.push(a); };
   const ci = ids.map((id) => /^cat(\d)_/.exec(id)).find(Boolean);
   const cat = ci ? anomalies[Number(ci[1])] : null;
   if (cat) {
-    if (budgetCats.has(String(cat.category_id))) add({ type: 'view_budget', category_id: String(cat.category_id) });
-    else if (current && cat.base_avg) add({ type: 'set_budget', category_id: String(cat.category_id), name: cat.name, amount: ceil100(cat.base_avg) });
-    add({ type: 'view_txns', category_id: String(cat.category_id) });
+    const id = String(cat.category_id);
+    const amount = cat.base_avg ? ceil100(cat.base_avg) : null;
+    if (budgetCats.has(id)) add({ type: 'view_budget', category_id: id });
+    else if (current && amount) {
+      // เดือนนี้ใช้เกินยอดงบที่จะเสนอไปแล้ว → เสนอตั้งงบ "เริ่มเดือนหน้า" (ตั้งเดือนนี้จะเกินงบทันที)
+      if (cat.amount > amount && nextPeriod) {
+        if (nextBudgetCats.has(id)) add({ type: 'view_budget', category_id: id, period: nextPeriod });
+        else add({ type: 'set_budget', category_id: id, name: cat.name, amount, period: nextPeriod, next: true });
+      } else add({ type: 'set_budget', category_id: id, name: cat.name, amount });
+    }
+    add({ type: 'view_txns', category_id: id });
   }
   if (current) {
     const gi = ids.map((id) => /^g(\d)_/.exec(id)).find(Boolean);

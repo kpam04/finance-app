@@ -108,13 +108,25 @@ async function loadPlan(userId, monthParam) {
 // ข้อมูลประกอบปุ่มลงมือทำของคำแนะนำ: หมวดที่มีงบในเดือนที่ดูแล้ว (มีแล้ว = ปุ่ม "ดูงบ" / ยังไม่มี = ปุ่ม "ตั้งงบ")
 async function adviceCtx(userId, analysis, goalEvals) {
   const [y, m] = analysis.month.split('-').map(Number);
-  const budgets = await Budget.find({ user: userId, month: m, year: y, stopped: { $ne: true } }).select('category').lean();
-  return { current: analysis.is_current, anomalies: analysis.anomalies, budgetCats: new Set(budgets.map((b) => String(b.category))), goalEvals };
+  const nx = addMonths(y, m, 1);
+  const [budgets, nextBudgets] = await Promise.all([
+    Budget.find({ user: userId, month: m, year: y, stopped: { $ne: true } }).select('category').lean(),
+    analysis.is_current ? Budget.find({ user: userId, month: nx.month, year: nx.year, stopped: { $ne: true } }).select('category').lean() : [],
+  ]);
+  return {
+    current: analysis.is_current, anomalies: analysis.anomalies, goalEvals,
+    budgetCats: new Set(budgets.map((b) => String(b.category))),
+    nextBudgetCats: new Set(nextBudgets.map((b) => String(b.category))),
+    nextPeriod: analysis.is_current ? { month: nx.month, year: nx.year } : null,
+  };
 }
 
-const savedOut = (doc, stale = false, ctx = null) => {
+// คำแนะนำของ AI ที่เก็บไว้: ป้ายสั้นของตัวเลข (short/label) ใช้ของปัจจุบัน ถ้ามีข้อเท็จจริง id เดียวกัน (ป้ายเคยเปลี่ยนชื่อ เช่น "เฉลี่ย" → "เฉลี่ย/เดือน") ค่าตัวเลขยังเป็นของตอนที่ AI เขียน
+const savedOut = (doc, stale = false, ctx = null, facts = []) => {
   if (!doc) return null;
-  const items = doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: i.facts_used, rating: i.rating || 0, source: 'ai' }));
+  const cur = new Map(facts.map((f) => [f.id, f]));
+  const relabel = (f) => (cur.has(f.id) && cur.get(f.id).unit === f.unit ? { ...f, label: cur.get(f.id).label, ...(cur.get(f.id).short !== undefined ? { short: cur.get(f.id).short } : {}) } : f);
+  const items = doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: (i.facts_used || []).map(relabel), rating: i.rating || 0, source: 'ai' }));
   return { items: ctx ? decorateAdvice(items, ctx) : items, generated_at: doc.generated_at, model: doc.model, stale };
 };
 
@@ -140,7 +152,7 @@ router.get('/overview', async (req, res) => {
         month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, achievements, max_goals: MAX_GOALS,
         installments: inst, budget_category_ids: [...ctx.budgetCats],
         rules_advice: decorateAdvice(rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ctx),
-        ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals), ctx),
+        ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals), ctx, facts),
         ai: await aiState(req.userId),
       },
     });
