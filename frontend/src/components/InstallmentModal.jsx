@@ -17,7 +17,8 @@ const css = `
 @media (max-width: 340px) { .im-grid { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .im-grid { gap: 0 8px; } .im-overlay { padding: 8px; align-items: flex-end; } .im-box { border-radius: 16px 16px 12px 12px; padding: 16px; } }
 .im-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; font-size: 14px; }
-.im-field > span { font-size: 13px; color: #4b5563; }
+.im-field > span { font-size: 13px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-hint { margin: -8px 0 12px; font-size: 12px; line-height: 1.5; color: #8A8177; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .im-field > small { font-size: 12px; color: #8A8177; line-height: 1.5; }
 .im-field input, .im-field select { width: 100%; box-sizing: border-box; min-width: 0; }
 .im-switch { position: relative; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; margin: 2px 0 12px; font-size: 13px; color: #4b5563; cursor: pointer; }
@@ -36,14 +37,27 @@ const css = `
 .im-note { margin: 0 0 8px; font-size: 12px; line-height: 1.6; color: #8A8177; }
 .im-lock { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #EEF2F8; color: #3b5b8f; font-size: 13px; line-height: 1.6; }
 .im-span { grid-column: 1 / -1; }
-.im-row3 { display: grid; grid-template-columns: 236px 84px; justify-content: start; gap: 4px 8px; margin-bottom: 12px; font-size: 14px; }
-@media (max-width: 360px) { .im-row3 { grid-template-columns: minmax(0, 1fr) 72px; } }
-.im-row3-l { font-size: 13px; color: #4b5563; }
-.im-ym { display: flex; gap: 8px; min-width: 0; }
-.im-ym-m { flex: 1; min-width: 0; max-width: 136px; }
-.im-ym-y { width: 92px; flex: none; }
-.im-row3 > input { width: 100%; box-sizing: border-box; text-align: center; }
-.im-ym .cs-wrap { width: 100%; }
+.im-box input:not([type=checkbox]), .im-box select, .im-box .cs-button { height: 42px; min-height: 42px; box-sizing: border-box; }
+.im-sec { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: #8A8177; }
+.im-sec::after { content: ''; flex: 1; height: 1px; background: #EEE9DF; }
+.im-sec + .im-grid, .im-sec + .im-field { margin-top: 0; }
+/* แถววันจ่าย: เดือน | ปี | ทุกวันที่ (สูงเท่ากัน บรรทัดเดียว) */
+.im-due { display: grid; grid-template-columns: calc(50% - 110px) 92px 76px minmax(0, 1fr); gap: 4px 12px; align-items: center; margin-bottom: 12px; font-size: 14px; }
+.im-due-l { font-size: 13px; color: #4b5563; }
+.im-due .cs-wrap { width: 100%; }
+.im-due-day input { width: 100%; text-align: center; }
+/* สรุปวันจ่าย: คอมอยู่ท้ายแถวเดียวกัน (ไม่ต้องยืดช่องเดือนให้ยาว) / มือถือลงไปบรรทัดใหม่ */
+.im-due-sum { display: flex; flex-direction: column; justify-content: center; min-height: 42px; margin: 0; padding: 3px 8px; box-sizing: border-box; border-radius: 8px; background: #F3F6F0; font-size: 11.5px; line-height: 1.45; white-space: nowrap; overflow: hidden; color: #6b7280; }
+.im-due-sum em { display: none; font-style: normal; }
+.im-due-sum b { font-weight: 600; color: #4F6B47; }
+.im-due-sum.hint { background: none; border: 1px dashed #E3DDD0; color: #A39A8C; white-space: normal; }
+@media (max-width: 480px) {
+  .im-due { grid-template-columns: minmax(0, 1fr) 88px 80px; gap: 4px 6px; }
+  .im-due-l4 { display: none; }
+  .im-due-sum { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; gap: 0 6px; min-height: 0; margin-top: 4px; padding: 7px 10px; font-size: 12px; white-space: normal; }
+  .im-due-sum em { display: inline; }
+  .im-due-sum.hint { display: none; }
+}
 .im-auto { margin-left: 4px; padding: 0 7px; border-radius: 999px; background: #EEF1EA; color: #5E7558; font-size: 11px; font-style: normal; font-weight: 600; }
 .im-relink { padding: 0; border: none; background: none; font: inherit; font-size: 12px; color: #5E7558; text-decoration: underline; cursor: pointer; }
 .im-bd.ok { color: #166534; } .im-bd.mid { color: #8A6A1F; } .im-bd.high { color: #C2410C; }
@@ -77,6 +91,16 @@ function monthChoices(curYm) {
     out.push({ value: `${yy}-${pad(mm)}`, label: `${MONTH_SHORT[mm - 1]} ${yy + 543}` });
   }
   return out;
+}
+// วันครบกำหนดของงวดที่ k (เริ่ม 0) ถ้าเดือนนั้นไม่มีวันที่ระบุ ใช้วันสุดท้ายของเดือน (เหมือนหลังบ้าน)
+function dueText(firstMonth, dueDay, k) {
+  const [y, m] = String(firstMonth || '').split('-').map(Number);
+  const d = Number(dueDay);
+  if (!y || !m || !Number.isInteger(d) || d < 1 || d > 31) return '';
+  const i = y * 12 + (m - 1) + k;
+  const yy = Math.floor(i / 12); const mm = (i % 12) + 1;
+  const last = new Date(yy, mm, 0).getDate();
+  return `${Math.min(d, last)} ${MONTH_SHORT[mm - 1]} ${yy + 543}`;
 }
 const MONTH_FULL = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const floor2 = (n) => Math.floor((Number(n) + 1e-9) * 100) / 100;
@@ -221,17 +245,16 @@ export default function InstallmentModal({ plan, categories, history = [], burde
         {error && <p className="im-error" role="alert" data-im-error>{error}</p>}
         {locked && <p className="im-lock">มีงวดที่จ่ายผ่านแอปแล้ว แก้ได้เฉพาะชื่อ ช่องทาง หมวด และวันครบกำหนด (ยอดและจำนวนงวดล็อกไว้)</p>}
 
+        <div className="im-sec">สินค้า</div>
         <div className="im-grid">
           <label className="im-field">
             <span>ชื่อสินค้า</span>
             <input type="text" value={f.name} maxLength={60} required placeholder="เช่น หูฟังไร้สาย" onChange={set('name')} data-im-name />
           </label>
-          <label className="im-field">
+          <div className="im-field" data-im-channel>
             <span>ช่องทางผ่อน</span>
-            <select value={f.channel} onChange={set('channel')} data-im-channel>
-              {CHANNEL_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </label>
+            <MonthPicker options={CHANNEL_OPTIONS} value={f.channel} currentValue={null} onChange={(v) => setF((s) => ({ ...s, channel: v }))} ariaLabel="ช่องทางผ่อน" />
+          </div>
         </div>
         {nameHint && (
           <label className="im-field">
@@ -249,6 +272,9 @@ export default function InstallmentModal({ plan, categories, history = [], burde
             <span>ราคาสินค้า (บาท)</span>
             <input type="number" inputMode="decimal" min="0.01" step="any" value={f.price} required disabled={locked} placeholder="ราคาเต็มก่อนผ่อน" onChange={set('price')} data-im-price />
           </label>
+        </div>
+        <div className="im-sec">การผ่อน</div>
+        <div className="im-grid">
           <label className="im-field">
             <span>จำนวนงวด</span>
             <input type="number" inputMode="numeric" min="1" max="60" step="1" value={f.months} required disabled={locked} placeholder="เช่น 10" onChange={set('months')} data-im-months />
@@ -262,53 +288,17 @@ export default function InstallmentModal({ plan, categories, history = [], burde
                 : <small><button type="button" className="im-relink" data-im-per-recalc onClick={() => setPerAuto(true)}>คำนวณให้อีกครั้ง</button></small>)}
             </label>
           )}
-          <div className="im-row3 im-span" data-im-row3>
-            <span className="im-row3-l">งวดแรก (เดือน / ปี)</span>
-            <span className="im-row3-l">ทุกวันที่</span>
-            <div className="im-ym">
-              {locked ? <input type="text" value={monthChoices(thisMonth()).find((o) => o.value === f.first_month)?.label || f.first_month} disabled /> : (() => {
-              const range = monthChoices(thisMonth()).map((o) => o.value);
-              const [sy, sm] = f.first_month.split('-').map(Number);
-              const [cy, cm] = thisMonth().split('-').map(Number);
-              const years = [...new Set(range.map((v) => Number(v.slice(0, 4))))].sort((x, z) => z - x);
-              const monthsOf = (y) => range.filter((v) => Number(v.slice(0, 4)) === y).map((v) => Number(v.slice(5))).sort((x, z) => x - z);
-              const ym = (y, m) => `${y}-${pad(m)}`;
-              const pickYear = (y) => {
-                const ms = monthsOf(y);
-                const m = ms.includes(sm) ? sm : ms.reduce((best, x) => (Math.abs(x - sm) < Math.abs(best - sm) ? x : best), ms[0]);
-                setF((s) => ({ ...s, first_month: ym(y, m) }));
-              };
-              return (
-                <>
-                  <div className="im-ym-m">
-                    <MonthPicker options={monthsOf(sy).map((m) => ({ value: m, label: MONTH_FULL[m - 1] }))} value={sm} currentValue={sy === cy ? cm : null} onChange={(m) => setF((s) => ({ ...s, first_month: ym(sy, Number(m)) }))} ariaLabel="เดือนของงวดแรก" />
-                  </div>
-                  <div className="im-ym-y">
-                    <MonthPicker options={years.map((y) => ({ value: y, label: String(y + 543) }))} value={sy} currentValue={null} onChange={(y) => pickYear(Number(y))} ariaLabel="ปีของงวดแรก (พ.ศ.)" />
-                  </div>
-                </>
-              );
-            })()}
-            </div>
-            <input type="number" inputMode="numeric" min="1" max="31" step="1" value={f.due_day} required placeholder="1–31" aria-label="ครบกำหนดทุกวันที่" onChange={set('due_day')} data-im-due />
-          </div>
           <label className="im-field">
-            <span>เงินดาวน์ (ไม่บังคับ)</span>
+            <span>เงินดาวน์ (ถ้ามี)</span>
             <input type="number" inputMode="decimal" min="0" step="any" value={f.down_payment} disabled={locked} placeholder="0" onChange={set('down_payment')} data-im-down />
           </label>
-          <label className="im-field">
-            <span>จ่ายไปแล้วกี่งวด</span>
-            <input type="number" inputMode="numeric" min="0" max={Math.max(0, months - 1)} step="1" value={f.prepaid_count} disabled={locked} onChange={set('prepaid_count')} data-im-prepaid />
-            <small>งวดที่จ่ายก่อนเริ่มใช้แอป (ไม่สร้างรายการรายจ่ายย้อนหลัง)</small>
-          </label>
+          {f.equal && (
+            <label className="im-field">
+              <span>ยอดรวมที่ต้องจ่าย (ถ้ามี)</span>
+              <input type="number" inputMode="decimal" min="0.01" step="any" value={f.total_payable} disabled={locked} placeholder="ตามที่แอปผ่อนแสดง" onChange={set('total_payable')} data-im-total />
+            </label>
+          )}
         </div>
-
-        {f.equal && (
-          <label className="im-field">
-            <span>ยอดรวมที่ต้องจ่าย (ไม่บังคับ)</span>
-            <input type="number" inputMode="decimal" min="0.01" step="any" value={f.total_payable} disabled={locked} placeholder="ถ้าแอปผ่อนแสดงยอดรวม กรอกเพื่อให้งวดสุดท้ายตรง" onChange={set('total_payable')} data-im-total />
-          </label>
-        )}
         {!locked && (
           <label className="im-switch">
             <input type="checkbox" checked={f.equal} onChange={(e) => setF((s) => ({ ...s, equal: e.target.checked }))} data-im-equal />
@@ -327,6 +317,53 @@ export default function InstallmentModal({ plan, categories, history = [], burde
             ))}
           </div>
         )}
+
+        <div className="im-sec">วันจ่าย</div>
+        <div className="im-due" data-im-row3>
+          <span className="im-due-l">งวดแรก (เดือน)</span>
+          <span className="im-due-l">ปี</span>
+          <span className="im-due-l">ทุกวันที่</span>
+          <span className="im-due-l im-due-l4" aria-hidden="true" />
+              {locked ? <><input type="text" value={monthChoices(thisMonth()).find((o) => o.value === f.first_month)?.label || f.first_month} disabled /><input type="text" value="" disabled aria-hidden="true" style={{ visibility: 'hidden' }} /></> : (() => {
+              const range = monthChoices(thisMonth()).map((o) => o.value);
+              const [sy, sm] = f.first_month.split('-').map(Number);
+              const [cy, cm] = thisMonth().split('-').map(Number);
+              const years = [...new Set(range.map((v) => Number(v.slice(0, 4))))].sort((x, z) => z - x);
+              const monthsOf = (y) => range.filter((v) => Number(v.slice(0, 4)) === y).map((v) => Number(v.slice(5))).sort((x, z) => x - z);
+              const ym = (y, m) => `${y}-${pad(m)}`;
+              const pickYear = (y) => {
+                const ms = monthsOf(y);
+                const m = ms.includes(sm) ? sm : ms.reduce((best, x) => (Math.abs(x - sm) < Math.abs(best - sm) ? x : best), ms[0]);
+                setF((s) => ({ ...s, first_month: ym(y, m) }));
+              };
+              return (
+                <>
+                  <div>
+                    <MonthPicker options={monthsOf(sy).map((m) => ({ value: m, label: MONTH_FULL[m - 1] }))} value={sm} currentValue={sy === cy ? cm : null} onChange={(m) => setF((s) => ({ ...s, first_month: ym(sy, Number(m)) }))} ariaLabel="เดือนของงวดแรก" />
+                  </div>
+                  <div>
+                    <MonthPicker options={years.map((y) => ({ value: y, label: String(y + 543) }))} value={sy} currentValue={null} onChange={(y) => pickYear(Number(y))} ariaLabel="ปีของงวดแรก (พ.ศ.)" />
+                  </div>
+                </>
+              );
+            })()}
+          <div className="im-due-day">
+            <input type="number" inputMode="numeric" min="1" max="31" step="1" value={f.due_day} required placeholder="1–31" aria-label="ครบกำหนดทุกวันที่" onChange={set('due_day')} data-im-due />
+          </div>
+          {dueText(f.first_month, f.due_day, 0) ? (
+            <p className="im-due-sum" data-im-due-sum>
+              <span>งวดแรก <b>{dueText(f.first_month, f.due_day, 0)}</b></span>
+              {months > 1 && <span><em>· </em>งวดสุดท้าย <b>{dueText(f.first_month, f.due_day, months - 1)}</b></span>}
+            </p>
+          ) : <p className="im-due-sum hint">กรอกวันที่ เพื่อดูวันจ่ายงวดแรกและงวดสุดท้าย</p>}
+        </div>
+        <div className="im-grid">
+          <label className="im-field">
+            <span>จ่ายไปแล้วกี่งวด</span>
+            <input type="number" inputMode="numeric" min="0" max={Math.max(0, months - 1)} step="1" value={f.prepaid_count} disabled={locked} onChange={set('prepaid_count')} data-im-prepaid />
+          </label>
+          <small className="im-span im-hint">งวดที่จ่ายไปก่อนใช้แอป (ไม่บันทึกรายจ่ายย้อนหลัง)</small>
+        </div>
 
         {calc && (
           <>

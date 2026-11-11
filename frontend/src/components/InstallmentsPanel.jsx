@@ -66,11 +66,16 @@ const css = `
 .in-pm { width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 20px; border-radius: 16px; background: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
 .in-pm h3 { margin: 0 0 4px; }
 .in-pm-sub { margin: 0 0 14px; font-size: 13px; color: #6b7280; }
-.in-pm-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
-.in-pm-row input { width: 100%; box-sizing: border-box; text-align: right; }
+.in-pm-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+/* ช่องยอดเงิน: กว้างพอดีตัวเลข (ตามจำนวนหลัก) มี ฿ นำหน้า */
+.in-amt { position: relative; display: inline-flex; align-items: center; flex: none; width: var(--w, 9ch); max-width: 100%; }
+.in-amt i { position: absolute; left: 10px; font-style: normal; font-size: 13px; color: #9a9184; pointer-events: none; }
+.in-amt input { width: 100%; height: 38px; min-height: 0; box-sizing: border-box; padding: 6px 10px 6px 24px; text-align: right; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.in-amt input::-webkit-outer-spin-button, .in-amt input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .in-pm-row small { display: block; color: #8A8177; }
 .in-pm-total { display: flex; justify-content: space-between; margin: 12px 0; padding-top: 10px; border-top: 1px dashed #E6E0D4; font-weight: 700; }
-.in-pm-date { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #4b5563; }
+.in-pm-date { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 8px; font-size: 13px; color: #4b5563; }
+.in-pm-date > input[type=date] { width: auto; height: 38px; min-height: 0; padding: 6px 10px; box-sizing: border-box; }
 .in-pm-note { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: #8A8177; }
 .in-pm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .in-grp { margin-bottom: 16px; padding: 12px; border-radius: 16px; border: 1px solid #E6E0D4; background: #FBFAF6; }
@@ -135,6 +140,9 @@ function dueTag(bill) {
 }
 
 // ป๊อปอัปยืนยันการจ่ายบิล: แก้ยอดแต่ละชิ้น / ติ๊กออกชิ้นที่ยังไม่ได้จ่าย / วันที่จ่าย
+// ความกว้างช่องยอดเงินตามจำนวนตัวอักษร (อย่างน้อย 6 หลัก สูงสุด 12) + ที่ของ ฿ และขอบ
+const amtWidth = (v) => ({ '--w': `calc(${Math.min(12, Math.max(6, String(v ?? '').length + 1))}ch + 36px)` });
+
 function PayModal({ bill, onClose, onPaid }) {
   const [amounts, setAmounts] = useState(() => bill.items.map((it) => String(it.amount)));
   const [on, setOn] = useState(() => bill.items.map(() => true));
@@ -176,12 +184,15 @@ function PayModal({ bill, onClose, onPaid }) {
               {multi && <input type="checkbox" checked={on[i]} onChange={(e) => setOn((o) => o.map((x, j) => (j === i ? e.target.checked : x)))} aria-label={`จ่าย ${it.name}`} data-pay-check />}
               <span>{it.name}<small>งวด {it.n}/{it.months}</small></span>
             </label>
-            <input type="number" inputMode="decimal" min="0.01" step="any" required={on[i]} disabled={!on[i]} value={amounts[i]} onChange={(e) => setAmounts((a) => a.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`ยอดที่จ่าย ${it.name}`} data-pay-amount />
+            <span className="in-amt" style={amtWidth(amounts[i])}>
+              <i aria-hidden="true">฿</i>
+              <input type="number" inputMode="decimal" min="0.01" step="any" required={on[i]} disabled={!on[i]} value={amounts[i]} onChange={(e) => setAmounts((a) => a.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`ยอดที่จ่าย ${it.name}`} data-pay-amount />
+            </span>
           </div>
         ))}
         <div className="in-pm-total"><span>รวม{multi && count < bill.items.length ? ` (${count} จาก ${bill.items.length} ชิ้น)` : ''}</span><span>{baht(total)}</span></div>
         <label className="in-pm-date">
-          วันที่จ่าย
+          <span>วันที่จ่าย</span>
           <input type="date" value={date} max={todayIso()} required onChange={(e) => setDate(e.target.value)} data-pay-date />
         </label>
         {changed && <p className="in-pm-note">ยอดที่ต่างจากงวด จะไปปรับที่งวดสุดท้าย (จ่ายเกิน → งวดท้ายลดลง / จ่ายขาด → งวดท้ายเพิ่มขึ้น และอาจมีค่าปรับจากผู้ให้ผ่อน)</p>}
@@ -231,12 +242,15 @@ function PayoffModal({ plan, onClose, onDone }) {
           <div><span>งวดที่เหลือ</span><b>{left} งวด</b></div>
           <div><span>ยอดคงเหลือตามตาราง</span><b>{baht(plan.remaining)}</b></div>
         </div>
-        <label className="in-po-field">
-          ยอดที่จ่ายปิดจริง (บาท)
-          <input type="number" inputMode="decimal" min="0.01" step="any" required value={amount} onChange={(e) => setAmount(e.target.value)} data-payoff-amount />
+        <label className="in-pm-date">
+          <span>ยอดที่จ่ายปิดจริง</span>
+          <span className="in-amt" style={amtWidth(amount)}>
+            <i aria-hidden="true">฿</i>
+            <input type="number" inputMode="decimal" min="0.01" step="any" required value={amount} onChange={(e) => setAmount(e.target.value)} data-payoff-amount />
+          </span>
         </label>
-        <label className="in-po-field">
-          วันที่จ่าย
+        <label className="in-pm-date">
+          <span>วันที่จ่าย</span>
           <input type="date" value={date} max={todayIso()} required onChange={(e) => setDate(e.target.value)} data-payoff-date />
         </label>
         {saved > 0 && <p className="in-po-saved" data-payoff-saved>ประหยัดได้ {baht(saved)}</p>}

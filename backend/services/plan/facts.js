@@ -1,4 +1,4 @@
-// รวม "ข้อเท็จจริง" (id, ป้าย, ค่า, หน่วย) จากผลวิเคราะห์ + เป้าหมาย ใช้ทั้งกับคำแนะนำจากกฎและส่งให้ AI เขียนคำอธิบาย
+// รวม "ข้อเท็จจริง" (id, ป้าย, ค่า, หน่วย) จากผลวิเคราะห์ + เป้าหมาย + รายการผ่อน ใช้ทั้งกับคำแนะนำจากกฎและส่งให้ AI เขียนคำอธิบาย
 // ตัวเลขทุกตัวมาจากที่นี่ AI ไม่มีสิทธิ์สร้างตัวเลขเอง (ระบบตรวจย้อนกลับทุกครั้ง)
 // short = ชื่อสั้นสำหรับป้ายตัวเลขใต้คำแนะนำ (เช่น "อาหาร" "เฉลี่ย") ใช้เฉพาะแสดงผล ไม่ส่งให้ AI (ป้ายเต็ม label ยังใช้เป็นคำอธิบายเมื่อชี้)
 const THAI_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -13,11 +13,12 @@ function thaiMonthYear(iso) {
 const clip = (s, n) => Array.from(String(s || '')).slice(0, n).join('');
 
 // goalEvals: [{ goal_id, name, target_date, ...ผลประเมินจาก evaluateGoal }]
-function buildFacts(analysis, goalEvals = []) {
+// inst (เฉพาะเดือนปัจจุบัน): { load, burden_pct, free: { amount, month, n, name } | null } จาก installmentFacts
+function buildFacts(analysis, goalEvals = [], inst = null) {
   const facts = [];
-  const add = (id, label, value, unit = '', short = null) => {
+  const add = (id, label, value, unit = '', short = null, extra = null) => {
     if (value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))) return;
-    facts.push({ id, label, value, unit, ...(short !== null ? { short } : {}) });
+    facts.push({ id, label, value, unit, ...(short !== null ? { short } : {}), ...(extra || {}) });
   };
   const n = analysis.baseline.months;
   const baseLabel = `${n} เดือนก่อน`;
@@ -33,6 +34,8 @@ function buildFacts(analysis, goalEvals = []) {
   if (current) add('projection', 'คาดการณ์รายจ่ายสิ้นเดือน', analysis.projection.expense_end, 'บาท', 'คาดการณ์');
   add('income_ref', 'รายรับอ้างอิงของเดือน', analysis.projection.income_ref, 'บาท', 'รายรับอ้างอิง');
   add('projection_pct', current ? 'คาดการณ์รายจ่ายเทียบกับรายรับอ้างอิง' : 'รายจ่ายเทียบกับรายรับอ้างอิง', analysis.projection.pct_of_income, '%', 'เทียบรายรับ');
+  // เดือนปัจจุบัน: อัตราการออมที่คาดว่าจะเหลือตอนสิ้นเดือน (ยอดถึงวันนี้ยังไม่สะท้อน เพราะรายรับมักเข้าต้นเดือน แต่รายจ่ายยังทยอยมา)
+  if (current && analysis.projection.pct_of_income !== null && analysis.projection.pct_of_income !== undefined) add('save_pct_proj', 'คาดว่าจะเหลือเก็บสิ้นเดือน (% ของรายรับอ้างอิง)', Math.round((100 - analysis.projection.pct_of_income) * 10) / 10, '%', 'คาดเหลือเก็บ');
   add('avg_surplus', `เงินเหลือเฉลี่ยต่อเดือน (${baseLabel})`, analysis.baseline.avg_surplus, 'บาท', 'เหลือเฉลี่ย/เดือน');
   analysis.anomalies.forEach((c, i) => {
     const nm = clip(c.name, 30);
@@ -59,6 +62,16 @@ function buildFacts(analysis, goalEvals = []) {
     add(`g${i}_delay`, `เป้าหมาย “${nm}” จะช้ากว่ากำหนด`, g.delay_months, 'เดือน', 'ช้ากว่า');
     if (g.eta_date) add(`g${i}_eta`, `เป้าหมาย “${nm}” คาดว่าจะถึงเมื่อ`, thaiMonthYear(g.eta_date), '', 'คาดถึง');
   });
+  if (current && inst) {
+    if (inst.load > 0) add('inst_load', 'ภาระผ่อนต่อเดือน (ทุกรายการที่กำลังผ่อน)', inst.load, 'บาท', 'ผ่อน/เดือน');
+    if (inst.load > 0) add('inst_burden_pct', 'ภาระผ่อนเทียบกับรายรับอ้างอิง', inst.burden_pct, '%', 'ของรายรับ');
+    if (inst.free) {
+      add('inst_free', 'เงินที่จะเหลือเพิ่มต่อเดือนหลังผ่อนจบ (รายการที่จบภายใน 2 เดือน)', inst.free.amount, 'บาท', 'เหลือเพิ่ม/เดือน');
+      add('inst_free_month', 'เริ่มมีเงินเหลือเพิ่มตั้งแต่', thaiMonthYear(`${inst.free.month}-01`), '', 'ตั้งแต่');
+      add('inst_free_n', 'จำนวนรายการผ่อนที่จะจบภายใน 2 เดือน', inst.free.n, 'รายการ', 'จบ');
+      if (inst.free.n === 1) add('inst_free_name', 'รายการผ่อนที่จะจบ', clip(inst.free.name, 30), '', 'รายการ', { ai: false });
+    }
+  }
   return facts;
 }
 

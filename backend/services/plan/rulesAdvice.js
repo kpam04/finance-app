@@ -1,66 +1,99 @@
 // คำแนะนำจากกฎ (ไม่ใช้ AI): ใช้เป็นคำแนะนำเริ่มต้น สำรองเมื่อ AI ใช้ไม่ได้ และเป็นข้อความสรุปบนแดชบอร์ด
 // ทุกข้อมีตัวเลขที่ใช้ (facts_used) ติดไปด้วยเสมอ
-const MAX_ITEMS = 4;
+// group = ประเภทสำหรับปุ่มกรอง: watch (ระวัง) / save (โอกาสออม) / good (ทำได้ดี) เรียง watch → save → good
+const MAX_ITEMS = 6;
+const GROUP_CAP = { watch: 3, save: 2, good: 2 };
+const GROUP_ORDER = ['watch', 'save', 'good'];
+const BURDEN_WARN_PCT = 30; // ภาระผ่อนเกิน 30% ของรายรับ = ควรระวังก่อนผ่อนเพิ่ม
+const DAILY_GOOD_PCT = -10; // ใช้จ่ายต่อวันต่ำกว่าค่าเฉลี่ยเดิมตั้งแต่ 10% = ทำได้ดี
 
 const num = (n) => {
   const r = Math.round(Number(n) * 10) / 10;
   return Number.isInteger(r) ? r.toLocaleString('en-US') : r.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 };
 
-// current = false เมื่อดูเดือนที่ผ่านมา: ใช้ถ้อยคำของเรื่องที่จบแล้ว (ไม่มี "ถ้าใช้จ่ายในอัตรานี้" / "ลองวางแผนล่วงหน้า") และไม่มีเรื่องเป้าหมาย
+// current = false เมื่อดูเดือนที่ผ่านมา: ใช้ถ้อยคำของเรื่องที่จบแล้ว (ไม่มี "ถ้าใช้จ่ายในอัตรานี้" / "ลองวางแผนล่วงหน้า") และไม่มีเรื่องเป้าหมาย/ผ่อน
 function rulesAdvice(facts, goalEvalsIn = [], { current = true } = {}) {
   const when = current ? 'เดือนนี้' : 'เดือนนั้น';
   const goalEvals = current ? goalEvalsIn : []; // เป้าหมายเป็นเรื่องของตอนนี้ ไม่พูดถึงในเดือนที่ผ่านมา
   const byId = new Map(facts.map((f) => [f.id, f]));
   const val = (id) => (byId.has(id) ? byId.get(id).value : null);
   const use = (...ids) => ids.filter((id) => byId.has(id)).map((id) => byId.get(id));
-  const items = [];
-  const push = (tag, text, ids) => { if (items.length < MAX_ITEMS) items.push({ tag, text, facts_used: use(...ids), source: 'rules' }); };
+  const cands = [];
+  const push = (group, tag, text, ids) => cands.push({ tag, group, text, facts_used: use(...ids), source: 'rules' });
 
-  // 1) คาดการณ์รายจ่ายสิ้นเดือนสูงกว่ารายรับอ้างอิง
+  // ---------- ระวัง ----------
   if (current && val('projection') !== null && val('income_ref') !== null && val('projection') > val('income_ref')) {
-    push('warning', `ถ้าใช้จ่ายในอัตรานี้ รายจ่ายสิ้นเดือนจะอยู่ราว ${num(val('projection'))} บาท สูงกว่ารายรับอ้างอิง ${num(val('income_ref'))} บาท ลองทบทวนรายการที่ลดได้ก่อนสิ้นเดือน`, ['projection', 'income_ref', 'projection_pct']);
+    push('watch', 'warning', `ถ้าใช้จ่ายในอัตรานี้ รายจ่ายสิ้นเดือนจะอยู่ราว ${num(val('projection'))} บาท สูงกว่ารายรับอ้างอิง ${num(val('income_ref'))} บาท ลองทบทวนรายการที่ลดได้ก่อนสิ้นเดือน`, ['projection', 'income_ref', 'projection_pct']);
   } else if (!current && val('expense_month') !== null && val('income_ref') !== null && val('expense_month') > val('income_ref')) {
-    push('warning', `รายจ่าย${when}อยู่ที่ ${num(val('expense_month'))} บาท สูงกว่ารายรับอ้างอิง ${num(val('income_ref'))} บาท ลองดูว่ามีรายการที่ลดได้ในเดือนถัดไปไหม`, ['expense_month', 'income_ref', 'projection_pct']);
+    push('watch', 'warning', `รายจ่าย${when}อยู่ที่ ${num(val('expense_month'))} บาท สูงกว่ารายรับอ้างอิง ${num(val('income_ref'))} บาท ลองดูว่ามีรายการที่ลดได้ในเดือนถัดไปไหม`, ['expense_month', 'income_ref', 'projection_pct']);
   }
-  // 2) หมวดที่สูงผิดปกติ (ข้อที่เกินมากที่สุด)
-  if (val('cat0_amount') !== null) {
-    const nm = byId.get('cat0_amount').label.replace(/^หมวด “/, '').replace(/” เดือน(นี้|นั้น)$/, '');
-    push('warning', `หมวด “${nm}” ${when} ${num(val('cat0_amount'))} บาท สูงกว่าค่าเฉลี่ยของคุณ (${num(val('cat0_base'))} บาท) อยู่ ${num(val('cat0_pct'))}% ลองดูรายการในหมวดนี้ว่ามีอะไรลดหรือเลื่อนได้บ้าง`, ['cat0_amount', 'cat0_base', 'cat0_pct']);
+  // หมวดที่สูงผิดปกติ (สูงสุด 2 หมวด เรียงตามยอดที่เกิน)
+  for (let i = 0; i < 2; i += 1) {
+    if (val(`cat${i}_amount`) === null) continue;
+    const nm = byId.get(`cat${i}_amount`).label.replace(/^หมวด “/, '').replace(/” เดือน(นี้|นั้น)$/, '');
+    push('watch', 'warning', `หมวด “${nm}” ${when} ${num(val(`cat${i}_amount`))} บาท สูงกว่าค่าเฉลี่ยของคุณ (${num(val(`cat${i}_base`))} บาท) อยู่ ${num(val(`cat${i}_pct`))}% ลองดูรายการในหมวดนี้ว่ามีอะไรลดหรือเลื่อนได้บ้าง`, [`cat${i}_amount`, `cat${i}_base`, `cat${i}_pct`]);
   }
-  // 3) เป้าหมายที่ยังไม่ทัน
+  // เป้าหมายที่ยังไม่ทัน
   const behind = goalEvals.findIndex((g) => g.status === 'behind');
   if (behind >= 0 && behind < 3 && val(`g${behind}_required`) !== null) {
     const g = goalEvals[behind];
-    push('goal', `เป้าหมาย “${g.name}” ต้องออมเดือนละ ${num(val(`g${behind}_required`))} บาท แต่เงินเหลือเฉลี่ยต่อเดือนของคุณอยู่ที่ ${num(val(`g${behind}_capacity`))} บาท ถ้าแบ่งมาออมทั้งหมดจะช้ากว่ากำหนดราว ${num(val(`g${behind}_delay`))} เดือน ลองดูรายจ่ายหมวดที่สูงว่าลดหรือเลื่อนได้บ้างไหม`, [`g${behind}_required`, `g${behind}_capacity`, `g${behind}_delay`]);
+    push('watch', 'goal', `เป้าหมาย “${g.name}” ต้องออมเดือนละ ${num(val(`g${behind}_required`))} บาท แต่เงินเหลือเฉลี่ยต่อเดือนของคุณอยู่ที่ ${num(val(`g${behind}_capacity`))} บาท ถ้าแบ่งมาออมทั้งหมดจะช้ากว่ากำหนดราว ${num(val(`g${behind}_delay`))} เดือน ลองปรับรายจ่ายบางหมวดดูว่าจะทันขึ้นไหม`, [`g${behind}_required`, `g${behind}_capacity`, `g${behind}_delay`]);
   } else {
     const noSur = goalEvals.findIndex((g) => g.status === 'no_surplus');
-    if (noSur >= 0 && noSur < 3) push('goal', `ช่วง 3 เดือนที่ผ่านมารายจ่ายไม่ต่ำกว่ารายรับ จึงยังออมเพื่อเป้าหมาย “${goalEvals[noSur].name}” ไม่ได้ ลองลดรายจ่ายบางหมวดก่อน`, [`g${noSur}_remaining`, 'avg_surplus']);
+    if (noSur >= 0 && noSur < 3) push('watch', 'goal', `ช่วง 3 เดือนที่ผ่านมารายจ่ายไม่ต่ำกว่ารายรับ จึงยังออมเพื่อเป้าหมาย “${goalEvals[noSur].name}” ไม่ได้ ลองลดรายจ่ายบางหมวดก่อน`, [`g${noSur}_remaining`, 'avg_surplus']);
   }
-  // 4) รายจ่ายเล็ก ๆ ถี่ ๆ
+  // ภาระผ่อนสูง
+  if (current && val('inst_burden_pct') !== null && val('inst_burden_pct') > BURDEN_WARN_PCT) {
+    push('watch', 'warning', `ภาระผ่อนต่อเดือน ${num(val('inst_load'))} บาท คิดเป็น ${num(val('inst_burden_pct'))}% ของรายรับอ้างอิง ซึ่งค่อนข้างสูง ลองชะลอการผ่อนรายการใหม่ไว้ก่อนจนกว่าบางรายการจะผ่อนจบ`, ['inst_load', 'inst_burden_pct']);
+  }
+
+  // ---------- โอกาสออม ----------
+  if (current && val('inst_free') !== null) {
+    const n = val('inst_free_n');
+    const what = n > 1 ? `รายการผ่อน ${num(n)} รายการ ` : `“${val('inst_free_name')}” `;
+    push('save', 'tip', `${what}จะผ่อนจบเร็ว ๆ นี้ ตั้งแต่ ${val('inst_free_month')} จะมีเงินเหลือเพิ่มราวเดือนละ ${num(val('inst_free'))} บาท ลองตั้งเป้าหมายออมด้วยเงินส่วนนี้ไว้ก่อน`, ['inst_free', 'inst_free_month', 'inst_free_name']);
+  }
   if (val('small_count') !== null && val('small_count') >= 15 && val('small_total') !== null) {
-    push('tip', current
+    push('save', 'tip', current
       ? `รายจ่ายน้อยกว่า 100 บาทมี ${num(val('small_count'))} ครั้งใน 30 วัน รวม ${num(val('small_total'))} บาท ลองดูว่ามีรายการที่รวมหรือลดได้ไหม`
       : `ก่อนสิ้นเดือนนั้น รายจ่ายน้อยกว่า 100 บาทมี ${num(val('small_count'))} ครั้ง รวม ${num(val('small_total'))} บาท`, ['small_count', 'small_total']);
   }
-  // 5) วันที่ใช้จ่ายสูงสุดของสัปดาห์
   if (val('peak_day') !== null && val('peak_share') !== null && val('peak_share') >= 20) {
-    push('tip', current
+    push('save', 'tip', current
       ? `วัน${val('peak_day')}เป็นวันที่คุณใช้จ่ายมากที่สุด คิดเป็น ${num(val('peak_share'))}% ของรายจ่ายรายสัปดาห์ ลองวางแผนล่วงหน้าสำหรับวันนี้`
       : `ช่วงก่อนสิ้นเดือนนั้น วัน${val('peak_day')}เป็นวันที่คุณใช้จ่ายมากที่สุด คิดเป็น ${num(val('peak_share'))}% ของรายจ่ายรายสัปดาห์`, ['peak_day', 'peak_share']);
   }
-  // 6) ข้อดีที่ควรรักษาไว้
-  if (items.length < MAX_ITEMS && val('savings_rate') !== null && val('savings_rate') >= 20) {
-    push('tip', current ? `อัตราการออมเดือนนี้ ${num(val('savings_rate'))}% อยู่ในเกณฑ์ดี ลองรักษาระดับนี้ไว้` : `อัตราการออมเดือนนั้น ${num(val('savings_rate'))}% อยู่ในเกณฑ์ดี`, ['savings_rate']);
+
+  // ---------- ทำได้ดี ----------
+  // เดือนปัจจุบันดูจากที่คาดว่าจะเหลือสิ้นเดือน (ไม่ใช้ยอดถึงวันนี้ ซึ่งดูดีเกินจริงช่วงต้นเดือน)
+  if (current && val('save_pct_proj') !== null && val('save_pct_proj') >= 20) {
+    push('good', 'tip', `ถ้าใช้จ่ายในอัตรานี้ สิ้นเดือนคาดว่าจะเหลือเก็บราว ${num(val('save_pct_proj'))}% ของรายรับ อยู่ในเกณฑ์ดี ลองรักษาระดับนี้ไว้`, ['save_pct_proj']);
+  } else if (!current && val('savings_rate') !== null && val('savings_rate') >= 20) {
+    push('good', 'tip', `อัตราการออมเดือนนั้น ${num(val('savings_rate'))}% อยู่ในเกณฑ์ดี`, ['savings_rate']);
+  }
+  if (val('avg_daily_pct') !== null && val('avg_daily_pct') <= DAILY_GOOD_PCT) {
+    push('good', 'tip', `${when}ใช้จ่ายเฉลี่ยวันละ ${num(val('avg_daily'))} บาท ต่ำกว่าค่าเฉลี่ยเดิม (${num(val('avg_daily_base'))} บาท) อยู่ ${num(Math.abs(val('avg_daily_pct')))}% ทำได้ดีมาก`, ['avg_daily', 'avg_daily_base', 'avg_daily_pct']);
   }
   const ontrack = goalEvals.findIndex((g) => g.status === 'on_track');
-  if (items.length < MAX_ITEMS && ontrack >= 0 && ontrack < 3 && val(`g${ontrack}_required`) !== null) {
-    push('goal', `เป้าหมาย “${goalEvals[ontrack].name}” อยู่ในเส้นทาง ต้องออมเดือนละ ${num(val(`g${ontrack}_required`))} บาท และเงินเหลือเฉลี่ยต่อเดือนของคุณอยู่ที่ ${num(val(`g${ontrack}_capacity`))} บาท ซึ่งพอสำหรับเป้าหมายนี้`, [`g${ontrack}_required`, `g${ontrack}_capacity`]);
+  if (ontrack >= 0 && ontrack < 3 && val(`g${ontrack}_required`) !== null) {
+    push('good', 'goal', `เป้าหมาย “${goalEvals[ontrack].name}” อยู่ในเส้นทาง ต้องออมเดือนละ ${num(val(`g${ontrack}_required`))} บาท และเงินเหลือเฉลี่ยต่อเดือนของคุณอยู่ที่ ${num(val(`g${ontrack}_capacity`))} บาท ซึ่งพอสำหรับเป้าหมายนี้`, [`g${ontrack}_required`, `g${ontrack}_capacity`]);
+  }
+
+  // เลือกตามโควตาของแต่ละประเภท (ให้มีข้อดีด้วยเสมอถ้ามี ไม่ใช่มีแต่ข้อเตือน)
+  const used = { watch: 0, save: 0, good: 0 };
+  const items = [];
+  for (const g of GROUP_ORDER) {
+    for (const c of cands) {
+      if (c.group !== g || used[g] >= GROUP_CAP[g] || items.length >= MAX_ITEMS) continue;
+      used[g] += 1;
+      items.push(c);
+    }
   }
   if (items.length === 0) {
-    push('tip', 'ยังไม่มีข้อมูลเพียงพอสำหรับคำแนะนำ ลองบันทึกรายการต่อเนื่องอีกสักระยะ ระบบจะเริ่มเทียบกับค่าเฉลี่ยของคุณได้', []);
+    items.push({ tag: 'tip', group: 'save', text: 'ยังไม่มีข้อมูลเพียงพอสำหรับคำแนะนำ ลองบันทึกรายการต่อเนื่องอีกสักระยะ ระบบจะเริ่มเทียบกับค่าเฉลี่ยของคุณได้', facts_used: [], source: 'rules' });
   }
   return items;
 }
 
-module.exports = { rulesAdvice, MAX_ITEMS };
+module.exports = { rulesAdvice, MAX_ITEMS, BURDEN_WARN_PCT, GROUP_ORDER };

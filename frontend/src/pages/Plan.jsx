@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import InfoTitle from '../components/InfoTitle.jsx';
 import GoalModal from '../components/GoalModal.jsx';
@@ -214,6 +214,99 @@ const css = `
 .pl-goal-more p { margin: 4px 0 0; line-height: 1.6; }
 .pl-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 13px; }
 .pl-empty { margin: 8px 0 0; font-size: 13px; color: #6b7280; line-height: 1.6; }
+/* ===== ภาพรวม: การ์ดสรุป 4 ใบ ===== */
+.pl-hero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.pl-hero-c { min-width: 0; padding: 12px 14px; border: 1px solid #ECE6DA; border-left: 4px solid #9AAB91; border-radius: 12px; background: #fff; text-align: left; font: inherit; color: inherit; }
+.pl-hero-c.warn { border-left-color: #E2A27E; }
+.pl-hero-c .l { font-size: 12px; color: #6b7280; }
+.pl-hero-c .v { margin: 2px 0; font-size: 21px; font-weight: 700; color: #3F3A34; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-hero-c.warn .v { color: #B45A2A; }
+.pl-hero-c .s { font-size: 12px; line-height: 1.5; color: #6b7280; }
+.pl-hero-btn { cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.pl-hero-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-color: #D9D2C3; }
+.pl-hero-btn:focus-visible { outline: 2px solid #9AAB91; outline-offset: 2px; }
+@media (max-width: 860px) { .pl-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (max-width: 400px) { .pl-hero-c { padding: 10px 11px; } .pl-hero-c .v { font-size: 18px; } }
+/* ===== การ์ดพฤติกรรม (ซ่อนได้) ===== */
+.pl-page > .card.pl-beh { padding-bottom: 16px; }
+.pl-page > .card.pl-beh.closed { padding-top: 12px; padding-bottom: 12px; }
+.pl-beh-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pl-collapse { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 5px 10px 5px 12px; border: 1px solid #E2DCCF; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; color: #6b6358; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.pl-collapse:hover { background: #F5F2EA; border-color: #D3CCBE; }
+.pl-collapse:focus-visible { outline: 2px solid #9AAB91; outline-offset: 1px; }
+.pl-chev { transform: rotate(180deg); transition: transform 0.25s; }
+.pl-beh.closed .pl-chev { transform: rotate(0deg); }
+.pl-beh-wrap { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.3s ease; }
+.pl-beh.closed .pl-beh-wrap { grid-template-rows: 0fr; }
+.pl-beh-inner { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .pl-beh-wrap, .pl-chev { transition: none; } }
+.pl-beh-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px 28px; padding-top: 12px; }
+@media (max-width: 820px) { .pl-beh-grid { grid-template-columns: minmax(0, 1fr); } }
+.pl-beh-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: #4B4740; }
+.pl-beh-sub span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 400; color: #8A8177; }
+.pl-lg-bar { display: inline-block; width: 12px; height: 8px; border-radius: 2px; background: #B9C8B2; }
+.pl-lg-mark { display: inline-block; width: 2px; height: 12px; margin-left: 6px; border-radius: 1px; background: #5b5348; }
+.pl-beh .pl-days { margin-top: 10px; }
+.pl-cbars { display: grid; gap: 9px; margin-top: 12px; }
+.pl-cbar { display: grid; grid-template-columns: minmax(64px, 104px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.pl-cbar .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3F3A34; }
+.pl-cbar .nm small { font-size: 10.5px; color: #9a9184; }
+.pl-cbar .tr { position: relative; height: 10px; border-radius: 5px; background: #F1EDE4; }
+.pl-cbar .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #B9C8B2; }
+.pl-cbar.flag .tr i { background: #E8B596; }
+.pl-cbar .tr b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: #5b5348; }
+.pl-cbar .am { min-width: 108px; text-align: right; white-space: nowrap; font-weight: 600; color: #3F3A34; }
+.pl-cbar .am em { display: inline-block; min-width: 46px; margin-left: 6px; font-style: normal; font-size: 11.5px; font-weight: 500; color: #8A8177; }
+.pl-cbar.flag .am em { color: #B45A2A; font-weight: 700; }
+@media (max-width: 480px) { .pl-cbar { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 8px; } .pl-cbar .am { min-width: 0; } .pl-cbar .am em { min-width: 0; } }
+/* ===== สิ่งที่ควรทำ ===== */
+.pl-side { display: grid; gap: 14px; }
+.pl-side > .card { margin-bottom: 0; }
+.pl-head-acts { display: inline-flex; align-items: center; gap: 2px 8px; flex-wrap: wrap; }
+.pl-link.on { color: #40563C; font-weight: 600; }
+.pl-fchips { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 2px; }
+.pl-fchips button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1px solid #E6E0D4; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; color: #6b6358; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.pl-fchips button span { font-size: 11px; color: #9a9184; }
+@media (max-width: 640px) { .pl-fchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -2px; padding: 0 2px 2px; } .pl-fchips::-webkit-scrollbar { display: none; } .pl-fchips button { flex-shrink: 0; white-space: nowrap; } }
+.pl-fchips button:hover { border-color: #CFC7B8; }
+.pl-fchips button.on { border-color: #9AAB91; background: #EEF2EA; color: #40563C; font-weight: 600; }
+.pl-fchips button.on span { color: #5E7558; }
+.pl-item.g-watch .adv-ic { color: #D08A5E; }
+.pl-item.g-good .adv-ic { color: #5E8A58; }
+.pl-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pl-act { padding: 5px 12px; border: 1px solid #D5DECF; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #4F6B47; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.pl-act:hover:not(:disabled) { background: #F1F3ED; border-color: #9AAB91; }
+.pl-act.main { border-color: #7E9677; background: #7E9677; color: #fff; }
+.pl-act.main:hover:not(:disabled) { background: #6B8364; border-color: #6B8364; }
+.pl-act:disabled { opacity: 0.6; cursor: wait; }
+.pl-ask { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding: 10px 12px; border-radius: 10px; background: #F6F8F3; border: 1px solid #DCE4D6; font-size: 13px; line-height: 1.6; color: #3F3A34; }
+.pl-ask-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.pl-ok { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: #EEF5EC; color: #3D6B3A; font-size: 13px; }
+/* ===== ลองปรับเอง ===== */
+.pl-sim { margin-top: 12px; padding: 12px 14px 14px; border-radius: 12px; background: #F8F6F0; border: 1px solid #ECE6DA; }
+.pl-sim-head { position: relative; display: flex; flex-direction: column; gap: 2px; padding-right: 28px; margin-bottom: 8px; font-size: 13.5px; color: #3F3A34; }
+.pl-sim-head span { font-size: 12px; color: #8A8177; }
+.pl-sim-x { position: absolute; top: -4px; right: -4px; width: 28px; height: 28px; border: none; border-radius: 8px; background: none; font-size: 20px; line-height: 1; color: #9a9184; cursor: pointer; }
+.pl-sim-x:hover { background: #EEE9DD; color: #4b5563; }
+label.pl-sim-row { display: grid; grid-template-columns: minmax(80px, 130px) minmax(0, 1fr) 96px; flex-direction: row; align-items: center; gap: 10px; margin: 0; padding: 6px 0; font-size: 13px; color: #3F3A34; }
+.pl-sim-row .nm { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.pl-sim-row .nm small { font-size: 11px; color: #8A8177; }
+.pl-sim-row .vv { text-align: right; font-weight: 600; white-space: nowrap; }
+.pl-sim-row .vv small { font-weight: 400; color: #8A8177; }
+.pl-sim-row input[type=range] { width: 100%; height: 6px; margin: 0; padding: 0; border: none; border-radius: 3px; appearance: none; -webkit-appearance: none; background: linear-gradient(to right, #7E9677 var(--p, 0%), #E3DDD0 var(--p, 0%)); cursor: pointer; }
+.pl-sim-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid #7E9677; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.pl-sim-row input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid #7E9677; }
+.pl-sim-row input[type=range]:focus-visible { outline: 2px solid #9AAB91; outline-offset: 4px; }
+@media (max-width: 480px) { label.pl-sim-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; } .pl-sim-row input[type=range] { grid-column: 1 / -1; grid-row: 2; } }
+.pl-sim-out { margin-top: 8px; padding-top: 10px; border-top: 1px dashed #DDD5C6; font-size: 13px; color: #4B4740; }
+.pl-sim-hint { color: #8A8177; }
+.pl-sim-big { font-size: 14px; } .pl-sim-big b { font-size: 18px; color: #40563C; } .pl-sim-big small { color: #8A8177; }
+.pl-sim-sub { margin-top: 2px; font-size: 12.5px; color: #6b7280; }
+.pl-sim-goals { display: grid; gap: 4px; margin: 8px 0 4px; padding: 0; list-style: none; }
+.pl-sim-goals li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.pl-sim-goals li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-sim-goals li b { font-weight: 600; color: #6b6358; white-space: nowrap; }
+.pl-sim-goals li.ok b { color: #3D6B3A; }
 `;
 
 const DAY_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -274,6 +367,103 @@ function Chips({ facts }) {
   });
 }
 
+const BEH_KEY = 'finance_plan_behavior_hidden';
+const GROUP_ORDER = ['watch', 'save', 'good'];
+const GROUP_LABEL = { watch: '⚠️ ระวัง', save: '💰 โอกาสออม', good: '👍 ทำได้ดี' };
+function actionLabel(a) {
+  switch (a.type) {
+    case 'set_budget': return `ตั้งงบ ${baht(a.amount)}`;
+    case 'view_budget': return 'ดูงบหมวดนี้';
+    case 'view_txns': return a.category_id ? 'ดูรายการหมวดนี้' : 'ดูรายการเดือนนี้';
+    case 'simulate': return 'ลองปรับเอง';
+    case 'new_goal': return 'ตั้งเป้าหมายออม';
+    case 'view_inst': return 'ดูรายการผ่อน';
+    default: return '';
+  }
+}
+const IconSliders = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" />
+  </svg>
+);
+
+// ระยะเวลาเป็นเดือนแบบอ่านง่าย (ทศนิยม 1 ตำแหน่ง ไม่ถึงครึ่งเดือน = "ไม่ถึงเดือน")
+const monthsText = (n) => (n < 0.5 ? 'ไม่ถึงเดือน' : `${num1(n)} เดือน`);
+
+// แผง "ลองปรับเอง": เลื่อนลดรายจ่ายหมวดที่ใช้เยอะ (ครั้งละ 5% สูงสุด 50%) ดูว่าจะเหลือเก็บเพิ่มเท่าไร และเป้าหมายถึงเร็วขึ้นแค่ไหน
+// คำนวณที่หลังบ้าน (POST /plan/simulate) ไม่บันทึกอะไร
+function SimPanel({ cats, hasGoals, onClose }) {
+  const [pcts, setPcts] = useState({});
+  const [res, setRes] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const any = Object.values(pcts).some((v) => v > 0);
+  useEffect(() => {
+    if (!any) { setRes(null); setErr(''); return undefined; }
+    let live = true;
+    const t = setTimeout(async () => {
+      setBusy(true);
+      try {
+        const r = await api.planSimulate(Object.entries(pcts).filter(([, v]) => v > 0).map(([id, v]) => ({ category_id: id, pct: -v })));
+        if (live) { setRes(r.data); setErr(''); }
+      } catch (e) {
+        if (live) setErr(e.message || 'คำนวณไม่สำเร็จ');
+      } finally {
+        if (live) setBusy(false);
+      }
+    }, 300);
+    return () => { live = false; clearTimeout(t); };
+  }, [pcts, any]);
+  const local = cats.reduce((s, c) => s + (c.base_avg * (pcts[c.category_id] || 0)) / 100, 0); // แสดงทันทีระหว่างรอผลจากหลังบ้าน
+  const delta = res ? res.scenario.delta_monthly : Math.round(local);
+  const goalRows = res ? res.scenario.goals.map((g) => {
+    const b = res.base.goals.find((x) => x.goal_id === g.goal_id) || {};
+    const faster = b.eta_months !== null && b.eta_months !== undefined && g.eta_months !== null && g.eta_months !== undefined ? b.eta_months - g.eta_months : null;
+    let text;
+    if (g.status === 'reached') text = 'ครบแล้ว';
+    else if (b.status !== 'on_track' && g.status === 'on_track') text = 'ทันกำหนดแล้ว 🎉';
+    else if (b.status === 'no_surplus' && g.eta_months) text = `เริ่มออมได้ ถึงในราว ${monthsText(g.eta_months)}`;
+    else if (faster !== null && faster >= 0.5) text = `เร็วขึ้นราว ${monthsText(faster)}`;
+    else if (g.status === 'behind') text = `ยังช้ากว่ากำหนดราว ${monthsText(g.delay_months || 0)}`;
+    else text = 'ไม่ค่อยเปลี่ยน';
+    return { id: g.goal_id, name: g.name, text, ok: g.status === 'on_track' || g.status === 'reached' };
+  }) : [];
+  return (
+    <div className="pl-sim" data-sim>
+      <div className="pl-sim-head">
+        <b>ลองปรับเอง</b><span>ถ้าลดรายจ่ายหมวดเหล่านี้ลง จะเป็นอย่างไร (แค่ลองดู ยังไม่บันทึกอะไร)</span>
+        <button type="button" className="pl-sim-x" aria-label="ปิดแผงลองปรับเอง" onClick={onClose}>×</button>
+      </div>
+      {cats.map((c) => {
+        const v = pcts[c.category_id] || 0;
+        return (
+          <label className="pl-sim-row" key={c.category_id} data-sim-row>
+            <span className="nm">{c.name}<small>เฉลี่ย {baht(c.base_avg)}/เดือน</small></span>
+            <input type="range" min="0" max="50" step="5" value={v} aria-label={`ลดรายจ่ายหมวด ${c.name} กี่เปอร์เซ็นต์`} onChange={(e) => setPcts((p) => ({ ...p, [c.category_id]: Number(e.target.value) }))} style={{ '--p': `${v * 2}%` }} />
+            <span className="vv">{v > 0 ? <>−{v}% <small>({baht((c.base_avg * v) / 100)})</small></> : '0%'}</span>
+          </label>
+        );
+      })}
+      <div className="pl-sim-out" aria-live="polite" data-sim-out>
+        {!any ? <span className="pl-sim-hint">เลื่อนแถบเพื่อดูผล</span> : (
+          <>
+            <div className="pl-sim-big">เหลือเก็บเพิ่มราว <b>{baht(delta)}</b>/เดือน{busy && <small> กำลังคำนวณ...</small>}</div>
+            {res && <div className="pl-sim-sub">เงินเหลือเฉลี่ยต่อเดือน {baht(res.base.surplus)} → {baht(res.scenario.surplus)}</div>}
+            {res && goalRows.length > 0 && (
+              <ul className="pl-sim-goals">
+                {goalRows.map((g) => <li key={g.id} className={g.ok ? 'ok' : ''}><span>{g.name}</span><b>{g.text}</b></li>)}
+              </ul>
+            )}
+            {res && !hasGoals && <div className="pl-sim-sub">ยังไม่มีเป้าหมาย ลองตั้งเป้าหมายเพื่อดูว่าจะถึงเร็วขึ้นแค่ไหน</div>}
+            {err && <p className="pl-msg" role="alert">{err}</p>}
+            <button type="button" className="pl-link" data-sim-reset onClick={() => setPcts({})}>ล้างค่า</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Plan() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -289,6 +479,17 @@ export default function Plan() {
   const [instAdd, setInstAdd] = useState(0); // เพิ่มค่า = เปิดฟอร์มเพิ่มรายการผ่อน (ปุ่มที่หัวข้อ)
   const [instView, setInstView] = useState('active'); // แท็บรายการผ่อน: 'active' กำลังผ่อน / 'done' ผ่อนเสร็จแล้ว
   const [cats, setCats] = useState([]); // หมวดรายจ่าย (ใช้ในฟอร์มรายการผ่อน)
+  const navigate = useNavigate();
+  const [behHidden, setBehHidden] = useState(() => { try { return localStorage.getItem(BEH_KEY) === '1'; } catch { return false; } }); // ซ่อนการ์ดพฤติกรรม (จำไว้)
+  const toggleBeh = () => setBehHidden((v) => {
+    try { localStorage.setItem(BEH_KEY, v ? '0' : '1'); } catch { /* ignore */ }
+    return !v;
+  });
+  const [advFilter, setAdvFilter] = useState('all'); // กรองคำแนะนำ: all / watch / save / good
+  const [simOpen, setSimOpen] = useState(false); // เปิดแผง "ลองปรับเอง"
+  const [budgetAsk, setBudgetAsk] = useState(null); // { key, action } ยืนยันก่อนตั้งงบจากคำแนะนำ
+  const [actBusy, setActBusy] = useState(false);
+  const [actMsg, setActMsg] = useState('');
   const loadInst = useCallback(async () => {
     try {
       const r = await api.getInstallments();
@@ -398,6 +599,9 @@ export default function Plan() {
     setConfirmDel(null);
     setGoalModal(null);
     setShowConsent(false);
+    setBudgetAsk(null);
+    setActMsg('');
+    setSimOpen(false);
     load();
   };
   const askAi = () => {
@@ -431,6 +635,41 @@ export default function Plan() {
       await load();
     } catch (e) {
       setError(e.message || 'ลบเป้าหมายไม่สำเร็จ');
+    }
+  };
+
+  // ปุ่มลงมือทำใต้คำแนะนำ
+  const runAction = (it, a) => {
+    setActMsg('');
+    const [y, m] = data.month.split('-').map(Number);
+    switch (a.type) {
+      case 'set_budget': setBudgetAsk({ key: it.key, action: a }); break;
+      case 'view_budget': navigate(`/budgets?month=${m}&year=${y}`); break;
+      case 'view_txns': navigate(`/transactions?month=${data.month}${a.category_id ? `&category=${a.category_id}` : ''}`); break;
+      case 'simulate':
+        setSimOpen(true);
+        setTimeout(() => { const el = document.querySelector('[data-sim]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 50);
+        break;
+      case 'new_goal': pickTab('goals'); setGoalView('active'); setGoalModal({ goal: null }); break;
+      case 'view_inst': pickTab('installments'); setInstView('active'); break;
+      default: break;
+    }
+  };
+  const confirmBudget = async () => {
+    if (!budgetAsk) return;
+    const a = budgetAsk.action;
+    const [y, m] = data.month.split('-').map(Number);
+    setActBusy(true);
+    try {
+      await api.createBudget({ category_id: a.category_id, amount_limit: a.amount, period_month: m, period_year: y, repeat: true });
+      if (!alive.current) return;
+      setBudgetAsk(null);
+      setActMsg(`ตั้งงบหมวด “${a.name}” เดือนละ ${baht(a.amount)} แล้ว`);
+      await load();
+    } catch (e) {
+      if (alive.current) setActMsg(e.message || 'ตั้งงบไม่สำเร็จ');
+    } finally {
+      if (alive.current) setActBusy(false);
     }
   };
 
@@ -598,13 +837,43 @@ export default function Plan() {
   const peakDay = an.weekday.by_day.reduce((a, d) => (d.amount > a.amount ? d : a), an.weekday.by_day[0]);
   const maxDay = Math.max(1, ...an.weekday.by_day.map((d) => d.amount));
   const proj = an.projection;
-  const catRows = an.categories.slice(0, 8);
+  const catRows = an.categories.slice(0, 6);
+  const catMax = Math.max(1, ...catRows.map((c) => Math.max(c.amount, c.expected_to_date || 0)));
   const isCur = data.is_current !== false; // false = กำลังดูเดือนที่ผ่านมา (ดูอย่างเดียว)
+  const instFacts = data.installments || null; // ภาระผ่อน (เฉพาะเดือนปัจจุบัน)
+  const canSim = isCur && an.baseline && an.baseline.avg_surplus !== null && (an.base_categories || []).some((c) => !c.lumpy);
 
-  // รายการคำแนะนำรวม: ของ AI ก่อน แล้วตามด้วยของระบบ (ข้ามข้อของระบบที่ใช้ตัวเลขชุดเดียวกับของ AI เพราะพูดเรื่องเดียวกัน)
+  // การ์ด "สถานะเดือนนี้": เดือนปัจจุบัน = รายรับอ้างอิง − คาดการณ์รายจ่ายสิ้นเดือน / เดือนที่ผ่านมา = รายรับ − รายจ่ายจริง
+  let heroStatus;
+  if (isCur) {
+    if (proj.expense_end === null) heroStatus = { label: 'สถานะเดือนนี้', value: '-', sub: an.days_elapsed < 7 ? 'ผ่านไปอย่างน้อย 7 วันจึงจะคาดการณ์ได้' : 'ยังไม่มีรายจ่ายให้คาดการณ์' };
+    else if (!proj.income_ref) heroStatus = { label: 'คาดการณ์รายจ่ายสิ้นเดือน', value: baht(proj.expense_end), sub: 'ยังไม่มีรายรับให้เทียบ' };
+    else {
+      const left = proj.income_ref - proj.expense_end;
+      heroStatus = left >= 0
+        ? { label: 'คาดว่าจะเหลือเก็บ', value: baht(left), sub: `รายรับ ${baht(proj.income_ref)} · คาดใช้ ${baht(proj.expense_end)}` }
+        : { label: 'คาดว่าจะใช้เกินรายรับ', value: baht(-left), sub: `รายรับ ${baht(proj.income_ref)} · คาดใช้ ${baht(proj.expense_end)}`, warn: true };
+    }
+  } else if (!an.totals.income) heroStatus = { label: 'รายจ่ายเดือนนั้น', value: baht(an.totals.expense || 0), sub: 'ไม่มีรายรับในเดือนนั้น' };
+  else {
+    const net = an.totals.income - an.totals.expense;
+    heroStatus = net >= 0
+      ? { label: 'เหลือเก็บเดือนนั้น', value: baht(net), sub: `รายรับ ${baht(an.totals.income)} · ใช้ ${baht(an.totals.expense)}` }
+      : { label: 'ใช้เกินรายรับเดือนนั้น', value: baht(-net), sub: `รายรับ ${baht(an.totals.income)} · ใช้ ${baht(an.totals.expense)}`, warn: true };
+  }
+
+  // รายการคำแนะนำรวม: ของ AI + ของระบบ (ข้ามข้อของระบบที่ใช้ตัวเลขชุดเดียวกับของ AI เพราะพูดเรื่องเดียวกัน)
+  // เรียงตามประเภท ระวัง → โอกาสออม → ทำได้ดี (ในประเภทเดียวกัน AI ก่อน) แล้วกรองตามปุ่มที่เลือก
   const aiItems = saved ? saved.items : [];
   const aiFactIds = new Set(aiItems.flatMap((it) => (it.facts_used || []).map((f) => f.id)));
   const sysItems = data.rules_advice.filter((it) => !(it.facts_used || []).some((f) => aiFactIds.has(f.id)));
+  const allItems = [
+    ...aiItems.map((it, i) => ({ ...it, source: 'ai', index: i, key: `ai-${i}` })),
+    ...sysItems.map((it, i) => ({ ...it, source: 'rules', key: `sys-${i}` })),
+  ].map((it, order) => ({ ...it, order })).sort((x, y) => (GROUP_ORDER.indexOf(x.group || 'save') - GROUP_ORDER.indexOf(y.group || 'save')) || x.order - y.order);
+  const groupCounts = GROUP_ORDER.map((g) => [g, allItems.filter((it) => (it.group || 'save') === g).length]).filter(([, n]) => n > 0);
+  const filterOn = advFilter !== 'all' && groupCounts.some(([g]) => g === advFilter) ? advFilter : 'all';
+  const shownItems = filterOn === 'all' ? allItems : allItems.filter((it) => (it.group || 'save') === filterOn);
 
   return (
     <div className="pl-page" data-plan-page>
@@ -627,82 +896,124 @@ export default function Plan() {
         </div>
       )}
 
-      {/* ===== 1 พฤติกรรมการใช้จ่าย ===== */}
-      <div className="card" data-plan-behavior>
-        <InfoTitle title={<><span className="pl-ti"><IconChart size={18} /></span>{isCur ? 'พฤติกรรมการใช้จ่ายเดือนนี้' : `พฤติกรรมการใช้จ่าย ${thaiMonth(data.month)}`}</>} label="คำอธิบายส่วนนี้" popId="pl-info-behavior">
-          <p>เทียบกับค่าเฉลี่ยของเดือนเต็มก่อนหน้า (สูงสุด 3 เดือน เฉพาะเดือนที่มีรายการ) หมวดที่ถือว่าสูงผิดปกติคือสูงกว่าที่ควรเป็นตั้งแต่ 30% และเกินอย่างน้อย 200 บาท หมวดที่จ่ายเป็นก้อน เช่น ค่าเช่า เทียบกับยอดเต็มเดือน</p>
-        </InfoTitle>
-        <div className="pl-metrics">
-          <div className="pl-metric" data-m="daily">
-            <div className="l">ใช้จ่ายเฉลี่ยต่อวัน</div>
-            <div className="v">{an.daily.avg === null ? '-' : baht(an.daily.avg)}</div>
-            <div className={`s${pctBase !== null && pctBase > 0 ? ' bad' : ''}`}>{pctBase === null ? 'ยังไม่มีค่าเฉลี่ยให้เทียบ' : `${pctBase > 0 ? 'สูงกว่า' : pctBase < 0 ? 'ต่ำกว่า' : 'เท่ากับ'}ค่าเฉลี่ยเดิม${pctBase === 0 ? '' : ` ${num1(Math.abs(pctBase))}%`}`}</div>
-          </div>
-          <div className="pl-metric" data-m="peak">
-            <div className="l">วันที่ใช้จ่ายสูงสุดของสัปดาห์</div>
-            <div className="v">{an.weekday.peak ? an.weekday.peak.name : '-'}</div>
-            <div className="s">{an.weekday.peak ? `${num1(an.weekday.peak.share_pct)}% ของรายจ่าย 90 วัน${isCur ? 'ล่าสุด' : 'ถึงสิ้นเดือน'}` : 'ข้อมูลยังไม่พอ'}</div>
-          </div>
-          <div className="pl-metric" data-m="anomaly">
-            <div className="l">หมวดที่สูงผิดปกติ</div>
-            <div className="v">{top ? top.name : 'ไม่พบ'}</div>
-            <div className={`s${top ? ' bad' : ''}`}>{top ? `${baht(top.amount)} สูงกว่าค่าเฉลี่ย ${num1(top.pct_vs_expected)}%` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
-          </div>
-          <div className="pl-metric" data-m="projection">
-            <div className="l">{isCur ? 'คาดการณ์รายจ่ายสิ้นเดือน' : 'รายจ่ายทั้งเดือน'}</div>
-            <div className="v">{proj.expense_end === null ? '-' : baht(isCur ? proj.expense_end : an.totals.expense)}</div>
-            <div className={`s${proj.over_income ? ' bad' : ''}`}>{proj.expense_end === null ? (isCur ? 'ยังคาดการณ์ไม่ได้' : 'ไม่มีรายจ่ายในเดือนนั้น') : proj.income_ref ? `เทียบรายรับอ้างอิง ${baht(proj.income_ref)} (${num1(proj.pct_of_income)}%)` : 'ยังไม่มีรายรับให้เทียบ'}</div>
-          </div>
+      {/* ===== 1 การ์ดสรุป 4 ใบ ===== */}
+      <div className="pl-hero" data-plan-hero>
+        <div className={`pl-hero-c${heroStatus.warn ? ' warn' : ''}`} data-hero="status">
+          <div className="l">{heroStatus.label}</div>
+          <div className="v">{heroStatus.value}</div>
+          <div className="s">{heroStatus.sub}</div>
         </div>
-        {an.small_purchases.flagged && (
-          <p className="pl-note" data-small>รายจ่ายน้อยกว่า {an.small_purchases.threshold} บาทมี {an.small_purchases.count} ครั้งใน {an.small_purchases.days} วัน รวม {baht(an.small_purchases.total)} ({num1(an.small_purchases.share_pct)}% ของรายจ่าย)</p>
-        )}
-        {an.weekday.reliable && (
-          <>
-            <div className="pl-days" role="img" aria-label={`รายจ่ายรายวันของสัปดาห์ ${isCur ? 'ย้อนหลัง' : 'ในช่วง'} 90 วัน`} data-days>
-              {an.weekday.by_day.map((d) => (
-                <div key={d.day} className={`pl-day${d.day === peakDay.day ? ' peak' : ''}`}>
-                  <i style={{ height: `${Math.max(2, Math.round((d.amount / maxDay) * 70))}px` }} />
-                  <span>{DAY_SHORT[d.day]}</span>
-                </div>
-              ))}
-            </div>
-            <p className="pl-days-cap">สัดส่วนรายจ่ายรายวันของสัปดาห์ ({isCur ? 'ย้อนหลัง 90 วัน' : '90 วันถึงสิ้นเดือน'})</p>
-          </>
-        )}
-        {catRows.length > 0 && (
-          <details className="pl-details" data-cat-details>
-            <summary>ดูรายจ่ายรายหมวดเทียบค่าเฉลี่ย</summary>
-            <table className="pl-table">
-              <thead><tr><th>หมวด</th><th>เดือนนี้</th><th>ค่าเฉลี่ยของคุณ</th><th>เทียบ</th></tr></thead>
-              <tbody>
-                {catRows.map((c) => (
-                  <tr key={c.category_id} data-cat-row>
-                    <td>{c.name}</td>
-                    <td>{baht(c.amount)}</td>
-                    <td>{c.expected_to_date === null ? '-' : baht(c.expected_to_date)}</td>
-                    <td className={c.flagged ? 'flag' : ''}>{c.pct_vs_expected === null ? '-' : `${c.pct_vs_expected > 0 ? '+' : ''}${num1(c.pct_vs_expected)}%`}{c.flagged ? ' ⚠️' : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
+        <div className={`pl-hero-c${pctBase !== null && pctBase >= 10 ? ' warn' : ''}`} data-hero="daily">
+          <div className="l">ใช้จ่ายเฉลี่ยต่อวัน</div>
+          <div className="v">{an.daily.avg === null ? '-' : baht(an.daily.avg)}</div>
+          <div className="s">{pctBase === null ? 'ยังไม่มีค่าเฉลี่ยให้เทียบ' : `${pctBase > 0 ? 'สูงกว่า' : pctBase < 0 ? 'ต่ำกว่า' : 'เท่ากับ'}ค่าเฉลี่ยเดิม${pctBase === 0 ? '' : ` ${num1(Math.abs(pctBase))}%`}`}</div>
+        </div>
+        <div className={`pl-hero-c${top ? ' warn' : ''}`} data-hero="anomaly">
+          <div className="l">หมวดที่สูงผิดปกติ</div>
+          <div className="v">{top ? top.name : 'ไม่พบ'}</div>
+          <div className="s">{top ? `${baht(top.amount)} สูงกว่าค่าเฉลี่ย ${num1(top.pct_vs_expected)}%${an.anomalies.length > 1 ? ` · อีก ${an.anomalies.length - 1} หมวด` : ''}` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
+        </div>
+        {isCur && instFacts ? (
+          <button type="button" className={`pl-hero-c pl-hero-btn${instFacts.burden_pct !== null && instFacts.burden_pct > 30 ? ' warn' : ''}`} data-hero="inst" onClick={() => { pickTab('installments'); setInstView('active'); }}>
+            <div className="l">ภาระผ่อนต่อเดือน</div>
+            <div className="v">{instFacts.count === 0 ? 'ไม่มี' : baht(instFacts.load)}</div>
+            <div className="s">{instFacts.count === 0 ? 'ไม่มีรายการที่กำลังผ่อน' : instFacts.burden_pct === null ? `${instFacts.count} รายการ · ยังไม่มีรายรับให้เทียบ` : `${num1(instFacts.burden_pct)}% ของรายรับ · ${instFacts.count} รายการ`}</div>
+          </button>
+        ) : (
+          <div className="pl-hero-c" data-hero="expense">
+            <div className="l">รายจ่ายทั้งเดือน</div>
+            <div className="v">{baht(an.totals.expense || 0)}</div>
+            <div className="s">{proj.pct_of_income !== null && proj.pct_of_income !== undefined ? `${num1(proj.pct_of_income)}% ของรายรับอ้างอิง` : 'ยังไม่มีรายรับให้เทียบ'}</div>
+          </div>
         )}
       </div>
 
+      {/* ===== 2 พฤติกรรมการใช้จ่าย (ซ่อนได้ ระบบจำไว้) ===== */}
+      <div className={`card pl-beh${behHidden ? ' closed' : ''}`} data-plan-behavior>
+        <div className="pl-beh-head">
+          <InfoTitle title={<><span className="pl-ti"><IconChart size={18} /></span>{isCur ? 'พฤติกรรมการใช้จ่าย' : `พฤติกรรมการใช้จ่าย ${thaiMonth(data.month)}`}</>} label="คำอธิบายส่วนนี้" popId="pl-info-behavior">
+            <p>เทียบกับค่าเฉลี่ยของเดือนเต็มก่อนหน้า (สูงสุด 3 เดือน เฉพาะเดือนที่มีรายการ) เส้นตั้งในแถบรายหมวดคือ “ระดับปกติของคุณ” ณ วันนี้ หมวดที่ถือว่าสูงผิดปกติคือสูงกว่าระดับปกติตั้งแต่ 30% และเกินอย่างน้อย 200 บาท หมวดที่จ่ายเป็นก้อน เช่น ค่าเช่า เทียบกับยอดเต็มเดือน</p>
+          </InfoTitle>
+          <button type="button" className="pl-collapse" aria-expanded={!behHidden} aria-controls="pl-beh-body" data-beh-toggle onClick={toggleBeh}>
+            {behHidden ? 'แสดง' : 'ซ่อน'}
+            <svg className="pl-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+        </div>
+        <div className="pl-beh-wrap" id="pl-beh-body" aria-hidden={behHidden}>
+          <div className="pl-beh-inner">
+            <div className="pl-beh-grid">
+              <div className="pl-beh-col" data-beh-days>
+                <div className="pl-beh-sub">รายจ่ายตามวันของสัปดาห์ <span>{isCur ? 'ย้อนหลัง 90 วัน' : '90 วันถึงสิ้นเดือน'}</span></div>
+                {an.weekday.reliable ? (
+                  <>
+                    <div className="pl-days" role="img" aria-label={`รายจ่ายรายวันของสัปดาห์ ${isCur ? 'ย้อนหลัง' : 'ในช่วง'} 90 วัน`} data-days>
+                      {an.weekday.by_day.map((d) => (
+                        <div key={d.day} className={`pl-day${d.day === peakDay.day ? ' peak' : ''}`}>
+                          <i style={{ height: `${Math.max(2, Math.round((d.amount / maxDay) * 70))}px` }} />
+                          <span>{DAY_SHORT[d.day]}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {an.weekday.peak && <p className="pl-days-cap">ใช้จ่ายมากสุดวัน{an.weekday.peak.name} ({num1(an.weekday.peak.share_pct)}%)</p>}
+                  </>
+                ) : <p className="pl-empty">ข้อมูลยังไม่พอที่จะดูรูปแบบรายวัน ลองบันทึกรายการต่อเนื่องอีกสักระยะ</p>}
+                {an.small_purchases.flagged && (
+                  <p className="pl-note" data-small>รายจ่ายน้อยกว่า {an.small_purchases.threshold} บาทมี {an.small_purchases.count} ครั้งใน {an.small_purchases.days} วัน รวม {baht(an.small_purchases.total)} ({num1(an.small_purchases.share_pct)}% ของรายจ่าย)</p>
+                )}
+              </div>
+              <div className="pl-beh-col" data-beh-cats>
+                <div className="pl-beh-sub">รายหมวดเทียบระดับปกติ <span><i className="pl-lg-bar" />{isCur ? 'เดือนนี้' : 'เดือนนั้น'} <i className="pl-lg-mark" />ระดับปกติ</span></div>
+                {catRows.length === 0 ? <p className="pl-empty">ยังไม่มีรายจ่าย{isCur ? 'เดือนนี้' : 'ในเดือนนั้น'}</p> : (
+                  <div className="pl-cbars">
+                    {catRows.map((c) => (
+                      <div className={`pl-cbar${c.flagged ? ' flag' : ''}`} key={c.category_id} data-cat-row>
+                        <span className="nm" title={c.name}>{c.name}{c.lumpy && <small> ก้อน</small>}</span>
+                        <span className="tr" title={c.expected_to_date === null ? '' : `ระดับปกติถึงวันนี้ ${baht(c.expected_to_date)}`}>
+                          <i style={{ width: `${Math.min(100, (c.amount / catMax) * 100)}%` }} />
+                          {c.expected_to_date !== null && <b style={{ left: `${Math.min(100, (c.expected_to_date / catMax) * 100)}%` }} />}
+                        </span>
+                        <span className="am">{baht(c.amount)}{c.pct_vs_expected !== null && <em>{c.pct_vs_expected > 0 ? '+' : ''}{num1(c.pct_vs_expected)}%</em>}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="pl-grid">
-        {/* ===== 2 คำแนะนำ (ของ AI และของระบบ รวมเป็นรายการเดียว) ===== */}
+        {/* ===== 3 สิ่งที่ควรทำ (คำแนะนำของ AI และของระบบ + ปุ่มลงมือทำ + ลองปรับเอง) ===== */}
         <div className="card" data-plan-advice>
           <div className="pl-card-head">
-            <InfoTitle title={<><span className="pl-ti"><IconSpark size={18} /></span>คำแนะนำ</>} label="คำอธิบายส่วนนี้" popId="pl-info-advice">
-              <p>ป้าย “AI” คือคำแนะนำที่ AI เขียนจากตัวเลขสรุปเมื่อคุณกดขอ (ไม่ส่งรายการรายตัวหรือบันทึกช่วยจำ) ระบบตรวจตัวเลขในข้อความทุกตัวก่อนแสดง ถ้าไม่ตรงกับที่ระบบคำนวณจะไม่แสดงข้อนั้น ป้าย “ระบบ” คำนวณด้วยกฎ ใช้ได้ตลอดแม้ไม่ใช้ AI คำแนะนำเป็นแนวทางเรื่องงบประมาณและการออมเท่านั้น ไม่เกี่ยวกับการลงทุน</p>
+            <InfoTitle title={<><span className="pl-ti"><IconSpark size={18} /></span>{isCur ? 'สิ่งที่ควรทำเดือนนี้' : 'คำแนะนำของเดือนนั้น'}</>} label="คำอธิบายส่วนนี้" popId="pl-info-advice">
+              <p>ป้าย “AI” คือคำแนะนำที่ AI เขียนจากตัวเลขสรุปเมื่อคุณกดขอ (ไม่ส่งรายการรายตัว บันทึกช่วยจำ หรือชื่อรายการผ่อน) ระบบตรวจตัวเลขในข้อความทุกตัวก่อนแสดง ถ้าไม่ตรงกับที่ระบบคำนวณจะไม่แสดงข้อนั้น ป้าย “ระบบ” คำนวณด้วยกฎ ใช้ได้ตลอดแม้ไม่ใช้ AI ปุ่มใต้คำแนะนำช่วยลงมือทำได้ทันที เช่น ตั้งงบ (ถามยืนยันก่อนเสมอ) คำแนะนำเป็นแนวทางเรื่องงบประมาณและการออมเท่านั้น ไม่เกี่ยวกับการลงทุน</p>
             </InfoTitle>
-            {isCur && ai.configured && !aiBusy && (
-              <button type="button" className="pl-link" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>
-                <IconSpark size={14} />{saved ? 'วิเคราะห์ใหม่' : 'ให้ AI วิเคราะห์'}
-              </button>
-            )}
+            <span className="pl-head-acts">
+              {canSim && (
+                <button type="button" className={`pl-link${simOpen ? ' on' : ''}`} data-sim-open aria-expanded={simOpen} onClick={() => setSimOpen((v) => !v)}>
+                  <IconSliders size={14} />ลองปรับเอง
+                </button>
+              )}
+              {isCur && ai.configured && !aiBusy && (
+                <button type="button" className="pl-link" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>
+                  <IconSpark size={14} />{saved ? 'วิเคราะห์ใหม่' : 'ให้ AI วิเคราะห์'}
+                </button>
+              )}
+            </span>
           </div>
+
+          {simOpen && canSim && <SimPanel cats={an.base_categories.filter((c) => !c.lumpy).slice(0, 5)} hasGoals={data.goals.length > 0} onClose={() => setSimOpen(false)} />}
+
+          {allItems.length > 1 && groupCounts.length > 1 && (
+            <div className="pl-fchips" role="group" aria-label="กรองคำแนะนำ" data-adv-filter>
+              <button type="button" className={advFilter === 'all' ? 'on' : ''} aria-pressed={advFilter === 'all'} onClick={() => setAdvFilter('all')}>ทั้งหมด <span>{allItems.length}</span></button>
+              {groupCounts.map(([g, n]) => (
+                <button type="button" key={g} className={`${advFilter === g ? 'on' : ''} g-${g}`} aria-pressed={advFilter === g} data-adv-filter-g={g} onClick={() => setAdvFilter(g)}>{GROUP_LABEL[g]} <span>{n}</span></button>
+              ))}
+            </div>
+          )}
 
           {aiBusy && (
             <div className="pl-busy" data-ai-busy-wrap>
@@ -711,28 +1022,41 @@ export default function Plan() {
             </div>
           )}
           {aiMsg && <p className="pl-msg" role="alert" data-ai-msg>{aiMsg}</p>}
+          {actMsg && <p className="pl-ok" role="status" data-act-msg>{actMsg}</p>}
 
-          {aiItems.map((it, i) => (
-            <div className="pl-item" key={`ai-${i}`} data-ai-item>
+          {shownItems.map((it) => (
+            <div className={`pl-item g-${it.group || 'save'}`} key={it.key} data-ai-item={it.source === 'ai' ? '' : undefined} data-rule-item={it.source === 'ai' ? undefined : ''} data-group={it.group || 'save'}>
               <AdviceIcon tag={it.tag} />
               <div className="tx">
-                <div>{it.text}<span className="pl-badge ai" data-badge>AI</span></div>
-                <div className="pl-chips" data-chips>
-                  <Chips facts={it.facts_used} />
-                  <span className="pl-rate">
-                    <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(i, 1)}><IconThumb size={15} /></button>
-                    <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(i, -1)}><IconThumb size={15} down /></button>
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-          {sysItems.map((it, i) => (
-            <div className="pl-item" key={`sys-${i}`} data-rule-item>
-              <AdviceIcon tag={it.tag} />
-              <div className="tx">
-                <div>{it.text}<span className="pl-badge" data-badge>ระบบ</span></div>
-                {it.facts_used && it.facts_used.length > 0 && <div className="pl-chips" data-chips><Chips facts={it.facts_used} /></div>}
+                <div>{it.text}<span className={`pl-badge${it.source === 'ai' ? ' ai' : ''}`} data-badge>{it.source === 'ai' ? 'AI' : 'ระบบ'}</span></div>
+                {((it.facts_used && it.facts_used.length > 0) || it.source === 'ai') && (
+                  <div className="pl-chips" data-chips>
+                    <Chips facts={it.facts_used} />
+                    {it.source === 'ai' && (
+                      <span className="pl-rate">
+                        <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(it.index, 1)}><IconThumb size={15} /></button>
+                        <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(it.index, -1)}><IconThumb size={15} down /></button>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {it.actions && it.actions.length > 0 && (
+                  budgetAsk && budgetAsk.key === it.key ? (
+                    <div className="pl-ask" data-budget-ask>
+                      <span>ตั้งงบหมวด “{budgetAsk.action.name}” เดือนละ <b>{baht(budgetAsk.action.amount)}</b> (ค่าเฉลี่ยของคุณ ปัดเป็นหลักร้อย) ใช้ต่อเนื่องทุกเดือน แก้ได้ทีหลังที่หน้างบประมาณ</span>
+                      <span className="pl-ask-btns">
+                        <button type="button" className="pl-act main" disabled={actBusy} data-budget-confirm onClick={confirmBudget}>{actBusy ? 'กำลังตั้งงบ...' : 'ตั้งงบ'}</button>
+                        <button type="button" className="pl-act" disabled={actBusy} onClick={() => setBudgetAsk(null)}>ยกเลิก</button>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="pl-acts" data-acts>
+                      {it.actions.map((a) => (
+                        <button type="button" key={a.type} className={`pl-act${a.type === 'set_budget' || a.type === 'new_goal' ? ' main' : ''}`} data-act={a.type} onClick={() => runAction(it, a)}>{actionLabel(a)}</button>
+                      ))}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           ))}
@@ -749,6 +1073,7 @@ export default function Plan() {
           </div>
         </div>
 
+        <div className="pl-side">
         {/* ===== 3 สรุปเป้าหมายการออม (แบบย่อ) กดเพื่อไปแท็บเป้าหมายออม ===== */}
         <div className="card" data-plan-goals-summary>
           <div className="pl-card-head">
@@ -819,6 +1144,7 @@ export default function Plan() {
             )}
           </div>
         )}
+        </div>
       </div>
       </div>
       )}

@@ -100,6 +100,21 @@ const txCss = `
 }
 `;
 
+// อ่านตัวกรองเริ่มต้นจาก query: month=YYYY-MM → ช่วงวันที่ทั้งเดือน / category=<id> → หมวด (ประเภทรายจ่าย)
+function filterFromQuery(search) {
+  const f = { type: '', category_id: '', start: '', end: '' };
+  const q = new URLSearchParams(search || '');
+  const m = /^(\d{4})-(\d{2})$/.exec(q.get('month') || '');
+  if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) {
+    const last = new Date(Number(m[1]), Number(m[2]), 0).getDate();
+    f.start = `${m[1]}-${m[2]}-01`;
+    f.end = `${m[1]}-${m[2]}-${String(last).padStart(2, '0')}`;
+  }
+  const c = q.get('category') || '';
+  if (/^[a-f0-9]{24}$/i.test(c)) { f.category_id = c; f.type = 'expense'; }
+  return f;
+}
+
 export default function Transactions() {
   // ข้อมูลหมวดหมู่และรายการธุรกรรม
   const [cats, setCats] = useState([]);
@@ -112,13 +127,8 @@ export default function Transactions() {
     total: 0,
   });
 
-  // ตัวกรองรายการ
-  const [filter, setFilter] = useState({
-    type: '',
-    category_id: '',
-    start: '',
-    end: '',
-  });
+  // ตัวกรองรายการ (เปิดจากลิงก์ได้ เช่น /transactions?month=2026-11&category=<id> จากปุ่ม "ดูรายการ" ในหน้าวางแผน)
+  const [filter, setFilter] = useState(() => filterFromQuery(window.location.search));
 
   // สถานะของหน้าและฟอร์ม
   const [page, setPage] = useState(1);

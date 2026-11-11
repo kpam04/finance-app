@@ -118,7 +118,7 @@ function analyze({ txns = [], categories = [], todayIso = bangkokToday(), month 
 
   // ค่าเฉลี่ยต่อเดือนรายหมวดของเดือนอ้างอิง (ใช้กับตัวจำลองแผน รวมหมวดที่เดือนนี้ยังไม่มีรายการ)
   const baseCategories = [...baseCat.entries()]
-    .map(([id, total]) => ({ category_id: id, name: catName(id), color: catColor(id), base_avg: round0(total / baseN) }))
+    .map(([id, total]) => ({ category_id: id, name: catName(id), color: catColor(id), base_avg: round0(total / baseN), lumpy: (baseCatN.get(id) || 0) / baseN < LUMPY_MAX_COUNT }))
     .sort((a, b) => b.base_avg - a.base_avg);
 
   // รูปแบบรายวันของสัปดาห์ (ย้อนหลัง 90 วัน)
@@ -156,7 +156,22 @@ function analyze({ txns = [], categories = [], todayIso = bangkokToday(), month 
 
   // คาดการณ์รายจ่ายสิ้นเดือน (เฉลี่ยตามวันที่ผ่านไป) ไม่คาดการณ์ถ้าข้อมูลน้อยเกินไป
   const projectable = !isFuture && cur.expense > 0 && (!isCurrent || daysElapsed >= MIN_DAYS_PROJECTION);
-  const expenseEnd = projectable ? (isCurrent ? round0((cur.expense / daysElapsed) * dim) : round0(cur.expense)) : null;
+  // เดือนปัจจุบัน: หมวดที่จ่ายทยอยคิดตามอัตราต่อวัน / หมวดที่จ่ายเป็นก้อน (เช่น ค่าเช่า) ไม่คูณตามวัน ใช้ยอดที่จ่ายแล้วหรือค่าเฉลี่ยต่อเดือน (ที่มากกว่า)
+  //  และหมวดก้อนที่เดือนนี้ยังไม่จ่าย นับค่าเฉลี่ยต่อเดือนไว้ด้วย (กันไม่ให้ค่าเช่าต้นเดือนถูกคูณจนคาดการณ์สูงเกินจริง)
+  let expenseEnd = null;
+  if (projectable && !isCurrent) expenseEnd = round0(cur.expense);
+  else if (projectable) {
+    let sum = 0;
+    for (const c of categoriesOut) {
+      const raw = cur.cats.get(c.category_id) || 0;
+      sum += c.lumpy ? Math.max(raw, baseCat.get(c.category_id) / baseN) : (raw / daysElapsed) * dim;
+    }
+    for (const [id, total] of baseCat) {
+      if (cur.cats.has(id) || (baseCatN.get(id) || 0) / baseN >= LUMPY_MAX_COUNT) continue;
+      sum += total / baseN;
+    }
+    expenseEnd = round0(sum);
+  }
   const incomeRef = Math.max(cur.income, baseline.avg_income_month || 0);
   const projection = {
     expense_end: expenseEnd,

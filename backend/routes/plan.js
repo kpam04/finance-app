@@ -6,6 +6,8 @@ const User = require('../models/User');
 const Category = require('../models/Category');
 const Transaction = require('../models/Transaction');
 const Goal = require('../models/Goal');
+const Budget = require('../models/Budget');
+const Installment = require('../models/Installment');
 const PlanAdvice = require('../models/PlanAdvice');
 const AiEvent = require('../models/AiEvent');
 const { aiConfig, AiError, intEnv } = require('../services/ai/aiClient');
@@ -14,6 +16,8 @@ const { analyze } = require('../services/plan/analysis');
 const { evaluateGoal } = require('../services/plan/goals');
 const { buildFacts } = require('../services/plan/facts');
 const { rulesAdvice } = require('../services/plan/rulesAdvice');
+const { decorateAdvice } = require('../services/plan/adviceActions');
+const { installmentFacts } = require('../services/plan/instFacts');
 const { dataSignature, goalsSignature, isStale } = require('../services/plan/signature');
 const { generateAdvice } = require('../services/plan/aiAdvice');
 const { PLAN_CONSENT_VERSION, MAX_GOALS, MAX_GOAL_NAME, MAX_GOAL_YEARS } = require('../services/plan/constants');
@@ -91,11 +95,28 @@ async function loadPlan(userId, monthParam) {
   if (analysis.is_current) goalEvals = active.map((g) => goalOut(g, analysis, todayIso));
   else if (active.length === 0) goalEvals = [];
   else goalEvals = (await loadPlan(userId)).goalEvals;
-  const facts = buildFacts(analysis, analysis.is_current ? goalEvals : []);
-  return { todayIso, analysis, goalEvals, achievements, facts, currentMonth: todayIso.slice(0, 7) };
+  // รายการผ่อน (ภาระต่อเดือน / รายการที่ใกล้ผ่อนจบ) เป็นเรื่องของตอนนี้ ใช้เฉพาะเดือนปัจจุบัน
+  let inst = null;
+  if (analysis.is_current) {
+    const plans = await Installment.find({ user: userId, status: 'active' }).lean();
+    inst = installmentFacts(plans, todayIso, analysis.projection.income_ref);
+  }
+  const facts = buildFacts(analysis, analysis.is_current ? goalEvals : [], inst);
+  return { todayIso, analysis, goalEvals, achievements, facts, inst, currentMonth: todayIso.slice(0, 7) };
 }
 
-const savedOut = (doc, stale = false) => (doc ? { items: doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: i.facts_used, rating: i.rating || 0, source: 'ai' })), generated_at: doc.generated_at, model: doc.model, stale } : null);
+// ข้อมูลประกอบปุ่มลงมือทำของคำแนะนำ: หมวดที่มีงบในเดือนที่ดูแล้ว (มีแล้ว = ปุ่ม "ดูงบ" / ยังไม่มี = ปุ่ม "ตั้งงบ")
+async function adviceCtx(userId, analysis, goalEvals) {
+  const [y, m] = analysis.month.split('-').map(Number);
+  const budgets = await Budget.find({ user: userId, month: m, year: y, stopped: { $ne: true } }).select('category').lean();
+  return { current: analysis.is_current, anomalies: analysis.anomalies, budgetCats: new Set(budgets.map((b) => String(b.category))), goalEvals };
+}
+
+const savedOut = (doc, stale = false, ctx = null) => {
+  if (!doc) return null;
+  const items = doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: i.facts_used, rating: i.rating || 0, source: 'ai' }));
+  return { items: ctx ? decorateAdvice(items, ctx) : items, generated_at: doc.generated_at, model: doc.model, stale };
+};
 
 async function aiState(userId) {
   const u = await User.findById(userId).select('aiPlanEnabled aiPlanConsentVersion').lean();
@@ -111,9 +132,18 @@ async function aiState(userId) {
 // ภาพรวมทั้งหมดของหน้า "วางแผน"
 router.get('/overview', async (req, res) => {
   try {
-    const { analysis, goalEvals, achievements, facts, currentMonth } = await loadPlan(req.userId, req.query.month);
-    const saved = await PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean();
-    res.json({ success: true, data: { month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, achievements, max_goals: MAX_GOALS, rules_advice: rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals)), ai: await aiState(req.userId) } });
+    const { analysis, goalEvals, achievements, facts, inst, currentMonth } = await loadPlan(req.userId, req.query.month);
+    const [saved, ctx] = await Promise.all([PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean(), adviceCtx(req.userId, analysis, goalEvals)]);
+    res.json({
+      success: true,
+      data: {
+        month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, achievements, max_goals: MAX_GOALS,
+        installments: inst, budget_category_ids: [...ctx.budgetCats],
+        rules_advice: decorateAdvice(rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ctx),
+        ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals), ctx),
+        ai: await aiState(req.userId),
+      },
+    });
   } catch (e) {
     console.error('[plan/overview]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
@@ -186,7 +216,8 @@ router.post('/advice', perMinute, async (req, res) => {
     const items = result.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: i.facts_used, rating: 0 }));
     const generated_at = new Date();
     await PlanAdvice.updateOne({ user: req.userId, month: analysis.month }, { $set: { items, model: result.model, event: event._id, generated_at, data_sig: dataSignature(analysis), goals_sig: goalsSignature(goalEvals) } }, { upsert: true });
-    res.json({ success: true, data: { items: items.map((i) => ({ ...i, source: 'ai' })), generated_at, model: result.model, event_id: String(event._id), dropped: result.dropped, stale: false } });
+    const ctx = await adviceCtx(req.userId, analysis, goalEvals);
+    res.json({ success: true, data: { items: decorateAdvice(items.map((i) => ({ ...i, source: 'ai' })), ctx), generated_at, model: result.model, event_id: String(event._id), dropped: result.dropped, stale: false } });
   } catch (e) {
     console.error('[plan/advice]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');

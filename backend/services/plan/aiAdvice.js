@@ -23,7 +23,8 @@ const SYSTEM = [
 ].join('\n');
 
 function buildPrompt(facts) {
-  const lines = facts.map((f) => {
+  // ข้อเท็จจริงที่มี ai: false (เช่น ชื่อรายการผ่อนที่ผู้ใช้ตั้งเอง) ใช้เฉพาะในแอป ไม่ส่งให้ AI
+  const lines = facts.filter((f) => f.ai !== false).map((f) => {
     const label = redactSensitive(clip(f.label, 80)).text;
     return `[${f.id}] ${label} = ${f.value}${f.unit ? ` ${f.unit}` : ''}`;
   });
