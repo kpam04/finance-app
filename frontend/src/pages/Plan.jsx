@@ -131,8 +131,18 @@ const css = `
 .pl-seg button.on { background: #fff; color: #40563C; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .pl-seg-n { min-width: 18px; padding: 0 6px; border-radius: 999px; background: #EEF1EA; color: #5E7558; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
 .pl-seg-n.gold { background: #F7EBCB; color: #8A6A1F; }
-.pl-seg-head { margin: 0; }
-@media (max-width: 640px) { .pl-seg { display: flex; } .pl-seg button { flex: 1; justify-content: center; } .pl-seg-head { width: 100%; } }
+.pl-seg-head { margin: 0 0 0 auto; }
+.pl-add-btn { display: inline-flex; align-items: center; gap: 4px; padding: 9px 16px; border: none; border-radius: 999px; background: #7E9677; font: inherit; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+.pl-add-btn:hover:not(:disabled) { background: #6B8364; }
+.pl-add-btn:disabled { background: #C9C3B6; cursor: not-allowed; }
+.pl-add-short { display: none; }
+@media (max-width: 640px) {
+  .pl-seg { display: flex; } .pl-seg button { flex: 1; justify-content: center; }
+  .pl-head-row { align-items: center; }
+  .pl-seg-head { order: 3; width: 100%; margin: 0; }
+  .pl-add-btn { order: 2; margin-left: auto; padding: 8px 14px; }
+  .pl-add-full { display: none; } .pl-add-short { display: inline; }
+}
 .pl-add-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 180px; padding: 16px; border: 2px dashed #D5DECF; border-radius: 16px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #5E7558; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
 .pl-add-card:hover:not(:disabled) { border-color: #9AAB91; background: rgba(241,243,237,0.6); }
 .pl-add-card:disabled { color: #b0a99c; border-color: #E6E0D4; cursor: not-allowed; }
@@ -275,6 +285,7 @@ export default function Plan() {
   const [confirmDel, setConfirmDel] = useState(null);
   const [goalView, setGoalView] = useState('active'); // แท็บเป้าหมายออม: 'active' กำลังออม / 'done' สำเร็จแล้ว
   const [inst, setInst] = useState(null); // ข้อมูลรายการผ่อน (ไม่ขึ้นกับเดือนที่ดู)
+  const [instAdd, setInstAdd] = useState(0); // เพิ่มค่า = เปิดฟอร์มเพิ่มรายการผ่อน (ปุ่มที่หัวข้อ)
   const [instView, setInstView] = useState('active'); // แท็บรายการผ่อน: 'active' กำลังผ่อน / 'done' ผ่อนเสร็จแล้ว
   const [cats, setCats] = useState([]); // หมวดรายจ่าย (ใช้ในฟอร์มรายการผ่อน)
   const loadInst = useCallback(async () => {
@@ -517,6 +528,18 @@ export default function Plan() {
             </button>
           </div>
         )}
+        {tab === 'installments' && inst && (
+          <button
+            type="button"
+            className="pl-add-btn"
+            data-inst-add
+            disabled={inst.plans.length >= inst.max_active}
+            title={inst.plans.length >= inst.max_active ? `มีรายการที่กำลังผ่อนได้สูงสุด ${inst.max_active} รายการ` : ''}
+            onClick={() => { setInstView('active'); setInstAdd((n) => n + 1); }}
+          >
+            <span className="pl-add-full">+ เพิ่มรายการผ่อน</span><span className="pl-add-short" aria-hidden="true">+ เพิ่ม</span>
+          </button>
+        )}
         {/* แท็บเป้าหมายออม: ปุ่มสลับ "กำลังออม / สำเร็จแล้ว" อยู่บรรทัดเดียวกับหัวข้อ (มือถือลงไปใต้หัวข้อ) */}
         {tab === 'goals' && data && (
             <div className="pl-seg pl-seg-head" role="group" aria-label="เลือกดูเป้าหมาย" data-goal-seg>
@@ -527,6 +550,18 @@ export default function Plan() {
                 <span aria-hidden="true">🏆</span> สำเร็จแล้ว <span className="pl-seg-n gold">{(data.achievements || []).length}</span>
               </button>
             </div>
+        )}
+        {tab === 'goals' && data && (
+          <button
+            type="button"
+            className="pl-add-btn"
+            data-goal-add
+            disabled={data.goals.length >= data.max_goals}
+            title={data.goals.length >= data.max_goals ? `ตั้งได้สูงสุด ${data.max_goals} เป้าหมาย` : `ตั้งได้อีก ${data.max_goals - data.goals.length} เป้า`}
+            onClick={() => { setGoalView('active'); setGoalModal({ goal: null }); }}
+          >
+            <span className="pl-add-full">+ เพิ่มเป้าหมาย</span><span className="pl-add-short" aria-hidden="true">+ เพิ่ม</span>
+          </button>
         )}
       </div>
     </div>
@@ -886,18 +921,6 @@ export default function Plan() {
                   </div>
                 );
               })}
-              {/* การ์ดเพิ่มเป้าหมาย (ต่อท้ายตาราง) ครบเพดานแล้วกดไม่ได้ */}
-              <button
-                type="button"
-                className="pl-add-card"
-                data-goal-add
-                disabled={data.goals.length >= data.max_goals}
-                onClick={() => setGoalModal({ goal: null })}
-              >
-                <span className="pl-add-plus" aria-hidden="true">+</span>
-                เพิ่มเป้าหมาย
-                <small>{data.goals.length >= data.max_goals ? `ครบ ${data.max_goals} เป้าแล้ว` : `ตั้งได้อีก ${data.max_goals - data.goals.length} เป้า`}</small>
-              </button>
             </div>
           )}
           {error && data && <p className="pl-msg" role="alert">{error}</p>}
@@ -913,6 +936,7 @@ export default function Plan() {
             onCategoryCreated={(c) => setCats((prev) => (prev.some((x) => String(x.category_id) === String(c.category_id)) ? prev : [...prev, c]))}
             onData={(d) => setInst(d)}
             onReload={loadInst}
+            addSignal={instAdd}
           />
         </div>
       )}

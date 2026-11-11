@@ -36,10 +36,11 @@ const css = `
 .im-note { margin: 0 0 8px; font-size: 12px; line-height: 1.6; color: #8A8177; }
 .im-lock { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #EEF2F8; color: #3b5b8f; font-size: 13px; line-height: 1.6; }
 .im-span { grid-column: 1 / -1; }
-.im-row3 { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 4px 8px; margin-bottom: 12px; font-size: 14px; }
+.im-row3 { display: grid; grid-template-columns: 236px 84px; justify-content: start; gap: 4px 8px; margin-bottom: 12px; font-size: 14px; }
+@media (max-width: 360px) { .im-row3 { grid-template-columns: minmax(0, 1fr) 72px; } }
 .im-row3-l { font-size: 13px; color: #4b5563; }
 .im-ym { display: flex; gap: 8px; min-width: 0; }
-.im-ym-m { flex: 1; min-width: 0; }
+.im-ym-m { flex: 1; min-width: 0; max-width: 136px; }
 .im-ym-y { width: 92px; flex: none; }
 .im-row3 > input { width: 100%; box-sizing: border-box; text-align: center; }
 .im-ym .cs-wrap { width: 100%; }

@@ -12,6 +12,7 @@ const itemSchema = new mongoose.Schema({
   paid_at:     { type: Date, default: null },
   prepaid:     { type: Boolean, default: false },
   transaction: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction', default: null },
+  payoff:      { type: Boolean, default: false }, // งวดที่ถูกปิดด้วยการปิดยอดก่อนกำหนด
 }, { _id: false });
 
 const schema = new mongoose.Schema({
@@ -29,6 +30,8 @@ const schema = new mongoose.Schema({
   equal:         { type: Boolean, default: true }, // true = ทุกงวดยอดเท่ากัน (เศษไปงวดสุดท้าย)
   schedule:      { type: [itemSchema], default: [] },
   status:        { type: String, enum: ['active', 'done'], default: 'active' },
+  // ปิดยอดก่อนกำหนด: remaining = ยอดคงเหลือตามตารางตอนปิด / amount = ยอดที่จ่ายจริง (ส่วนต่าง = ประหยัดได้)
+  payoff:        { type: { remaining: Number, amount: Number, date: Date, transaction: mongoose.Schema.Types.ObjectId }, default: null },
   closed_at:     { type: Date, default: null },
 }, { timestamps: true });
 

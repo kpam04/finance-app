@@ -238,10 +238,59 @@ router.post('/pay', async (req, res) => {
   }
 });
 
+// ปิดยอดก่อนกำหนด: จ่ายยอดคงเหลือทั้งหมดครั้งเดียว (มักได้ส่วนลดดอกเบี้ย) → บันทึกรายจ่าย 1 รายการ ปิดแผน เลิกกันเงิน
+router.post('/:id/payoff', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบรายการผ่อน');
+    const plan = await Installment.findOne({ _id: req.params.id, user: req.userId, status: 'active' }).lean();
+    if (!plan) return fail(res, 404, 'ไม่พบรายการผ่อน หรือผ่อนเสร็จแล้ว');
+    const b = req.body || {};
+    const todayIso = bangkokToday();
+    const date = b.date === undefined || b.date === '' ? todayIso : b.date;
+    if (!validIso(date) || date > todayIso) return fail(res, 400, 'วันที่จ่ายไม่ถูกต้อง (ต้องไม่เป็นวันในอนาคต)');
+    const amt = parseAmount(b.amount, 'ยอดที่จ่ายปิด');
+    if (amt.error) return fail(res, 400, amt.error);
+    const open = I.effectiveSchedule(plan).items.filter(I.isOpenItem);
+    if (!open.length) return fail(res, 400, 'ไม่มีงวดที่ต้องจ่ายแล้ว');
+    const remaining = I.round2(open.reduce((s, it) => s + it.amount, 0));
+    if (amt.value > remaining * 1.5) return fail(res, 400, `ยอดที่จ่ายปิดสูงกว่ายอดคงเหลือ (฿${remaining.toLocaleString('th-TH')}) มากเกินไป ลองตรวจตัวเลขอีกครั้ง`);
+    const first = open[0].n;
+    const last = open[open.length - 1].n;
+    const when = new Date(`${date}T00:00:00.000Z`);
+    const t = await Transaction.create({
+      user: req.userId, category: plan.category, type: 'expense', amount: amt.value, date: when,
+      note: `ปิดยอด ${plan.name} งวด ${first === last ? first : `${first}–${last}`}/${plan.months} (${I.channelLabel(plan)})`.slice(0, 200),
+      installment: plan._id, installment_n: first,
+    });
+    const openNs = new Set(open.map((it) => it.n));
+    const schedule = plan.schedule.map((it) => (openNs.has(it.n)
+      ? { ...it, paid: true, payoff: true, paid_at: when, paid_amount: it.n === first ? amt.value : 0, transaction: it.n === first ? t._id : null }
+      : it));
+    await Installment.updateOne({ _id: plan._id }, { $set: { schedule, status: 'done', closed_at: new Date(), payoff: { remaining, amount: amt.value, date: when, transaction: t._id } } });
+    await checkBudgetAlert(req.userId, plan.category, when);
+    const saved = I.round2(Math.max(0, remaining - amt.value));
+    res.json({ success: true, message: saved > 0 ? `ปิดยอด ${plan.name} แล้ว ประหยัดได้ ฿${saved.toLocaleString('th-TH')}` : `ปิดยอด ${plan.name} แล้ว`, data: await overview(req.userId) });
+  } catch (e) {
+    console.error('[installments/payoff]', e.message);
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
 module.exports = router;
 // ใช้ใน routes/transactions.js: ลบ/แก้ยอดรายการที่มาจากงวดผ่อน → ปรับสถานะงวดให้ตรง
 module.exports.syncFromTransaction = async function syncFromTransaction(t, { deleted = false } = {}) {
   if (!t || !t.installment || !t.installment_n) return;
+  // รายจ่ายจากการปิดยอด: ลบ → ทุกงวดที่ปิดไว้กลับเป็นยังไม่จ่าย / แก้ยอด → ยอดที่จ่ายปิดเปลี่ยนตาม
+  const plan = await Installment.findOne({ _id: t.installment, user: t.user }).lean();
+  if (plan && plan.payoff && String(plan.payoff.transaction) === String(t._id)) {
+    if (deleted) {
+      const schedule = plan.schedule.map((it) => (it.payoff ? { ...it, paid: false, payoff: false, paid_at: null, paid_amount: null, transaction: null } : it));
+      await Installment.updateOne({ _id: plan._id }, { $set: { schedule, payoff: null, status: 'active', closed_at: null } });
+    } else {
+      await Installment.updateOne({ _id: plan._id, 'schedule.n': t.installment_n }, { $set: { 'schedule.$.paid_amount': t.amount, 'payoff.amount': t.amount } });
+    }
+    return;
+  }
   const set = deleted
     ? { 'schedule.$.paid': false, 'schedule.$.paid_amount': null, 'schedule.$.paid_at': null, 'schedule.$.transaction': null, status: 'active', closed_at: null }
     : { 'schedule.$.paid_amount': t.amount };

@@ -136,6 +136,7 @@ export const api = {
   updateInstallment: (id, data) => request(`/installments/${id}`, { method: 'PUT', body: data }),
   deleteInstallment: (id) => request(`/installments/${id}`, { method: 'DELETE' }),
   payInstallments: (data) => request('/installments/pay', { method: 'POST', body: data }), // { items: [{ plan_id, n, amount }], date }
+  payoffInstallment: (id, data) => request(`/installments/${id}/payoff`, { method: 'POST', body: data }), // ปิดยอดก่อนกำหนด { amount, date }
 
   // transactions
   getTransactions: (params) => request('/transactions', { params }),

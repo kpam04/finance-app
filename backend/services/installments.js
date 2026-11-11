@@ -64,11 +64,11 @@ function effectiveSchedule(plan) {
   const items = plan.schedule.map((it) => ({
     n: it.n, scheduled: it.amount, paid: !!it.paid, prepaid: !!it.prepaid,
     paid_amount: it.paid ? round2(it.paid_amount !== null && it.paid_amount !== undefined ? it.paid_amount : it.amount) : null,
-    paid_at: it.paid_at || null, transaction: it.transaction || null, due_date: dueDateOf(plan, it.n), amount: it.amount,
+    paid_at: it.paid_at || null, transaction: it.transaction || null, due_date: dueDateOf(plan, it.n), amount: it.amount, payoff: !!it.payoff,
   }));
   for (const it of items) if (it.paid) it.amount = it.paid_amount;
   let diff = 0; // + = จ่ายขาด (ต้องเพิ่มที่งวดท้าย) / − = จ่ายเกิน
-  for (const it of items) if (it.paid) diff += it.scheduled - it.paid_amount;
+  for (const it of items) if (it.paid && !it.payoff) diff += it.scheduled - it.paid_amount;
   diff = round2(diff);
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const it = items[i];
@@ -98,6 +98,11 @@ function planOut(plan, todayIso) {
     price: plan.price, down_payment: plan.down_payment || 0, months: plan.months, due_day: plan.due_day,
     first_month: plan.first_month, total_payable: plan.total_payable, equal: plan.equal !== false,
     status: plan.status, closed_at: plan.closed_at || null,
+    payoff: plan.payoff ? (() => {
+      const it = items.find((x) => x.payoff && x.transaction);
+      const amount = it ? it.paid_amount : plan.payoff.amount;
+      return { amount, remaining: plan.payoff.remaining, saved: round2(Math.max(0, plan.payoff.remaining - amount)), date: plan.payoff.date };
+    })() : null,
     total_pay: totalPay, fee: round2(totalPay - plan.price),
     paid_count: paidCount, paid_total: paidTotal, remaining,
     next_due: next ? { n: next.n, due_date: next.due_date, amount: next.amount, overdue: next.due_date < todayIso } : null,
