@@ -59,6 +59,25 @@ const CATEGORY_RULES = [
     type: 'expense',
     keywords: ['ค่าเช่า', 'ค่าห้อง', 'เช่าคอนโด', 'หอพัก', 'ผ่อนบ้าน', 'ส่วนกลาง', 'ค่างวดบ้าน'],
   },
+  // ความงาม: ตรวจก่อนการศึกษา/ช้อปปิ้ง เพื่อให้ "คอร์สความงาม" ไม่ถูกจับเป็นการศึกษา
+  // ใช้หมวดความงามของผู้ใช้ถ้ามี (ชื่อมีคำว่า ความงาม/สวย/beauty) ไม่มีจึงใช้ "อื่นๆ"
+  {
+    category: 'ความงาม',
+    nameHints: ['ความงาม', 'สวย', 'beauty', 'บิวตี้'],
+    alt: ['อื่นๆ'],
+    type: 'expense',
+    keywords: [
+      'ความงาม', 'เสริมความงาม', 'คลินิกความงาม', 'ทรีตเมนต์', 'treatment', 'เลเซอร์', 'laser', 'โบท็อก', 'botox',
+      'ฟิลเลอร์', 'filler', 'ร้อยไหม', 'ทำหน้า', 'ฉีดหน้า', 'ทำผม', 'ทำเล็บ', 'สปา', 'spa', 'นวดหน้า', 'สักคิ้ว', 'ต่อขนตา', 'ศัลยกรรม',
+    ],
+  },
+  // ผลิตภัณฑ์ความงาม: ไปหมวด "ความงาม" เฉพาะเมื่อผู้ใช้มีหมวดนี้ ไม่มีก็ปล่อยให้กฎช้อปปิ้งด้านล่างจับ
+  {
+    category: 'ความงาม',
+    nameHints: ['ความงาม', 'สวย', 'beauty', 'บิวตี้'],
+    type: 'expense',
+    keywords: ['เครื่องสำอาง', 'สกินแคร์', 'skincare', 'ครีม', 'เซรั่ม', 'ลิป', 'น้ำหอม'],
+  },
   {
     category: 'ช้อปปิ้ง',
     type: 'expense',
@@ -108,10 +127,18 @@ export function matchCategoryByKeyword(text, categories = [], preferredType = nu
     if (preferredType && rule.type !== preferredType) continue;
     if (!rule.keywords.some((kw) => lower.includes(kw))) continue;
 
-    const found = categories.find(
-      (c) => c.name.toLowerCase() === rule.category.toLowerCase() && c.type === rule.type
-    );
-    if (found) return found.category_id;
+    // หมวดที่ผู้ใช้สร้างเองและชื่อบอกความหมายเดียวกัน (nameHints) เช่น "ความสวยความงาม" / "Beauty"
+    if (rule.nameHints) {
+      const own = categories.find((c) => c.type === rule.type && rule.nameHints.some((h) => c.name.toLowerCase().includes(h)));
+      if (own) return own.category_id;
+    }
+    // ชื่อหมวดตามกฎ ถ้าผู้ใช้ไม่มีหมวดนั้น ลองชื่อสำรอง (alt) ตามลำดับ
+    for (const name of [rule.category, ...(rule.alt || [])]) {
+      const found = categories.find(
+        (c) => c.name.toLowerCase() === name.toLowerCase() && c.type === rule.type
+      );
+      if (found) return found.category_id;
+    }
   }
   return null;
 }

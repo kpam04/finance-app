@@ -8,6 +8,8 @@ const schema = new mongoose.Schema({
   note:      { type: String, default: '' },
   date:      { type: Date, required: true },
   recurring: { type: mongoose.Schema.Types.ObjectId, ref: 'Recurring', default: null },
+  installment:   { type: mongoose.Schema.Types.ObjectId, ref: 'Installment', default: null }, // รายจ่ายที่มาจากการกด "จ่ายแล้ว" ของงวดผ่อน
+  installment_n: { type: Number, default: null },
 }, { timestamps: true });
 
 schema.index({ user: 1, date: -1 });
@@ -17,6 +19,12 @@ schema.index({ user: 1, type: 1 });
 schema.index(
   { recurring: 1, date: 1 },
   { unique: true, partialFilterExpression: { recurring: { $type: 'objectId' } } }
+);
+
+// กันบันทึกงวดผ่อนเดียวกันซ้ำ
+schema.index(
+  { installment: 1, installment_n: 1 },
+  { unique: true, partialFilterExpression: { installment: { $type: 'objectId' } } }
 );
 
 module.exports = mongoose.model('Transaction', schema);

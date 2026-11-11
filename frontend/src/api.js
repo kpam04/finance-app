@@ -130,6 +130,13 @@ export const api = {
   deleteGoal: (id) => request(`/plan/goals/${id}`, { method: 'DELETE' }),
   planSimulate: (adjustments) => request('/plan/simulate', { method: 'POST', body: { adjustments } }),
 
+  // รายการผ่อน
+  getInstallments: () => request('/installments'),
+  createInstallment: (data) => request('/installments', { method: 'POST', body: data }),
+  updateInstallment: (id, data) => request(`/installments/${id}`, { method: 'PUT', body: data }),
+  deleteInstallment: (id) => request(`/installments/${id}`, { method: 'DELETE' }),
+  payInstallments: (data) => request('/installments/pay', { method: 'POST', body: data }), // { items: [{ plan_id, n, amount }], date }
+
   // transactions
   getTransactions: (params) => request('/transactions', { params }),
   exportTransactionsCsv: (params) => download('/transactions/export', params), // params: ตัวกรองเดียวกับ getTransactions (ไม่ส่ง page/limit)

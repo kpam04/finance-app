@@ -5,6 +5,7 @@ import InfoTitle from '../components/InfoTitle.jsx';
 import GoalModal from '../components/GoalModal.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import AiConsentModal from '../components/AiConsentModal.jsx';
+import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
 import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, AdviceIcon } from '../components/PlanIcons.jsx';
 import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions } from '../utils/planFormat.js';
 
@@ -176,6 +177,11 @@ const css = `
 .pl-cele-ok { margin-top: 14px; padding: 9px 26px; border: none; border-radius: 999px; background: #7E9677; font: inherit; font-weight: 700; color: #fff; cursor: pointer; }
 .pl-cele-ok:hover { background: #6B8364; }
 .pl-cele-undo { margin-top: 10px; padding: 2px; border: none; background: none; font: inherit; font-size: 12px; color: #8A8177; text-decoration: underline; cursor: pointer; }
+.pl-inst-sum { display: grid; gap: 6px; margin-top: 10px; font-size: 13px; }
+.pl-inst-sum div { display: flex; justify-content: space-between; gap: 10px; }
+.pl-inst-sum span { color: #6b7280; }
+.pl-inst-sum b { color: #3F3A34; text-align: right; }
+.pl-inst-sum b.over { color: #C2410C; }
 .pl-goal-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 16px; text-align: center; }
 .pl-goal-empty p { margin: 0; max-width: 420px; font-size: 13px; line-height: 1.7; color: #6b7280; }
 .pl-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid #C9D4C2; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #4F6B47; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
@@ -268,6 +274,19 @@ export default function Plan() {
   const [goalModal, setGoalModal] = useState(null); // null | { goal, reopen } (goal = null เพิ่มใหม่ / reopen = ย้ายเป้าที่สำเร็จแล้วกลับ)
   const [confirmDel, setConfirmDel] = useState(null);
   const [goalView, setGoalView] = useState('active'); // แท็บเป้าหมายออม: 'active' กำลังออม / 'done' สำเร็จแล้ว
+  const [inst, setInst] = useState(null); // ข้อมูลรายการผ่อน (ไม่ขึ้นกับเดือนที่ดู)
+  const [instView, setInstView] = useState('active'); // แท็บรายการผ่อน: 'active' กำลังผ่อน / 'done' ผ่อนเสร็จแล้ว
+  const [cats, setCats] = useState([]); // หมวดรายจ่าย (ใช้ในฟอร์มรายการผ่อน)
+  const loadInst = useCallback(async () => {
+    try {
+      const r = await api.getInstallments();
+      if (alive.current) setInst(r.data);
+    } catch { /* โหลดไม่ได้: ส่วนรายการผ่อนแสดงข้อความกำลังโหลดค้างไว้ หน้าอื่นใช้งานได้ตามปกติ */ }
+  }, []);
+  useEffect(() => {
+    loadInst();
+    api.getCategories().then((r) => { if (alive.current) setCats(r.data.filter((c) => c.type === 'expense')); }).catch(() => {});
+  }, [loadInst]);
   const [celebrate, setCelebrate] = useState(null); // เป้าที่เพิ่งออมครบ (แสดงหน้าต่างแสดงความยินดี)
   const [achMenu, setAchMenu] = useState(null); // เมนู ⋯ ของการ์ดสำเร็จแล้วที่เปิดอยู่
   useEffect(() => {
@@ -462,7 +481,7 @@ export default function Plan() {
           >
             {t.label}
             {t.id === 'goals' && data && data.goals.length > 0 && <span className="pl-tab-count">{data.goals.length}</span>}
-            {t.id === 'installments' && <span className="pl-tab-soon">เร็ว ๆ นี้</span>}
+            {t.id === 'installments' && inst && inst.plans.length > 0 && <span className="pl-tab-count">{inst.plans.length}</span>}
           </button>
         ))}
       </div>
@@ -479,13 +498,25 @@ export default function Plan() {
             </InfoTitle>
           ) : <h2>เป้าหมายการออม</h2>
         ) : tab === 'installments' ? (
-          <h2>รายการผ่อน</h2>
+          <InfoTitle as="h2" title="รายการผ่อน" label="คำอธิบายหน้านี้" popId="pl-info-inst">
+            <p>บันทึกการผ่อนสินค้า (SPayLater, บัตรเครดิต, ผ่อนกับร้านค้า ฯลฯ) ระบบรวมงวดที่ครบกำหนดวันเดียวกันของช่องทางเดียวกันเป็นบิลเดียว กด “จ่ายแล้ว” เมื่อจ่ายจริง ระบบจะบันทึกรายจ่ายตามหมวดของแต่ละชิ้นให้ งวดที่ยังไม่จ่ายของเดือนนี้ถูกกันไว้ในงบ (“ใช้ได้อีก” บนแดชบอร์ด) อัตโนมัติ</p>
+          </InfoTitle>
         ) : data ? (
           <InfoTitle as="h2" title="วางแผนการเงิน" label="คำอธิบายหน้านี้" popId="pl-info-head">
             <p>วิเคราะห์จากรายการของคุณใน{thaiMonth(data.month)}{data.is_current === false ? ' (เดือนที่ผ่านมา)' : ''} ตัวเลขทั้งหมดคำนวณโดยระบบ (ไม่ได้ให้ AI คิดเลข)</p>
           </InfoTitle>
         ) : <h2>วางแผนการเงิน</h2>}
         {tab === 'overview' && monthPicker}
+        {tab === 'installments' && inst && (
+          <div className="pl-seg pl-seg-head" role="group" aria-label="เลือกดูรายการผ่อน" data-inst-seg>
+            <button type="button" className={instView === 'active' ? 'on' : ''} aria-pressed={instView === 'active'} data-inst-seg-active onClick={() => setInstView('active')}>
+              กำลังผ่อน <span className="pl-seg-n">{inst.plans.length}</span>
+            </button>
+            <button type="button" className={instView === 'done' ? 'on' : ''} aria-pressed={instView === 'done'} data-inst-seg-done onClick={() => setInstView('done')}>
+              ✓ ผ่อนเสร็จแล้ว <span className="pl-seg-n">{inst.done.length}</span>
+            </button>
+          </div>
+        )}
         {/* แท็บเป้าหมายออม: ปุ่มสลับ "กำลังออม / สำเร็จแล้ว" อยู่บรรทัดเดียวกับหัวข้อ (มือถือลงไปใต้หัวข้อ) */}
         {tab === 'goals' && data && (
             <div className="pl-seg pl-seg-head" role="group" aria-label="เลือกดูเป้าหมาย" data-goal-seg>
@@ -721,6 +752,36 @@ export default function Plan() {
             </button>
           )}
         </div>
+
+        {/* ===== 4 สรุปรายการผ่อนเดือนนี้ (แบบย่อ) กดเพื่อไปแท็บรายการผ่อน ===== */}
+        {inst && (
+          <div className="card" data-plan-inst-summary>
+            <div className="pl-card-head">
+              <InfoTitle title={<><span className="pl-ti" aria-hidden="true">💳</span>ผ่อนเดือนนี้</>} label="คำอธิบายส่วนนี้" popId="pl-info-inst-sum">
+                <p>งวดผ่อนที่ครบกำหนดเดือนนี้ (รวมที่ค้างชำระ) ไม่ขึ้นกับเดือนที่ดู จัดการรายการผ่อนได้ที่แท็บ “รายการผ่อน”</p>
+              </InfoTitle>
+            </div>
+            {inst.plans.length === 0 ? (
+              <>
+                <p className="pl-empty">ยังไม่มีรายการผ่อน บันทึกไว้เพื่อให้ระบบเตือนวันจ่ายและกันเงินในงบให้</p>
+                <button type="button" className="pl-link" data-inst-sum-add onClick={() => { pickTab('installments'); setInstView('active'); }}>+ เพิ่มรายการผ่อน</button>
+              </>
+            ) : (
+              <>
+                <div className="pl-inst-sum">
+                  <div><span>ต้องจ่ายเดือนนี้</span><b>{baht(inst.summary.due_month)}</b></div>
+                  <div><span>เหลือต้องจ่าย</span><b>{baht(inst.summary.left_month)}</b></div>
+                  {inst.summary.next_bill && (
+                    <div><span>บิลถัดไป</span><b className={inst.summary.next_bill.overdue ? 'over' : ''}>{inst.summary.next_bill.channel_label} · {thaiDate(inst.summary.next_bill.due_date)}{inst.summary.next_bill.overdue ? ' (ค้างชำระ)' : ''}</b></div>
+                  )}
+                </div>
+                <div className="pl-gs-more">
+                  <button type="button" className="pl-link" data-inst-sum-all onClick={() => { pickTab('installments'); setInstView('active'); }}>ดูรายการผ่อน →</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
       </div>
       )}
@@ -845,20 +906,14 @@ export default function Plan() {
 
       {tab === 'installments' && (
         <div role="tabpanel" id="pl-panel-installments" aria-labelledby="pl-tab-installments" data-plan-panel="installments">
-          <div className="card pl-soon" data-plan-installments-soon>
-            <span className="pl-soon-icon" aria-hidden="true">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4M8 14.5h3M8 17.5h6" />
-              </svg>
-            </span>
-            <h3>รายการผ่อน · กำลังพัฒนา</h3>
-            <p>เร็ว ๆ นี้จะบันทึกการผ่อนสินค้าได้ที่นี่ ทั้ง SPayLater, LazPayLater, TikTok, บัตรเครดิต และผ่อนกับร้านค้า</p>
-            <ul>
-              <li>เตือนก่อนครบกำหนดจ่ายแต่ละงวด</li>
-              <li>กันเงินงวดผ่อนไว้ในงบให้อัตโนมัติ</li>
-              <li>ดูภาระผ่อนต่อเดือนเทียบกับรายรับ</li>
-            </ul>
-          </div>
+          <InstallmentsPanel
+            inst={inst}
+            view={instView}
+            categories={cats}
+            onCategoryCreated={(c) => setCats((prev) => (prev.some((x) => String(x.category_id) === String(c.category_id)) ? prev : [...prev, c]))}
+            onData={(d) => setInst(d)}
+            onReload={loadInst}
+          />
         </div>
       )}
 

@@ -5,6 +5,7 @@ const Category = require('../models/Category');
 const auth = require('../middleware/auth');
 const checkBudgetAlert = require('../services/budgetAlert');
 const { parseAmount, cleanNote, yearInRange } = require('../utils/inputRules');
+const { syncFromTransaction } = require('./installments');
 
 const router = express.Router();
 router.use(auth);
@@ -231,6 +232,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });
     }
     await t.save();
+    if (t.installment) await syncFromTransaction(t); // รายจ่ายจากงวดผ่อน: แก้ยอด → ยอดที่จ่ายของงวดนั้นเปลี่ยนตาม
     if (t.type === 'expense') {
       await checkBudgetAlert(req.userId, t.category, t.date);
       // ย้ายหมวดหรือเปลี่ยนวันที่: ยอดใช้ของงบเดิมลดลง ปรับระดับแจ้งเตือนของงบเดิมด้วย (รีเซ็ตเงียบ ๆ)
@@ -253,6 +255,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
     }
     await Transaction.deleteOne({ _id: t._id, user: req.userId });
+    if (t.installment) await syncFromTransaction(t, { deleted: true }); // ลบรายจ่ายของงวดผ่อน → งวดนั้นกลับเป็นยังไม่จ่าย
     // ลบรายจ่ายแล้วยอดใช้ของงบลดลง: ปรับระดับแจ้งเตือนของงบนั้น (รีเซ็ตเงียบ ๆ ไม่ส่งแจ้งเตือน)
     if (t.type === 'expense') await checkBudgetAlert(req.userId, t.category, t.date);
     res.json({ success: true, message: 'ลบรายการสำเร็จ' });

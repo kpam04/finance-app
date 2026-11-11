@@ -74,6 +74,7 @@ function createApp({ env = process.env, mount } = {}) {
   app.use('/api/admin', require('./routes/admin'));
   app.use('/api/ai', require('./routes/ai'));
   app.use('/api/plan', require('./routes/plan'));
+  app.use('/api/installments', require('./routes/installments'));
   if (typeof mount === 'function') mount(app); // ใช้ในชุดทดสอบเท่านั้น
 
   // ---------- เสิร์ฟหน้าเว็บที่ build แล้ว (frontend/dist) ----------

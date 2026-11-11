@@ -3,12 +3,14 @@ const Budget = require('../models/Budget');
 const Category = require('../models/Category');
 const Recurring = require('../models/Recurring');
 const Transaction = require('../models/Transaction');
+const Installment = require('../models/Installment');
+const { reservedItems: installmentReserved } = require('./installments');
 const { addInterval, todayTH } = require('./recurringRunner');
 const { thaiPeriod } = require('./budgetCarry');
 
 // "เงินที่ใช้ได้จริง" + ไฟสถานะงบ (คำนวณด้วยโค้ดล้วน ไม่ใช้ AI)
 //  ใช้ได้อีก = งบรวม (หมวดที่ตั้งงบและเปิดใช้เดือนนี้) − รายจ่ายเดือนนี้ในหมวดเหล่านั้น − เงินที่กันไว้
-//  เงินที่กันไว้ = รายการเกิดซ้ำ (รายจ่าย) ที่ยังไม่ถึงวันจ่ายในเดือนนี้ และอยู่ในหมวดที่ตั้งงบ
+//  เงินที่กันไว้ = รายการเกิดซ้ำ (รายจ่าย) ที่ยังไม่ถึงวันจ่ายในเดือนนี้ + งวดผ่อนที่ยังไม่จ่าย (ครบกำหนดภายในเดือนนี้ รวมค้างชำระ) เฉพาะหมวดที่ตั้งงบ
 //  (รายการเกิดซ้ำในหมวดที่ไม่ได้ตั้งงบไม่หัก เพราะไม่ได้อยู่ในแผนงบ)
 
 const LUMPY_MAX_COUNT = 3; // ตรรกะเดียวกับหน้าวางแผน: เฉลี่ยน้อยกว่า 3 รายการ/เดือน = จ่ายเป็นก้อน
@@ -68,6 +70,15 @@ async function reservedByCategory(userId, categoryIds, { now = Date.now() } = {}
       e.items.push({ note: r.note || '', amount: r.amount, date: d.toISOString().slice(0, 10), due: d <= today });
       map.set(key, e);
     }
+  }
+  // งวดผ่อนที่ยังไม่จ่าย (ครบกำหนดภายในเดือนนี้ รวมที่ค้างชำระ)
+  const plans = await Installment.find({ user: userId, status: 'active', category: { $in: categoryIds } }).lean();
+  const todayIso = new Date(today.getTime()).toISOString().slice(0, 10);
+  for (const it of installmentReserved(plans, categoryIds, todayIso)) {
+    const e = map.get(it.category) || { total: 0, items: [] };
+    e.total = round2(e.total + it.amount);
+    e.items.push({ note: it.note, amount: it.amount, date: it.date, due: it.due });
+    map.set(it.category, e);
   }
   return map;
 }
