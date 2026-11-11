@@ -21,3 +21,6 @@ npm-debug.log*
 ocr-test/
 
 Claude outputs/
+
+# ข้อมูลทดลอง (รหัสของที่สคริปต์ seedDemo สร้าง)
+backend/scripts/.demo-seed.json

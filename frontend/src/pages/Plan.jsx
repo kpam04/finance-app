@@ -33,6 +33,7 @@ const css = `
 .pl-tab:focus-visible { outline: 2px solid #9AAB91; outline-offset: 1px; }
 .pl-tab-count { min-width: 18px; padding: 0 6px; border-radius: 999px; background: #EEF1EA; color: #5E7558; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
 .pl-tab.active .pl-tab-count { background: #fff; }
+.pl-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: #C2410C; }
 .pl-tab-soon { padding: 0 7px; border-radius: 999px; background: #F3EFE6; color: #9a9184; font-size: 11px; font-weight: 500; line-height: 18px; }
 .pl-tab.active .pl-tab-soon { background: #fff; }
 @media (min-width: 641px) and (max-width: 1023px) { .pl-tabs { margin-top: -12px; } }
@@ -493,6 +494,7 @@ export default function Plan() {
             {t.label}
             {t.id === 'goals' && data && data.goals.length > 0 && <span className="pl-tab-count">{data.goals.length}</span>}
             {t.id === 'installments' && inst && inst.plans.length > 0 && <span className="pl-tab-count">{inst.plans.length}</span>}
+            {t.id === 'installments' && inst && inst.summary.attention && <span className="pl-tab-dot" title="มีบิลค้างชำระหรือใกล้ครบกำหนด" aria-label="มีบิลค้างชำระหรือใกล้ครบกำหนด" data-inst-dot />}
           </button>
         ))}
       </div>

@@ -82,6 +82,19 @@ function effectiveSchedule(plan) {
 
 const isOpenItem = (it) => !it.paid && !it.covered;
 
+// ดอกเบี้ยจริงโดยประมาณต่อปี (%): หา r ที่ทำให้ Σ ยอดงวดที่ k / (1+r)^k = ราคา − เงินดาวน์ (งวดแรกจ่าย 1 เดือนหลังซื้อ)
+//  แล้วแปลงเป็นต่อปี (1+r)^12 − 1 / จ่ายรวมไม่เกินยอดที่ผ่อน = 0 (ผ่อน 0%)
+function aprOf(principal, amounts) {
+  const p = Number(principal);
+  const total = amounts.reduce((s, a) => s + a, 0);
+  if (!(p > 0) || !amounts.length || total <= p + 0.005) return 0;
+  const pv = (r) => amounts.reduce((s, a, k) => s + a / (1 + r) ** (k + 1), 0);
+  let lo = 0; let hi = 1; // ต่อเดือน 0–100%
+  for (let i = 0; i < 80; i += 1) { const mid = (lo + hi) / 2; if (pv(mid) > p) lo = mid; else hi = mid; }
+  const r = (lo + hi) / 2;
+  return Math.round(((1 + r) ** 12 - 1) * 1000) / 10;
+}
+
 // ข้อมูลแผนสำหรับส่งให้หน้าเว็บ
 function planOut(plan, todayIso) {
   const { items } = effectiveSchedule(plan);
@@ -104,6 +117,8 @@ function planOut(plan, todayIso) {
       return { amount, remaining: plan.payoff.remaining, saved: round2(Math.max(0, plan.payoff.remaining - amount)), date: plan.payoff.date };
     })() : null,
     total_pay: totalPay, fee: round2(totalPay - plan.price),
+    apr: aprOf(plan.price - (plan.down_payment || 0), plan.schedule.map((it) => it.amount)),
+    monthly: open[0] ? open[0].amount : 0,
     paid_count: paidCount, paid_total: paidTotal, remaining,
     next_due: next ? { n: next.n, due_date: next.due_date, amount: next.amount, overdue: next.due_date < todayIso } : null,
     has_app_payments: items.some((it) => it.paid && !it.prepaid),
@@ -157,7 +172,12 @@ function summaryOf(plans, todayIso) {
   }
   const upcoming = billsOf(active, todayIso, { until: '9999-12-31' });
   const next = upcoming[0] || null;
+  // ภาระผ่อนต่อเดือน = ยอดงวดถัดไปของทุกรายการที่กำลังผ่อน
+  let load = 0;
+  for (const p of active) { const nx = effectiveSchedule(p).items.find(isOpenItem); if (nx) load += nx.amount; }
   return {
+    monthly_load: round2(load),
+    attention: upcoming.some((b) => b.overdue || b.days <= 3), // จุดที่แท็บ: ค้างชำระ หรือครบกำหนดภายใน 3 วัน
     active_count: active.length, done_count: plans.length - active.length,
     due_month: round2(due), paid_month: round2(paid), left_month: round2(due - paid), remaining: round2(remaining),
     next_bill: next ? { channel_label: next.channel_label, due_date: next.due_date, total: next.total, overdue: next.overdue, days: next.days } : null,
@@ -181,6 +201,6 @@ function reservedItems(plans, categoryIds, todayIso) {
 }
 
 module.exports = {
-  CHANNELS, MAX_MONTHS, MAX_ACTIVE_PLANS, channelLabel, channelKey, dueDateOf, buildAmounts, scheduleWarnings,
+  CHANNELS, MAX_MONTHS, MAX_ACTIVE_PLANS, aprOf, channelLabel, channelKey, dueDateOf, buildAmounts, scheduleWarnings,
   effectiveSchedule, isOpenItem, planOut, billsOf, summaryOf, reservedItems, monthEndIso, round2,
 };

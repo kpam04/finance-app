@@ -23,7 +23,6 @@ const PACE = {
   paid: { label: 'จ่ายแล้ว ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
   unpaid: { label: 'ยังไม่จ่าย', bg: '#EEE7DC', fg: '#6B6258', bar: '#CFC5B6' },
 };
-const PAY_STYLE_TH = { auto: 'อัตโนมัติ', lump: 'จ่ายเป็นก้อน', spread: 'ทยอยจ่าย' };
 const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 // กลุ่มเงินที่กันไว้: "Netflix 25 พ.ย." / "ทดสอบรายวัน ×4 · 12–15 พ.ย."
 const groupText = (g) => {
@@ -125,7 +124,7 @@ const css = `
 }
 `;
 
-const emptyForm = () => ({ category_id: '', amount_limit: '', alert_threshold: '80', repeat: true, pay_style: 'auto' });
+const emptyForm = () => ({ category_id: '', amount_limit: '', alert_threshold: '80', repeat: true });
 
 // แจ้งให้กระดิ่งแจ้งเตือนโหลดใหม่ทันที (ไม่ต้องรอรอบ 60 วินาที)
 const refreshBell = () => {
@@ -289,7 +288,6 @@ export default function Budgets() {
       amount_limit: String(b.amount_limit),
       alert_threshold: String(b.alert_threshold),
       repeat: b.repeat !== false,
-      pay_style: b.pay_style || 'auto',
     });
     setFormError('');
     setShowForm(true);
@@ -306,7 +304,6 @@ export default function Budgets() {
         amount_limit: Number(form.amount_limit),
         alert_threshold: Number(form.alert_threshold),
         repeat: form.repeat,
-        pay_style: form.pay_style,
         period_month: month,
         period_year: year,
       });
@@ -475,11 +472,11 @@ export default function Budgets() {
                 <div className={`bd-details${isOpen ? ' open' : ''}`} data-budget-details data-open={isOpen ? 'true' : 'false'} aria-hidden={!isOpen} inert={isOpen ? undefined : ''}>
                   <div className="bd-details-inner">
                   <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px dashed #E9E1D6' }}>
-                    {/* จังหวะการใช้ (ทยอยจ่าย) / วิธีจ่าย (จ่ายเป็นก้อน) */}
+                    {/* จังหวะการใช้ (ทยอยจ่าย) / จ่ายเป็นก้อน (ระบบดูจากประวัติ) */}
                     {enabled && b.pace_status && (b.lumpy || b.elapsed_pct < 100) && (
                       <div data-pace-note style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
                         {b.lumpy
-                          ? `จ่ายเป็นก้อน${b.pay_style === 'auto' ? ' (ระบบดูจากประวัติ)' : ''}`
+                          ? 'จ่ายเป็นก้อน (ระบบดูจากประวัติ)'
                           : `ผ่านไป ${Math.round(b.elapsed_pct)}% ของเดือน · ใช้ไป ${b.percent_used}% ของงบ`}
                       </div>
                     )}
@@ -606,23 +603,6 @@ export default function Budgets() {
                     onChange={(e) => setForm({ ...form, alert_threshold: e.target.value })}
                     required
                   />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label style={label}>วิธีจ่าย</label>
-                <select
-                  style={field}
-                  data-pay-style
-                  value={form.pay_style}
-                  onChange={(e) => setForm({ ...form, pay_style: e.target.value })}
-                >
-                  <option value="auto">อัตโนมัติ (ให้ระบบดูจากประวัติ)</option>
-                  <option value="lump">จ่ายเป็นก้อน (เช่น ค่าเช่า ค่าไฟ ค่าเทอม)</option>
-                  <option value="spread">ทยอยจ่าย (เช่น ค่าอาหาร ค่าเดินทาง)</option>
-                </select>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-                  ใช้กับไฟสถานะ: จ่ายเป็นก้อนจะแสดง “จ่ายแล้ว / ยังไม่จ่าย” แทนการเทียบกับจำนวนวันที่ผ่านไป
                 </div>
               </div>
 

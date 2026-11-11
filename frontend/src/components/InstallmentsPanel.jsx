@@ -93,6 +93,10 @@ const css = `
 .in-tools button:hover { color: #4b5563; background: #F3EFE6; }
 .in-tools button.del:hover { color: #b91c1c; }
 .in-plan-name { padding-right: 56px; }
+.in-burden { display: inline-block; margin-top: 6px; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.in-burden.ok { background: #E4F2E6; color: #166534; }
+.in-burden.mid { background: #FDF3D6; color: #8A6A1F; }
+.in-burden.high { background: #FDE7D7; color: #9A3412; }
 .in-due { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #E6E0D4; font-size: 13px; color: #6b7280; }
 .in-card-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
 .in-payoff { display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border: 1px solid #C9D4C2; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: #5E7558; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
@@ -119,6 +123,9 @@ const thaiDate = (iso) => {
   const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 };
+const num1 = (n) => (Math.round(Number(n) * 10) / 10).toLocaleString('th-TH', { maximumFractionDigits: 1 });
+// ภาระผ่อน % ของรายรับ: เขียว < 20 / เหลือง 20–30 / ส้ม > 30 (ไม่ใช้แดง)
+const burdenCls = (pct) => (pct > 30 ? 'high' : pct >= 20 ? 'mid' : 'ok');
 const todayIso = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 
 function dueTag(bill) {
@@ -328,6 +335,7 @@ export default function InstallmentsPanel({ inst, view, categories, onCategoryCr
         ) : (
           <>
             <div className="in-row"><span>เหลือต้องจ่าย</span><b>{baht(p.remaining)}</b></div>
+            <div className="in-row" data-inst-apr><span>ดอกเบี้ย</span><b>{p.apr > 0 ? `${baht(Math.max(0, p.fee))} (~${num1(p.apr)}% ต่อปี)` : 'ผ่อน 0%'}</b></div>
             {p.next_due && !due && <div className="in-row"><span>งวดถัดไป</span><b>{thaiDay(p.next_due.due_date)} · {baht(p.next_due.amount)}</b></div>}
             {due && (
               <div className="in-due" data-inst-due>
@@ -383,6 +391,11 @@ export default function InstallmentsPanel({ inst, view, categories, onCategoryCr
               <div className="l">ต้องจ่ายเดือนนี้</div>
               <div className="v">{baht(summary.due_month)}</div>
               <div className="s">{summary.due_month > 0 ? `จ่ายแล้ว ${baht(summary.paid_month)} · เหลือ ${baht(summary.left_month)}` : 'ไม่มีงวดที่ต้องจ่ายเดือนนี้'}</div>
+              {summary.burden_pct !== null && summary.burden_pct !== undefined && summary.monthly_load > 0 && (
+                <div className={`in-burden ${burdenCls(summary.burden_pct)}`} data-inst-burden title={`ภาระผ่อนต่อเดือน ${baht(summary.monthly_load)} เทียบรายรับเฉลี่ย ${baht(summary.income_ref)}`}>
+                  ภาระผ่อน {num1(summary.burden_pct)}% ของรายรับ
+                </div>
+              )}
             </div>
             <div className="m">
               <div className="l">ยอดผ่อนคงเหลือทั้งหมด</div>
@@ -437,6 +450,7 @@ export default function InstallmentsPanel({ inst, view, categories, onCategoryCr
           plan={modal.plan}
           categories={categories}
           history={[...plans, ...done].map((p) => ({ name: p.name, category_id: p.category_id }))}
+          burden={{ load: summary.monthly_load || 0, income: summary.income_ref || 0, current: modal.plan ? modal.plan.monthly || 0 : 0 }}
           onCategoryCreated={onCategoryCreated}
           onClose={() => setModal(null)}
           onSaved={async (d) => {

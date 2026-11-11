@@ -13,6 +13,8 @@ const LEVEL = {
 
 // การแจ้งเตือนเชิงพยากรณ์ "ที่ความเร็วนี้คาดว่าจะเกินงบ" (kind = forecast)
 const FORECAST = { icon: '🔮', label: 'คาดการณ์ว่าจะเกินงบ' };
+// บิลผ่อนใกล้ครบกำหนด / ครบกำหนดวันนี้ (kind = installment) กดแล้วไปแท็บรายการผ่อน
+const INSTALLMENT = { icon: '💳', label: 'บิลผ่อน' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
 //  - onRead(id): ทำเครื่องหมายอ่านแล้ว (ใช้เมื่อไม่ส่ง onSelect)
@@ -26,12 +28,12 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {items.map((n) => {
         const unread = !n.is_read;
-        const lv = n.kind === 'forecast' ? FORECAST : LEVEL[n.level];
+        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : LEVEL[n.level];
         // เปิดหน้างบประมาณของเดือนนั้นได้เมื่อยังมีงบอยู่ (งบถูกลบแล้ว = ไม่มีเดือน/ปี)
-        const canOpen = !!(onSelect && n.period_month && n.period_year);
+        const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment'));
         const clickable = canOpen || unread;
         const title = canOpen
-          ? 'คลิกเพื่อดูงบประมาณของเดือนนั้น'
+          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
           : unread
             ? 'คลิกเพื่อทำเครื่องหมายว่าอ่านแล้ว'
             : '';

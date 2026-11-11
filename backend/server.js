@@ -20,6 +20,7 @@ if (dnsServers) dns.setServers(dnsServers);
 
 const seedDefaultCategories = require('./seed/defaultCategories');
 const { runDueRecurring } = require('./services/recurringRunner');
+const { runInstallmentReminders } = require('./services/installmentReminders');
 const { recordJobRun } = require('./services/jobRuns');
 const { createApp } = require('./app');
 
@@ -39,6 +40,19 @@ async function processRecurring(trigger) {
   }
 }
 
+// แจ้งเตือนบิลผ่อนที่ใกล้ครบกำหนด (3 วันก่อน + วันครบกำหนด) ลงกระดิ่ง
+async function processInstallmentReminders(trigger) {
+  const startedAt = new Date();
+  try {
+    const r = await runInstallmentReminders();
+    console.log(`[installments:${trigger}] ${r.users} user(s), ${r.created} reminder(s)`);
+    await recordJobRun({ job: 'installment-reminders', trigger, startedAt, rules: r.users, created: r.created, errors: r.errors, ok: r.errors.length === 0 });
+  } catch (e) {
+    console.error(`[installments:${trigger}] error:`, e.message);
+    await recordJobRun({ job: 'installment-reminders', trigger, startedAt, errors: [e.message], ok: false });
+  }
+}
+
 let server = null;
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
@@ -47,7 +61,9 @@ mongoose.connect(process.env.MONGO_URI)
 
     // รันชดเชยตอนเริ่มระบบ (กรณีเซิร์ฟเวอร์ปิด/หลับไปหลายวัน) แล้วตั้งเวลารันทุกวัน 00:05 น. เวลาไทย
     processRecurring('startup');
+    processInstallmentReminders('startup');
     cron.schedule('5 0 * * *', () => processRecurring('daily'), { timezone: 'Asia/Bangkok' });
+    cron.schedule('10 0 * * *', () => processInstallmentReminders('daily'), { timezone: 'Asia/Bangkok' });
 
     server = app.listen(PORT, () => console.log('Server running on port ' + PORT));
   })

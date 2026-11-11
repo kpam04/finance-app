@@ -500,6 +500,12 @@ const spendCss = `
   @media (max-width: 620px) {
     .sp-list { grid-template-columns: 1fr; row-gap: 10px; }
   }
+  .sp-nextbill { display: flex; align-items: center; gap: 8px; margin: -8px 0 16px; padding: 8px 14px; border-radius: 10px; font-size: 13px; color: #5E5A52; text-decoration: none; transition: background 0.2s; }
+  .sp-nextbill:hover { background: rgba(116,137,111,0.08); }
+  .sp-nextbill b { color: #3F3A34; }
+  .sp-nextbill.over { color: #9A3412; }
+  .sp-nextbill.over b { color: #9A3412; }
+  .sp-nextbill-go { margin-left: auto; color: #74896F; }
   @media (prefers-reduced-motion: reduce) { .sp-chev, .sp-details, .sp-link svg { transition: none; } }
 `;
 
@@ -511,6 +517,7 @@ export default function Dashboard() {
   const [insights, setInsights] = useState([]);
   const [planSummary, setPlanSummary] = useState(null); // สรุปการวางแผน (เฉพาะเดือนปัจจุบัน) โหลดแยก ถ้าโหลดไม่ได้ก็ไม่กระทบแดชบอร์ด
   const [spendOpen, setSpendOpen] = useState(false); // แถบ "ใช้ได้อีก": เปิดดูยอดเหลือแยกหมวด (เปิดหน้ามาหุบไว้ก่อน)
+  const [nextBill, setNextBill] = useState(null); // บิลผ่อนถัดไป (เฉพาะเดือนปัจจุบัน)
   const [spendable, setSpendable] = useState(null); // "ใช้ได้อีก" ตามงบ (เฉพาะเดือนปัจจุบัน) โหลดแยก ไม่กระทบแดชบอร์ดถ้าล้มเหลว
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -559,6 +566,10 @@ export default function Dashboard() {
     api.get('/dashboard/spendable')
       .then((r) => { if (live) setSpendable(r.data.data); })
       .catch(() => { if (live) setSpendable(null); });
+    // บิลผ่อนถัดไป (บรรทัดเล็กใต้แถบ "ใช้ได้อีก")
+    api.getInstallments()
+      .then((r) => { if (live) setNextBill((r && r.data && r.data.summary && r.data.summary.next_bill) || null); })
+      .catch(() => { if (live) setNextBill(null); });
     return () => { live = false; };
   }, [month, year, curMonth, curYear]);
 
@@ -706,7 +717,7 @@ export default function Dashboard() {
                   ? <>💰 ใช้ได้อีก <strong>฿{baht0(spendable.available)}</strong> ตามงบ</>
                   : <>ใช้เกินแผนไป <strong>฿{baht0(-spendable.available)}</strong> ลองดูหมวดที่ยังเหลือ</>}
                 {spendable.reserved > 0 && (
-                  <span className="sp-muted"> (กันค่าประจำไว้แล้ว ฿{baht0(spendable.reserved)})</span>
+                  <span className="sp-muted"> (กันค่าประจำและงวดผ่อนไว้แล้ว ฿{baht0(spendable.reserved)})</span>
                 )}
               </span>
               <span className="sp-actions">
@@ -764,6 +775,15 @@ export default function Dashboard() {
           </div>
         );
       })()}
+
+      {/* บิลผ่อนถัดไป กดแล้วไปแท็บรายการผ่อน */}
+      {nextBill && (
+        <Link to="/plan?tab=installments" className={`sp-nextbill${nextBill.overdue ? ' over' : ''}`} data-next-bill>
+          <span aria-hidden="true">💳</span>
+          <span>บิลผ่อนถัดไป <b>{nextBill.channel_label}</b> {new Date(`${nextBill.due_date}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} · ฿{baht0(nextBill.total)} · {nextBill.overdue ? `ค้างชำระ ${-nextBill.days} วัน` : nextBill.days === 0 ? 'ครบกำหนดวันนี้' : `อีก ${nextBill.days} วัน`}</span>
+          <span className="sp-nextbill-go" aria-hidden="true">→</span>
+        </Link>
+      )}
 
       {hasCarry && (
         <p data-carry-note style={{ fontSize: 12, color: '#9ca3af', margin: '-4px 0 16px' }}>

@@ -46,6 +46,7 @@ const css = `
 .im-ym .cs-wrap { width: 100%; }
 .im-auto { margin-left: 4px; padding: 0 7px; border-radius: 999px; background: #EEF1EA; color: #5E7558; font-size: 11px; font-style: normal; font-weight: 600; }
 .im-relink { padding: 0; border: none; background: none; font: inherit; font-size: 12px; color: #5E7558; text-decoration: underline; cursor: pointer; }
+.im-bd.ok { color: #166534; } .im-bd.mid { color: #8A6A1F; } .im-bd.high { color: #C2410C; }
 .im-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .im-error { margin: 0 0 10px; padding: 8px 12px; border-radius: 8px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
 `;
@@ -94,10 +95,20 @@ export function guessCategory(name, categories, history = []) {
   return shop ? shop.category_id : '';
 }
 
+// ดอกเบี้ยจริงโดยประมาณต่อปี (%) วิธีเดียวกับหลังบ้าน: Σ งวด k / (1+r)^k = ยอดที่ผ่อน → (1+r)^12 − 1
+function aprOf(principal, amounts) {
+  const total = amounts.reduce((s, a) => s + a, 0);
+  if (!(principal > 0) || !amounts.length || total <= principal + 0.005) return 0;
+  const pv = (r) => amounts.reduce((s, a, k) => s + a / (1 + r) ** (k + 1), 0);
+  let lo = 0; let hi = 1;
+  for (let i = 0; i < 80; i += 1) { const mid = (lo + hi) / 2; if (pv(mid) > principal) lo = mid; else hi = mid; }
+  return Math.round(((1 + (lo + hi) / 2) ** 12 - 1) * 1000) / 10;
+}
+
 const thisMonth = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 7);
 const nextMonth = () => { const [y, m] = thisMonth().split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${pad(m + 1)}`; };
 
-export default function InstallmentModal({ plan, categories, history = [], onCategoryCreated, onClose, onSaved }) {
+export default function InstallmentModal({ plan, categories, history = [], burden = null, onCategoryCreated, onClose, onSaved }) {
   const editing = !!plan;
   const locked = editing && plan.has_app_payments;
   const [f, setF] = useState(() => (editing ? {
@@ -170,7 +181,8 @@ export default function InstallmentModal({ plan, categories, history = [], onCat
     const warn = last <= 0
       ? 'ยอดรวมที่ต้องจ่ายน้อยกว่ายอดต่องวดรวมกัน ลองตรวจตัวเลขอีกครั้ง'
       : amounts.length >= 2 && Math.abs(last - amounts[0]) / amounts[0] > 0.5 ? `งวดสุดท้าย ${baht(last)} ต่างจากงวดอื่นมาก ลองตรวจยอดรวมที่ต้องจ่ายอีกครั้ง` : '';
-    return { amounts, total, fee, feePct: fee !== null && price > 0 ? Math.round((fee / price) * 1000) / 10 : null, last, warn };
+    const apr = price > 0 ? aprOf(price - down, amounts) : null;
+    return { amounts, total, fee, feePct: fee !== null && price > 0 ? Math.round((fee / price) * 1000) / 10 : null, last, warn, apr };
   }, [f, months, perAuto, autoBase]);
 
   const submit = async (e) => {
@@ -322,7 +334,18 @@ export default function InstallmentModal({ plan, categories, history = [], onCat
             <div className="im-calc" data-im-calc>
               <div><span>จ่ายรวม{num(f.down_payment) > 0 ? ' (รวมเงินดาวน์)' : ''}</span><b>{baht(calc.total)}</b></div>
               {calc.fee !== null && <div><span>ดอกเบี้ย/ค่าธรรมเนียมรวม</span><b>{calc.fee >= 0 ? `${baht(calc.fee)} (${calc.feePct}%)` : `จ่ายน้อยกว่าราคา ${baht(-calc.fee)}`}</b></div>}
+              {calc.apr !== null && <div data-im-apr><span>ดอกเบี้ยจริงโดยประมาณ</span><b>{calc.apr > 0 ? `~${calc.apr.toLocaleString('th-TH', { maximumFractionDigits: 1 })}% ต่อปี` : 'ผ่อน 0%'}</b></div>}
               <div><span>ภาระผ่อนต่อเดือน</span><b>{f.equal ? baht(calc.amounts[0]) : `${baht(Math.min(...calc.amounts))}–${baht(Math.max(...calc.amounts))}`}</b></div>
+              {burden && burden.income > 0 && (() => {
+                // ภาระผ่อนทั้งหมดต่อเดือนเทียบรายรับ ก่อน → หลังเพิ่ม/แก้รายการนี้
+                const before = burden.load;
+                const after = Math.max(0, burden.load - (burden.current || 0) + calc.amounts[Math.min(Number(f.prepaid_count) || 0, calc.amounts.length - 1)]);
+                const pct = (v) => Math.round((v / burden.income) * 1000) / 10;
+                const cls = (p) => (p > 30 ? 'high' : p >= 20 ? 'mid' : 'ok');
+                return (
+                  <div data-im-burden><span>ภาระผ่อนทั้งหมดต่อรายรับ</span><b className={`im-bd ${cls(pct(after))}`}>{editing ? '' : `${pct(before).toLocaleString('th-TH')}% → `}{pct(after).toLocaleString('th-TH')}%</b></div>
+                );
+              })()}
               {f.equal && calc.last !== calc.amounts[0] && calc.last > 0 && <div><span>งวดสุดท้าย</span><b>{baht(calc.last)}</b></div>}
             </div>
           </>

@@ -96,7 +96,10 @@ export default function NotificationBell() {
   // กดการแจ้งเตือน: ทำเครื่องหมายอ่านแล้ว และพาไปหน้างบประมาณของเดือน/ปีนั้น (ถ้างบยังอยู่)
   const select = async (n) => {
     if (!n.is_read) await markRead(n.notification_id);
-    if (n.period_month && n.period_year) {
+    if (n.kind === 'installment') {
+      setOpen(false);
+      navigate('/plan?tab=installments');
+    } else if (n.period_month && n.period_year) {
       setOpen(false);
       navigate(`/budgets?month=${n.period_month}&year=${n.period_year}`);
     }

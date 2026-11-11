@@ -8,6 +8,7 @@ const checkBudgetAlert = require('../services/budgetAlert');
 const { parseAmount, MAX_AMOUNT } = require('../utils/inputRules');
 const { bangkokToday, validIso } = require('../services/plan/dateUtil');
 const I = require('../services/installments');
+const { runInstallmentReminders } = require('../services/installmentReminders');
 
 // รายการผ่อน: เพิ่ม/แก้/ลบแผนผ่อน, ดูบิลของเดือน, กด "จ่ายแล้ว" (ระบบบันทึกรายจ่ายตามหมวดของแต่ละชิ้น)
 const router = express.Router();
@@ -39,12 +40,34 @@ function parseMoney0(raw, label) {
 async function loadPlans(userId) {
   return Installment.find({ user: userId }).sort({ createdAt: 1 }).lean();
 }
+// รายรับอ้างอิงต่อเดือน (ใช้คิด % ภาระผ่อน): ค่าเฉลี่ยของ 3 เดือนเต็มก่อนหน้า (เฉพาะเดือนที่มีรายรับ) หรือรายรับเดือนนี้ ถ้ามากกว่า
+async function incomeRef(userId, todayIso) {
+  const [y, m] = todayIso.split('-').map(Number);
+  const from = new Date(Date.UTC(y, m - 4, 1));
+  const to = new Date(Date.UTC(y, m, 1));
+  const rows = await Transaction.aggregate([
+    { $match: { user: new mongoose.Types.ObjectId(String(userId)), type: 'income', date: { $gte: from, $lt: to } } },
+    { $group: { _id: { y: { $year: '$date' }, m: { $month: '$date' } }, total: { $sum: '$amount' } } },
+  ]);
+  let cur = 0; let sum = 0; let n = 0;
+  for (const r of rows) {
+    if (r._id.y === y && r._id.m === m) cur = r.total;
+    else if (r.total > 0) { sum += r.total; n += 1; }
+  }
+  return I.round2(Math.max(n ? sum / n : 0, cur));
+}
+
 async function overview(userId) {
   const todayIso = bangkokToday();
   const plans = await loadPlans(userId);
+  const summary = I.summaryOf(plans, todayIso);
+  let income = 0;
+  try { income = await incomeRef(userId, todayIso); } catch (e) { console.error('[installments/income]', e.message); }
+  summary.income_ref = income;
+  summary.burden_pct = income > 0 ? Math.round((summary.monthly_load / income) * 1000) / 10 : null;
   return {
     today: todayIso,
-    summary: I.summaryOf(plans, todayIso),
+    summary,
     bills: I.billsOf(plans, todayIso),
     plans: plans.filter((p) => p.status === 'active').map((p) => I.planOut(p, todayIso)),
     done: plans.filter((p) => p.status === 'done').sort((a, b) => new Date(b.closed_at || 0) - new Date(a.closed_at || 0)).map((p) => I.planOut(p, todayIso)),
@@ -122,6 +145,8 @@ async function validatePlan(b, userId, { todayIso, keepPaid = null } = {}) {
 
 router.get('/', async (req, res) => {
   try {
+    // ตรวจแจ้งเตือนบิลของผู้ใช้คนนี้ด้วย (เผื่อเซิร์ฟเวอร์หลับตอนงานรายวันควรรัน) ไม่รอผล ไม่ทำให้หน้าช้า
+    runInstallmentReminders({ userId: req.userId }).catch((e) => console.error('[installments/remind]', e.message));
     res.json({ success: true, data: await overview(req.userId) });
   } catch (e) {
     console.error('[installments]', e.message);
