@@ -58,6 +58,7 @@ function actionsOf(item, { current, anomalies = [], budgetCats = new Set(), next
       add({ type: 'new_goal', amount: f ? f.value : null });
     }
     if (ids.includes('inst_burden_pct') || ids.includes('inst_load')) add({ type: 'view_inst' });
+    if (ids.includes('special_total')) add({ type: 'new_goal' });
   }
   if (ids.includes('small_count')) add({ type: 'view_txns' });
   return out;

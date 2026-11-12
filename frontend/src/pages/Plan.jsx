@@ -7,7 +7,7 @@ import MonthPicker from '../components/MonthPicker.jsx';
 import AiConsentModal from '../components/AiConsentModal.jsx';
 import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
 import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, AdviceIcon } from '../components/PlanIcons.jsx';
-import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions } from '../utils/planFormat.js';
+import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions, timesOf, pctOrTimes } from '../utils/planFormat.js';
 
 // หน้า "วางแผน": วิเคราะห์พฤติกรรมการใช้จ่าย + คำแนะนำ (จากระบบ / จาก AI) + เป้าหมายการออม + ลองปรับแผน
 // ตัวเลขทั้งหมดคำนวณโดยระบบ AI เขียนเฉพาะคำอธิบายและต้องผ่านการตรวจตัวเลขก่อนแสดง
@@ -222,7 +222,37 @@ const css = `
 .pl-hero-c .v { margin: 2px 0; font-size: 21px; font-weight: 700; color: #3F3A34; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-hero-c.warn .v { color: #B45A2A; }
 .pl-hero-c .s { font-size: 12px; line-height: 1.5; color: #6b7280; }
-.pl-hero-btn { cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.pl-trend { display: inline-block; max-width: 100%; margin-top: 3px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-trend.g { background: #E4F2E6; color: #166534; }
+.pl-trend.o { background: #FBEBDD; color: #A2522A; }
+.pl-hero-c .x.warn { color: #B45A2A; }
+.pl-hero-c .x { margin-top: 1px; font-size: 11px; line-height: 1.4; color: #A39A8C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-hero-tip { position: relative; cursor: pointer; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.pl-hero-tip:hover, .pl-hero-tip.open { box-shadow: 0 2px 10px rgba(60,50,30,0.08); }
+.pl-hero-tip:focus-visible { box-shadow: 0 0 0 2px #9AAB91; }
+.pl-hero-more { position: absolute; top: 9px; right: 10px; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: 1px solid #D6CFC2; border-radius: 50%; font-size: 10px; font-style: italic; font-weight: 700; font-family: Georgia, serif; color: #A39A8C; }
+.pl-hero-tip.open .pl-hero-more, .pl-hero-tip:hover .pl-hero-more { border-color: #9AAB91; color: #5E7558; }
+.pl-hero-pop { position: absolute; left: -1px; right: -1px; top: calc(100% + 6px); z-index: 30; display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid #E6E0D4; box-shadow: 0 10px 28px rgba(60,50,30,0.16); cursor: default; animation: pl-pop-in 0.15s ease-out; }
+@keyframes pl-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pl-hero-pop { animation: none; } }
+.pl-hero-pop .t { font-size: 12.5px; color: #3F3A34; }
+.pl-hero-pop .r { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: #6b6358; }
+.pl-hero-pop .r b { color: #3F3A34; white-space: nowrap; }
+.pl-hero-pop .r small { color: #9a9184; }
+.pl-dot { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; vertical-align: 1px; }
+.pl-dot.ok { background: #8FB386; } .pl-dot.wait { background: #D6CFC2; } .pl-dot.late { background: #E2A27E; }
+.pl-dot-lg { display: flex; gap: 12px; margin: 2px 0 0; font-size: 11px; color: #9a9184; }
+.pl-hero-pop .r.fx span { display: flex; flex-direction: column; min-width: 0; }
+.pl-hero-pop .r.fx small { font-size: 11px; }
+.pl-hero-pop small.ok { color: #5E8A58; } .pl-hero-pop small.wait { color: #9a9184; } .pl-hero-pop small.late { color: #B45A2A; }
+.pl-hero-pop .r.sum { padding-top: 4px; border-top: 1px solid #F0EBE0; }
+.pl-hero-pop .up { color: #B45A2A; } .pl-hero-pop .down { color: #3D6B3A; }
+.pl-hero-pop .n { margin: 2px 0 0; font-size: 11.5px; line-height: 1.5; color: #8A8177; }
+.pl-hero-pop .pl-cap { justify-self: start; margin-top: 4px; }
+@media (max-width: 860px) { .pl-hero > :nth-child(2n) .pl-hero-pop { left: auto; right: -1px; width: min(300px, calc(100vw - 32px)); } .pl-hero > :nth-child(2n+1) .pl-hero-pop { width: min(300px, calc(100vw - 32px)); right: auto; } }
+.pl-hero-btn { position: relative; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; width: 100%; margin: 0; line-height: inherit; text-align: left; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.pl-hero-btn .go { position: absolute; top: 10px; right: 12px; color: #B5AC9E; transition: transform 0.2s, color 0.2s; }
+.pl-hero-btn:hover .go { color: #5E7558; transform: translateX(2px); }
 .pl-hero-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-color: #D9D2C3; }
 .pl-hero-btn:focus-visible { outline: 2px solid #9AAB91; outline-offset: 2px; }
 @media (max-width: 860px) { .pl-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
@@ -247,6 +277,49 @@ const css = `
 .pl-lg-bar { display: inline-block; width: 12px; height: 8px; border-radius: 2px; background: #B9C8B2; }
 .pl-lg-mark { display: inline-block; width: 2px; height: 12px; margin-left: 6px; border-radius: 1px; background: #5b5348; }
 .pl-beh .pl-days { margin-top: 10px; }
+.pl-wd { margin-top: 12px; }
+.pl-wd-area { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; height: 138px; padding-top: 26px; box-sizing: border-box; border-bottom: 1px solid #E6E0D4; }
+.pl-wd-grid { position: absolute; left: 0; right: 0; border-top: 1px solid #F1EDE4; pointer-events: none; }
+.pl-wd-avg { position: absolute; left: 0; right: 0; border-top: 1.5px dashed #BDB4A6; pointer-events: none; z-index: 1; }
+.pl-wd-bar { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; padding: 0; border: none; background: none; cursor: pointer; z-index: 2; }
+.pl-wd-bar i { display: block; width: 100%; max-width: 34px; border-radius: 7px 7px 2px 2px; background: #CBD8C4; transition: background 0.2s, opacity 0.2s, transform 0.2s; transform-origin: bottom; }
+.pl-wd-bar.today i { background: #7E9677; }
+.pl-wd-bar em { position: absolute; left: -20px; right: -20px; text-align: center; white-space: nowrap; font-style: normal; font-size: 11px; font-weight: 700; color: #5E7558; }
+.pl-wd-bar:hover i, .pl-wd-bar.on i { background: #A9BDA1; }
+.pl-wd-bar.today:hover i, .pl-wd-bar.today.on i { background: #6B8364; }
+.pl-wd.has-act .pl-wd-bar:not(.on) i { opacity: 0.45; }
+.pl-wd-bar:focus-visible { outline: none; }
+.pl-wd-bar:focus-visible i { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #9AAB91; }
+.pl-wd-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 5px; font-size: 11.5px; color: #8A8177; text-align: center; }
+.pl-wd-days .today { font-weight: 700; color: #40563C; }
+/* ป้าย "สูงสุด" เหนือแท่งของวันที่ใช้มากที่สุด (แยกจากแท่งเข้ม = วันนี้) */
+.pl-wd-bar em.pl-wd-peak { left: 50%; right: auto; transform: translateX(-50%); padding: 0 7px; border-radius: 999px; background: #F6EBD9; color: #8A6A1F; font-size: 10.5px; line-height: 1.7; }
+.pl-wd-tip { position: absolute; top: -6px; z-index: 5; display: grid; gap: 1px; min-width: 132px; padding: 8px 11px; border-radius: 10px; background: #fff; border: 1px solid #E6E0D4; box-shadow: 0 6px 18px rgba(60,50,30,0.12); font-size: 12px; line-height: 1.5; color: #4B4740; transform: translateX(-50%); pointer-events: none; white-space: nowrap; }
+.pl-wd-tip.l { transform: translateX(-20%); } .pl-wd-tip.r { transform: translateX(-80%); }
+.pl-wd-tip b { font-size: 12.5px; color: #3F3A34; }
+.pl-wd-tip small { color: #9a9184; }
+.pl-special { margin-top: 12px; padding: 8px 12px; border-radius: 10px; background: #FBF6EC; border: 1px solid #EFE3CB; }
+.pl-special-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; color: #8A6A1F; }
+.pl-special-h span { cursor: help; }
+.pl-special-h b { font-size: 13px; color: #5C4615; }
+.pl-special ul { display: grid; gap: 2px; margin: 4px 0 0; padding: 0; list-style: none; }
+.pl-special li { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 13px; color: #4B4740; }
+.pl-special li .d { color: #8A8177; white-space: nowrap; }
+.pl-special li .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-special li .n small { color: #9a9184; }
+.pl-special li .a { font-weight: 600; white-space: nowrap; }
+.pl-special-note { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: #A39A8C; }
+.pl-wd-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font-size: 11.5px; color: #8A8177; }
+.pl-wd-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.pl-wd-legend i { font-style: normal; }
+.pl-wd-legend .pl-lg-peak { margin: 0; }
+.pl-wd-legend .pl-lg-pk { margin: 0; }
+.pl-lg-dash { display: inline-block; width: 16px; border-top: 1.5px dashed #BDB4A6; }
+.pl-lg-pk { display: inline-block; margin-right: 3px; padding: 0 6px; border-radius: 999px; background: #F6EBD9; color: #8A6A1F; font-size: 10.5px; font-weight: 700; line-height: 1.6; }
+.pl-lg-peak { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; background: #7E9677; vertical-align: -1px; }
+.pl-wd-tip .p { color: #5E7558; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .pl-wd-bar i { transition: none; } }
+@media (max-width: 480px) { .pl-wd-area, .pl-wd-days { gap: 5px; } .pl-wd-pk { display: none; } }
 .pl-cbars { display: grid; gap: 9px; margin-top: 12px; }
 .pl-cbar { display: grid; grid-template-columns: minmax(64px, 104px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
 .pl-cbar .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3F3A34; }
@@ -410,6 +483,83 @@ function Chips({ facts }) {
 }
 
 const BEH_KEY = 'finance_plan_behavior_hidden';
+// การ์ดสรุปด้านบน: ชี้เมาส์ (คอม) หรือแตะ (มือถือ) เพื่อเปิดกล่องรายละเอียด / แตะซ้ำ แตะที่อื่น หรือกด Esc เพื่อปิด
+function HeroCard({ id, open, setOpen, warn, tip, children }) {
+  const ptr = useRef('mouse');
+  const isOpen = open === id;
+  return (
+    <div
+      className={`pl-hero-c pl-hero-tip${warn ? ' warn' : ''}${isOpen ? ' open' : ''}`}
+      data-hero={id}
+      data-hero-card
+      tabIndex={0}
+      role="button"
+      aria-expanded={isOpen}
+      onPointerEnter={(e) => { ptr.current = e.pointerType; if (e.pointerType === 'mouse') setOpen(id); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setOpen((v) => (v === id ? null : v)); }}
+      onPointerDown={(e) => { ptr.current = e.pointerType; }}
+      onClick={(e) => { if (e.target.closest('[data-tip-action]')) return; if (ptr.current !== 'mouse') setOpen((v) => (v === id ? null : id)); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => (v === id ? null : id)); } if (e.key === 'Escape') setOpen(null); }}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen((v) => (v === id ? null : v)); }}
+    >
+      {children}
+      <span className="pl-hero-more" aria-hidden="true">i</span>
+      {isOpen && <div className="pl-hero-pop" role="dialog" data-hero-pop={id} onClick={(e) => e.stopPropagation()}>{tip}</div>}
+    </div>
+  );
+}
+// หมวดที่ลองปรับได้: ไม่ใช่หมวดจ่ายก้อน และมีส่วนที่ไม่ใช่ค่าประจำ (ค่าประจำลดระหว่างเดือนไม่ได้)
+const simable = (c) => !c.lumpy && c.base_avg - (c.fixed_avg || 0) > 0;
+const WD_ORDER = [1, 2, 3, 4, 5, 6, 0]; // เรียงจันทร์ → อาทิตย์
+const WD_H = 112; // ความสูงสูงสุดของแท่ง (px)
+// กราฟ "ใช้จ่ายตามวันในสัปดาห์": ชี้เมาส์ / แตะ / โฟกัสด้วยคีย์บอร์ด เพื่อดูยอดของวันนั้น
+function WeekdayChart({ days, peakDay, todayDay = null }) {
+  const [act, setAct] = useState(null);
+  const list = WD_ORDER.map((i) => days.find((d) => d.day === i)).filter(Boolean);
+  const max = Math.max(1, ...list.map((d) => d.amount));
+  const total = list.reduce((t, d) => t + d.amount, 0);
+  const avgLine = total / 7;
+  const sel = act !== null ? list.find((d) => d.day === act) : null;
+  const pos = sel ? list.indexOf(sel) : -1;
+  return (
+    <div className={`pl-wd${act !== null ? ' has-act' : ''}`} data-days onMouseLeave={() => setAct(null)}>
+      <div className="pl-wd-area">
+        <span className="pl-wd-grid" style={{ bottom: `${WD_H}px` }} />
+        <span className="pl-wd-grid" style={{ bottom: `${WD_H / 2}px` }} />
+        <span className="pl-wd-avg" style={{ bottom: `${Math.round((avgLine / max) * WD_H)}px` }} />
+        {list.map((d) => (
+          <button
+            type="button"
+            key={d.day}
+            className={`pl-wd-bar${d.day === todayDay ? ' today' : ''}${act === d.day ? ' on' : ''}`}
+            aria-label={`วัน${d.name} รวม ${baht(d.amount)} จาก ${d.days} วัน เฉลี่ยวันละ ${baht(d.avg || 0)} คิดเป็น ${num1(d.share_pct)}% ของรายจ่าย`}
+            data-wd={d.day}
+            onMouseEnter={() => setAct(d.day)}
+            onFocus={() => setAct(d.day)}
+            onBlur={() => setAct(null)}
+            onClick={() => setAct((v) => (v === d.day ? null : d.day))}
+          >
+            {d.day === peakDay && act === null && <em className="pl-wd-peak" style={{ bottom: `${Math.max(3, Math.round((d.amount / max) * WD_H)) + 3}px` }}><span className="pl-wd-pk">สูงสุด </span>{Math.round(d.share_pct)}%</em>}
+            <i style={{ height: `${Math.max(3, Math.round((d.amount / max) * WD_H))}px` }} />
+          </button>
+        ))}
+        {sel && (
+          <div className={`pl-wd-tip${pos <= 1 ? ' l' : pos >= 5 ? ' r' : ''}`} style={{ left: `${((pos + 0.5) / 7) * 100}%` }} role="status" data-wd-tip>
+            <b>วัน{sel.name}</b>
+            <span>รวม {baht(sel.amount)} <small>({sel.days} วัน)</small></span>
+            <span>เฉลี่ยวันละ {baht(sel.avg || 0)}</span>
+            <span className="p">{num1(sel.share_pct)}% ของรายจ่าย</span>
+          </div>
+        )}
+      </div>
+      <div className="pl-wd-days">
+        {list.map((d) => (
+          <span key={d.day} className={d.day === todayDay ? 'today' : ''} data-wd-today={d.day === todayDay ? '' : undefined}>{DAY_SHORT[d.day]}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 const AI_HIDE_KEY = 'finance_plan_ai_hidden';
 const SYS_HIDE_KEY = 'finance_plan_sys_hidden';
 // ปุ่มซ่อน/แสดงเล็ก ๆ ที่หัวแต่ละส่วน
@@ -475,7 +625,7 @@ function SimPanel({ cats, hasGoals, onClose }) {
     }, 300);
     return () => { live = false; clearTimeout(t); };
   }, [pcts, any]);
-  const local = cats.reduce((s, c) => s + (c.base_avg * (pcts[c.category_id] || 0)) / 100, 0); // แสดงทันทีระหว่างรอผลจากหลังบ้าน
+  const local = cats.reduce((s, c) => s + ((c.base_avg - (c.fixed_avg || 0)) * (pcts[c.category_id] || 0)) / 100, 0); // แสดงทันทีระหว่างรอผลจากหลังบ้าน
   const delta = res ? res.scenario.delta_monthly : Math.round(local);
   const goalRows = res ? res.scenario.goals.map((g) => {
     const b = res.base.goals.find((x) => x.goal_id === g.goal_id) || {};
@@ -499,9 +649,9 @@ function SimPanel({ cats, hasGoals, onClose }) {
         const v = pcts[c.category_id] || 0;
         return (
           <label className="pl-sim-row" key={c.category_id} data-sim-row>
-            <span className="nm">{c.name}<small>เฉลี่ย {baht(c.base_avg)}/เดือน</small></span>
+            <span className="nm">{c.name}<small>เฉลี่ย {baht(c.base_avg - (c.fixed_avg || 0))}/เดือน{c.fixed_avg > 0 ? ' (ไม่รวมค่าประจำ)' : ''}</small></span>
             <input type="range" min="0" max="50" step="5" value={v} aria-label={`ลดรายจ่ายหมวด ${c.name} กี่เปอร์เซ็นต์`} onChange={(e) => setPcts((p) => ({ ...p, [c.category_id]: Number(e.target.value) }))} style={{ '--p': `${v * 2}%` }} />
-            <span className="vv">{v > 0 ? <>−{v}% <small>({baht((c.base_avg * v) / 100)})</small></> : '0%'}</span>
+            <span className="vv">{v > 0 ? <>−{v}% <small>({baht(((c.base_avg - (c.fixed_avg || 0)) * v) / 100)})</small></> : '0%'}</span>
           </label>
         );
       })}
@@ -551,6 +701,13 @@ export default function Plan() {
   const [aiHidden, setAiHidden] = useState(() => readFlag(AI_HIDE_KEY));
   const [sysHidden, setSysHidden] = useState(() => readFlag(SYS_HIDE_KEY));
   const flip = (setter, key) => setter((v) => { try { localStorage.setItem(key, v ? '0' : '1'); } catch { /* ignore */ } return !v; });
+  const [heroTip, setHeroTip] = useState(null); // การ์ดสรุปที่เปิดกล่องรายละเอียดอยู่
+  useEffect(() => {
+    if (!heroTip) return undefined;
+    const close = (e) => { if (!e.target.closest('[data-hero-card]')) setHeroTip(null); };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
+  }, [heroTip]);
   const [advFilter, setAdvFilter] = useState('all'); // กรองคำแนะนำ: all / watch / save / good
   const [simOpen, setSimOpen] = useState(false); // เปิดแผง "ลองปรับเอง"
   const [budgetAsk, setBudgetAsk] = useState(null); // { key, action } ยืนยันก่อนตั้งงบจากคำแนะนำ
@@ -903,32 +1060,21 @@ export default function Plan() {
   const top = an.anomalies[0];
   const pctBase = an.daily.pct_vs_base;
   const peakDay = an.weekday.by_day.reduce((a, d) => (d.amount > a.amount ? d : a), an.weekday.by_day[0]);
-  const maxDay = Math.max(1, ...an.weekday.by_day.map((d) => d.amount));
   const proj = an.projection;
-  const catRows = an.categories.slice(0, 6);
+  // แถบรายหมวด (การ์ดพฤติกรรม): เฉพาะส่วนที่ผู้ใช้ควบคุมได้ ไม่รวมค่าประจำ และไม่แสดงหมวดจ่ายเป็นก้อน
+  //  (ข้อมูลเก่าที่ยังไม่มี var_* ใช้ยอดรวมแทน)
+  const catRows = an.categories
+    .filter((c) => !c.lumpy)
+    .map((c) => (c.var_amount === undefined ? c : { ...c, amount: c.var_amount, expected_to_date: c.var_expected, pct_vs_expected: c.var_pct, flagged: c.var_flagged }))
+    .filter((c) => c.amount > 0)
+    .sort((x, y) => y.amount - x.amount)
+    .slice(0, 6);
   const catMax = Math.max(1, ...catRows.map((c) => Math.max(c.amount, c.expected_to_date || 0)));
   const isCur = data.is_current !== false; // false = กำลังดูเดือนที่ผ่านมา (ดูอย่างเดียว)
   const instFacts = data.installments || null; // ภาระผ่อน (เฉพาะเดือนปัจจุบัน)
-  const canSim = isCur && an.baseline && an.baseline.avg_surplus !== null && (an.base_categories || []).some((c) => !c.lumpy);
+  const canSim = isCur && an.baseline && an.baseline.avg_surplus !== null && (an.base_categories || []).some(simable);
 
-  // การ์ด "สถานะเดือนนี้": เดือนปัจจุบัน = รายรับอ้างอิง − คาดการณ์รายจ่ายสิ้นเดือน / เดือนที่ผ่านมา = รายรับ − รายจ่ายจริง
-  let heroStatus;
-  if (isCur) {
-    if (proj.expense_end === null) heroStatus = { label: 'สถานะเดือนนี้', value: '-', sub: an.days_elapsed < 7 ? 'ผ่านไปอย่างน้อย 7 วันจึงจะคาดการณ์ได้' : 'ยังไม่มีรายจ่ายให้คาดการณ์' };
-    else if (!proj.income_ref) heroStatus = { label: 'คาดการณ์รายจ่ายสิ้นเดือน', value: baht(proj.expense_end), sub: 'ยังไม่มีรายรับให้เทียบ' };
-    else {
-      const left = proj.income_ref - proj.expense_end;
-      heroStatus = left >= 0
-        ? { label: 'คาดว่าจะเหลือเก็บ', value: baht(left), sub: `รายรับ ${baht(proj.income_ref)} · คาดใช้ ${baht(proj.expense_end)}` }
-        : { label: 'คาดว่าจะใช้เกินรายรับ', value: baht(-left), sub: `รายรับ ${baht(proj.income_ref)} · คาดใช้ ${baht(proj.expense_end)}`, warn: true };
-    }
-  } else if (!an.totals.income) heroStatus = { label: 'รายจ่ายเดือนนั้น', value: baht(an.totals.expense || 0), sub: 'ไม่มีรายรับในเดือนนั้น' };
-  else {
-    const net = an.totals.income - an.totals.expense;
-    heroStatus = net >= 0
-      ? { label: 'เหลือเก็บเดือนนั้น', value: baht(net), sub: `รายรับ ${baht(an.totals.income)} · ใช้ ${baht(an.totals.expense)}` }
-      : { label: 'ใช้เกินรายรับเดือนนั้น', value: baht(-net), sub: `รายรับ ${baht(an.totals.income)} · ใช้ ${baht(an.totals.expense)}`, warn: true };
-  }
+  const wk = an.weekly || null; // ใช้จ่าย 7 วันล่าสุด (ไม่รวมรายจ่ายก้อน)
 
   // รายการคำแนะนำรวม: ของ AI + ของระบบ (ข้ามข้อของระบบที่ใช้ตัวเลขชุดเดียวกับของ AI เพราะพูดเรื่องเดียวกัน)
   // เรียงตามประเภท ระวัง → โอกาสออม → ทำได้ดี (ในประเภทเดียวกัน AI ก่อน) แล้วกรองตามปุ่มที่เลือก
@@ -1005,41 +1151,81 @@ export default function Plan() {
 
       {/* ===== 1 การ์ดสรุป 4 ใบ ===== */}
       <div className="pl-hero" data-plan-hero>
-        <div className={`pl-hero-c${heroStatus.warn ? ' warn' : ''}`} data-hero="status">
-          <div className="l">{heroStatus.label}</div>
-          <div className="v">{heroStatus.value}</div>
-          <div className="s">{heroStatus.sub}</div>
-        </div>
         <div className={`pl-hero-c${pctBase !== null && pctBase >= 10 ? ' warn' : ''}`} data-hero="daily">
           <div className="l">ใช้จ่ายเฉลี่ยต่อวัน</div>
           <div className="v">{an.daily.avg === null ? '-' : baht(an.daily.avg)}</div>
-          <div className="s">{pctBase === null ? 'ยังไม่มีค่าเฉลี่ยให้เทียบ' : `${pctBase > 0 ? 'สูงกว่า' : pctBase < 0 ? 'ต่ำกว่า' : 'เท่ากับ'}ค่าเฉลี่ยเดิม${pctBase === 0 ? '' : ` ${num1(Math.abs(pctBase))}%`}`}</div>
+          <div className="s">{pctBase === null ? 'ยังไม่มีค่าเฉลี่ยให้เทียบ' : pctBase >= 100 ? `${num1(timesOf(pctBase))} เท่าของค่าเฉลี่ยเดิม` : `${pctBase > 0 ? 'สูงกว่า' : pctBase < 0 ? 'ต่ำกว่า' : 'เท่ากับ'}ค่าเฉลี่ยเดิม${pctBase === 0 ? '' : ` ${num1(Math.abs(pctBase))}%`}`}</div>
+          {an.daily.excludes_lumpy && <div className="x" data-daily-ex>ไม่รวมค่าประจำและรายจ่ายก้อน</div>}
         </div>
-        <div className={`pl-hero-c${top ? ' warn' : ''}`} data-hero="anomaly">
-          <div className="l">หมวดที่สูงผิดปกติ</div>
-          <div className="v">{top ? top.name : 'ไม่พบ'}</div>
-          <div className="s">{top ? `${baht(top.amount)} สูงกว่าค่าเฉลี่ย ${num1(top.pct_vs_expected)}%${an.anomalies.length > 1 ? ` · อีก ${an.anomalies.length - 1} หมวด` : ''}` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
-        </div>
-        {isCur && instFacts ? (
-          <button type="button" className={`pl-hero-c pl-hero-btn${instFacts.burden_pct !== null && instFacts.burden_pct > 30 ? ' warn' : ''}`} data-hero="inst" onClick={() => { pickTab('installments'); setInstView('active'); }}>
-            <div className="l">ภาระผ่อนต่อเดือน</div>
-            <div className="v">{instFacts.count === 0 ? 'ไม่มี' : baht(instFacts.load)}</div>
-            <div className="s">{instFacts.count === 0 ? 'ไม่มีรายการที่กำลังผ่อน' : instFacts.burden_pct === null ? `${instFacts.count} รายการ · ยังไม่มีรายรับให้เทียบ` : `${num1(instFacts.burden_pct)}% ของรายรับ · ${instFacts.count} รายการ`}</div>
-          </button>
-        ) : (
-          <div className="pl-hero-c" data-hero="expense">
-            <div className="l">รายจ่ายทั้งเดือน</div>
-            <div className="v">{baht(an.totals.expense || 0)}</div>
-            <div className="s">{proj.pct_of_income !== null && proj.pct_of_income !== undefined ? `${num1(proj.pct_of_income)}% ของรายรับอ้างอิง` : 'ยังไม่มีรายรับให้เทียบ'}</div>
+        {wk && wk.last7 !== null && wk.last7 !== undefined && (
+          <div className={`pl-hero-c${wk.pct_vs_base !== null && wk.pct_vs_base >= 10 ? ' warn' : ''}`} data-hero="weekly" title={`${thaiDate(wk.from)} – ${thaiDate(wk.to)}`}>
+            <div className="l">{isCur ? 'ใช้จ่าย 7 วันล่าสุด' : 'ใช้จ่าย 7 วันสุดท้ายของเดือน'}</div>
+            <div className="v">{baht(wk.last7)}</div>
+            <div className="s">{wk.base ? `สัปดาห์ปกติ ${baht(wk.base)}${wk.pct_vs_base !== null ? ` (${pctOrTimes(wk.pct_vs_base)})` : ''}` : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
+            {isCur && wk.trend === 'down' && <span className="pl-trend g" data-week-trend="down">↓ ช่วงนี้ใช้น้อยลง</span>}
+            {isCur && wk.trend === 'up' && <span className="pl-trend o" data-week-trend="up">↑ ช่วงนี้ใช้เร็วขึ้น</span>}
           </div>
         )}
+        <HeroCard id="anomaly" open={heroTip} setOpen={setHeroTip} warn={!!top} tip={(
+          <>
+            <b className="t">หมวดที่สูงกว่าปกติ</b>
+            {an.anomalies.length === 0 ? <p className="n">{an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</p> : an.anomalies.map((c) => (
+              <div className="r" key={c.category_id}><span>{c.name} <small>(ปกติ {baht(c.expected_to_date)})</small></span><b className="up">{baht(c.amount)}</b></div>
+            ))}
+            <p className="n">เทียบกับระดับปกติถึงวันนี้ ไม่รวมค่าประจำและรายจ่ายพิเศษ</p>
+          </>
+        )}>
+          <div className="l">หมวดที่สูงผิดปกติ</div>
+          <div className="v">{top ? top.name : 'ไม่พบ'}</div>
+          <div className="s">{top ? `${baht(top.amount)} ${top.pct_vs_expected >= 100 ? `· ${num1(timesOf(top.pct_vs_expected))} เท่าของปกติ` : `สูงกว่าปกติ ${num1(top.pct_vs_expected)}%`}${an.anomalies.length > 1 ? ` · อีก ${an.anomalies.length - 1} หมวด` : ''}` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
+        </HeroCard>
+        {(() => {
+          // ค่าใช้จ่ายประจำ (ค่าเช่า ค่าน้ำไฟ ค่าสมาชิก งวดผ่อน ฯลฯ) + ภาระผ่อนต่อเดือน กดไปแท็บรายการผ่อนได้
+          const fm = an.fixed_month || { total: 0, paid: 0, pending: 0, pct_of_income: null, by_category: [] };
+          const todayKey = isCur && an.weekly ? an.weekly.to : null;
+          const load = isCur && instFacts ? instFacts.load : 0;
+          const burden = isCur && instFacts ? instFacts.burden_pct : null;
+          const warn = (fm.pct_of_income !== null && fm.pct_of_income > 50) || (burden !== null && burden > 30);
+          const sub = fm.total > 0 ? (fm.pct_of_income !== null ? `${num1(fm.pct_of_income)}% ของรายรับ` : 'ยังไม่มีรายรับให้เทียบ') : 'ยังไม่มีค่าใช้จ่ายประจำ';
+          const body = (
+            <>
+              <div className="l">ค่าใช้จ่ายประจำ{isCur ? '' : 'เดือนนั้น'}</div>
+              <div className="v">{baht(fm.total)}</div>
+              <div className="s">{sub}</div>
+              {load > 0 && <div className={`x${burden !== null && burden > 30 ? ' warn' : ''}`}>ผ่อน {baht(load)}/เดือน{burden !== null ? ` (${num1(burden)}%)` : ''}</div>}
+            </>
+          );
+          return (
+            <HeroCard id="fixed" open={heroTip} setOpen={setHeroTip} warn={warn} tip={(
+              <>
+                <b className="t">ค่าใช้จ่ายประจำ{isCur ? 'เดือนนี้' : 'เดือนนั้น'}</b>
+                {fm.by_category.length === 0 ? <p className="n">ยังไม่มีค่าใช้จ่ายประจำ</p> : fm.by_category.map((c) => {
+                  const done = c.status === 'paid' || c.status === undefined;
+                  const late = !done && c.due_date && todayKey && c.due_date < todayKey;
+                  return (
+                    <div className="r" key={c.category_id} data-fixed-row={c.status || 'paid'} title={done ? 'จ่ายแล้ว' : late ? 'เลยกำหนด' : `รอจ่าย${c.due_date ? ` ราว ${thaiDate(c.due_date)}` : ''}`}>
+                      <span><i className={`pl-dot ${done ? 'ok' : late ? 'late' : 'wait'}`} />{c.name}</span>
+                      <b>{baht(c.amount)}</b>
+                    </div>
+                  );
+                })}
+                {fm.total > 0 && <div className="r sum"><span>รวม</span><b>{baht(fm.total)}</b></div>}
+                {fm.total > 0 && (
+                  <p className="pl-dot-lg"><span><i className="pl-dot ok" />จ่ายแล้ว</span><span><i className="pl-dot wait" />รอจ่าย</span>{fm.by_category.some((c) => c.status !== 'paid' && c.due_date && todayKey && c.due_date < todayKey) && <span><i className="pl-dot late" />เลยกำหนด</span>}</p>
+                )}
+              </>
+            )}>
+              {body}
+            </HeroCard>
+          );
+        })()}
       </div>
 
       {/* ===== 2 พฤติกรรมการใช้จ่าย (ซ่อนได้ ระบบจำไว้) ===== */}
       <div className={`card pl-beh${behHidden ? ' closed' : ''}`} data-plan-behavior>
         <div className="pl-beh-head">
           <InfoTitle title={<><span className="pl-ti"><IconChart size={18} /></span>{isCur ? 'พฤติกรรมการใช้จ่าย' : `พฤติกรรมการใช้จ่าย ${thaiMonth(data.month)}`}</>} label="คำอธิบายส่วนนี้" popId="pl-info-behavior">
-            <p>เทียบกับค่าเฉลี่ยของเดือนเต็มก่อนหน้า (สูงสุด 3 เดือน เฉพาะเดือนที่มีรายการ) เส้นตั้งในแถบรายหมวดคือ “ระดับปกติของคุณ” ณ วันนี้ หมวดที่ถือว่าสูงผิดปกติคือสูงกว่าระดับปกติตั้งแต่ 30% และเกินอย่างน้อย 200 บาท หมวดที่จ่ายเป็นก้อน เช่น ค่าเช่า เทียบกับยอดเต็มเดือน</p>
+            <p>เทียบกับค่าเฉลี่ยของเดือนเต็มก่อนหน้า (สูงสุด 3 เดือน เฉพาะเดือนที่มีรายการ) เส้นตั้งในแถบรายหมวดคือ “ระดับปกติของคุณ” ณ วันนี้ หมวดที่ถือว่าสูงผิดปกติคือสูงกว่าระดับปกติตั้งแต่ 30% และเกินอย่างน้อย 200 บาท การ์ดนี้ดูเฉพาะการใช้จ่ายที่คุณเลือกเองได้ ไม่รวมค่าประจำ (รายการเกิดซ้ำรายเดือน งวดผ่อน ค่าสมาชิกที่ตัดเดือนละครั้ง) และรายจ่ายก้อน เช่น ค่าเช่า</p>
           </InfoTitle>
           <button type="button" className="pl-collapse" aria-expanded={!behHidden} aria-controls="pl-beh-body" data-beh-toggle onClick={toggleBeh}>
             {behHidden ? 'แสดง' : 'ซ่อน'}
@@ -1050,18 +1236,15 @@ export default function Plan() {
           <div className="pl-beh-inner">
             <div className="pl-beh-grid">
               <div className="pl-beh-col" data-beh-days>
-                <div className="pl-beh-sub">รายจ่ายตามวันของสัปดาห์ <span>{isCur ? 'ย้อนหลัง 90 วัน' : '90 วันถึงสิ้นเดือน'}</span></div>
+                <div className="pl-beh-sub">ใช้จ่ายตามวันในสัปดาห์ <span>{isCur ? 'รวม 90 วันล่าสุด' : 'รวม 90 วันถึงสิ้นเดือน'}</span></div>
                 {an.weekday.reliable ? (
                   <>
-                    <div className="pl-days" role="img" aria-label={`รายจ่ายรายวันของสัปดาห์ ${isCur ? 'ย้อนหลัง' : 'ในช่วง'} 90 วัน`} data-days>
-                      {an.weekday.by_day.map((d) => (
-                        <div key={d.day} className={`pl-day${d.day === peakDay.day ? ' peak' : ''}`}>
-                          <i style={{ height: `${Math.max(2, Math.round((d.amount / maxDay) * 70))}px` }} />
-                          <span>{DAY_SHORT[d.day]}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {an.weekday.peak && <p className="pl-days-cap">ใช้จ่ายมากสุดวัน{an.weekday.peak.name} ({num1(an.weekday.peak.share_pct)}%)</p>}
+                    <WeekdayChart days={an.weekday.by_day} peakDay={an.weekday.peak ? peakDay.day : null} todayDay={isCur && an.weekly ? new Date(`${an.weekly.to}T00:00:00Z`).getUTCDay() : null} />
+                    <p className="pl-wd-legend" title="แต่ละแท่ง = ยอดรวมของวันนั้นทุกสัปดาห์ในช่วง 90 วัน (เช่น ทุกวันจันทร์)">
+                      {isCur && <span><i className="pl-lg-peak" />วันนี้</span>}
+                      <span><i className="pl-lg-dash" />เฉลี่ยทุกวัน</span>
+                      <span><i className="pl-lg-pk">สูงสุด</i>วันที่ใช้มากที่สุด</span>
+                    </p>
                   </>
                 ) : <p className="pl-empty">ข้อมูลยังไม่พอที่จะดูรูปแบบรายวัน ลองบันทึกรายการต่อเนื่องอีกสักระยะ</p>}
                 {an.small_purchases.flagged && (
@@ -1074,14 +1257,31 @@ export default function Plan() {
                   <div className="pl-cbars">
                     {catRows.map((c) => (
                       <div className={`pl-cbar${c.flagged ? ' flag' : ''}`} key={c.category_id} data-cat-row>
-                        <span className="nm" title={c.name}>{c.name}{c.lumpy && <small> ก้อน</small>}</span>
+                        <span className="nm" title={c.name}>{c.name}</span>
                         <span className="tr" title={c.expected_to_date === null ? '' : `ระดับปกติถึงวันนี้ ${baht(c.expected_to_date)}`}>
                           <i style={{ width: `${Math.min(100, (c.amount / catMax) * 100)}%` }} />
-                          {c.expected_to_date !== null && <b style={{ left: `${Math.min(100, (c.expected_to_date / catMax) * 100)}%` }} />}
+                          {c.expected_to_date !== null && c.expected_to_date !== undefined && <b style={{ left: `${Math.min(100, (c.expected_to_date / catMax) * 100)}%` }} />}
                         </span>
-                        <span className="am">{baht(c.amount)}{c.pct_vs_expected !== null && <em>{c.pct_vs_expected > 0 ? '+' : ''}{num1(c.pct_vs_expected)}%</em>}</span>
+                        <span className="am">{baht(c.amount)}{c.pct_vs_expected !== null && <em>{pctOrTimes(c.pct_vs_expected)}</em>}</span>
                       </div>
                     ))}
+                  </div>
+                )}
+                {an.special && an.special.total > 0 && (
+                  <div className="pl-special" data-special>
+                    <div className="pl-special-h">
+                      <span title={`รายการก้อนใหญ่ที่นาน ๆ มีครั้ง${an.special.threshold ? ` (ตั้งแต่ ${baht(an.special.threshold)} ต่อรายการ)` : ''} แยกไว้ ไม่นำไปเทียบกับการใช้จ่ายปกติ`}>รายจ่ายพิเศษ</span>
+                      {an.special.items.length > 1 && <b>{baht(an.special.total)}</b>}
+                    </div>
+                    <ul>
+                      {an.special.items.map((it, i) => (
+                        <li key={`${it.date}-${i}`} data-special-item>
+                          <span className="d">{thaiDate(it.date).replace(/ \d{4}$/, '')}</span>
+                          <span className="n" title={it.note ? `${it.note} · ${it.category_name}` : it.category_name}>{it.note || it.category_name}</span>
+                          <span className="a">{baht(it.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
@@ -1106,7 +1306,7 @@ export default function Plan() {
             </span>
           </div>
 
-          {simOpen && canSim && <SimPanel cats={an.base_categories.filter((c) => !c.lumpy).slice(0, 5)} hasGoals={data.goals.length > 0} onClose={() => setSimOpen(false)} />}
+          {simOpen && canSim && <SimPanel cats={an.base_categories.filter(simable).slice(0, 5)} hasGoals={data.goals.length > 0} onClose={() => setSimOpen(false)} />}
 
           {allItems.length > 1 && groupCounts.length > 1 && (
             <div className="pl-fchips" role="group" aria-label="กรองคำแนะนำ" data-adv-filter>

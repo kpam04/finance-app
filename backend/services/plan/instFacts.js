@@ -11,8 +11,8 @@ const round1 = (n) => Math.round((Number(n) + Number.EPSILON) * 10) / 10;
 
 function installmentFacts(plans, todayIso, incomeRef) {
   const active = (plans || []).filter((p) => p.status === 'active');
-  if (active.length === 0) return { load: 0, burden_pct: null, free: null, count: 0 };
-  const { monthly_load: load } = I.summaryOf(active, todayIso);
+  if (active.length === 0) return { load: 0, burden_pct: null, free: null, count: 0, paid_month: 0, left_month: 0, next_due: null };
+  const { monthly_load: load, paid_month: paidMonth, left_month: leftMonth, next_bill: nextBill } = I.summaryOf(active, todayIso);
   const [y, m] = todayIso.split('-').map(Number);
   const lastOk = (() => { const a = addMonths(y, m, FREE_WITHIN_MONTHS - 1); return monthKeyOf(a.year, a.month); })();
   const ending = [];
@@ -29,7 +29,7 @@ function installmentFacts(plans, todayIso, incomeRef) {
   const free = ending.length
     ? { amount: I.round2(ending.reduce((s, e) => s + e.amount, 0)), month: ending.map((e) => e.month).sort().pop(), n: ending.length, name: ending[0].name }
     : null;
-  return { load: I.round2(load), burden_pct: incomeRef > 0 && load > 0 ? round1((load / incomeRef) * 100) : null, free, count: active.length };
+  return { load: I.round2(load), burden_pct: incomeRef > 0 && load > 0 ? round1((load / incomeRef) * 100) : null, free, count: active.length, paid_month: paidMonth, left_month: leftMonth, next_due: nextBill ? nextBill.due_date : null };
 }
 
 module.exports = { installmentFacts, FREE_WITHIN_MONTHS };

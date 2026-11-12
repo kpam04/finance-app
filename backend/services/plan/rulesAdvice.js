@@ -37,7 +37,7 @@ function rulesAdvice(facts, goalEvalsIn = [], { current = true } = {}) {
     const tail = !current ? 'ลองดูว่าเดือนถัดไปมีอะไรลดหรือเลื่อนได้บ้าง'
       : lumpy ? 'ช่วงที่เหลือของเดือนลองชะลอหมวดนี้ไว้ก่อน และตั้งงบไว้สำหรับเดือนหน้า'
         : 'ช่วงที่เหลือของเดือนลองดูว่ามีรายการในหมวดนี้ที่ลดหรือเลื่อนได้บ้าง';
-    push('watch', 'warning', `หมวด “${nm}” ${when} ${num(val(`cat${i}_amount`))} บาท สูงกว่า${lumpy ? 'ค่าเฉลี่ยต่อเดือน' : 'ระดับปกติถึงวันนี้'}ของคุณ (${num(val(`cat${i}_base`))} บาท) อยู่ ${num(val(`cat${i}_pct`))}% ${tail}`, [`cat${i}_amount`, `cat${i}_base`, `cat${i}_pct`]);
+    push('watch', 'warning', `หมวด “${nm}” ${when} ${num(val(`cat${i}_amount`))} บาท สูงกว่า${lumpy ? 'ค่าเฉลี่ยต่อเดือน' : 'ระดับปกติถึงวันนี้'}ของคุณ (${num(val(`cat${i}_base`))} บาท) ${val(`cat${i}_pct`) >= 100 ? `ราว ${num(1 + val(`cat${i}_pct`) / 100)} เท่า` : `อยู่ ${num(val(`cat${i}_pct`))}%`} ${tail}`, [`cat${i}_amount`, `cat${i}_base`, `cat${i}_pct`]);
   }
   // เป้าหมายที่ยังไม่ทัน
   const behind = goalEvals.findIndex((g) => g.status === 'behind');
@@ -54,6 +54,12 @@ function rulesAdvice(facts, goalEvalsIn = [], { current = true } = {}) {
   }
 
   // ---------- โอกาสออม ----------
+  // รายจ่ายพิเศษ (ค่าเทอม คอนเสิร์ต ฯลฯ): ชวนเตรียมเงินล่วงหน้าสำหรับครั้งหน้า
+  if (val('special_total') !== null) {
+    push('save', 'tip', current
+      ? `${when}มีรายจ่ายพิเศษ ${num(val('special_count'))} รายการ รวม ${num(val('special_total'))} บาท ถ้าเป็นรายจ่ายที่รู้ล่วงหน้า เช่น ค่าเทอม ลองตั้งเป้าหมายออมทยอยเก็บไว้ ครั้งหน้าจะไม่กระทบเงินเดือนก้อนเดียว`
+      : `${when}มีรายจ่ายพิเศษ ${num(val('special_count'))} รายการ รวม ${num(val('special_total'))} บาท ถ้ามีรายจ่ายแบบนี้อีก ลองทยอยเก็บเงินไว้ล่วงหน้า`, ['special_total', 'special_count']);
+  }
   if (current && val('inst_free') !== null) {
     const n = val('inst_free_n');
     const what = n > 1 ? `รายการผ่อน ${num(n)} รายการ ` : `“${val('inst_free_name')}” `;

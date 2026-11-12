@@ -8,6 +8,7 @@ const Transaction = require('../models/Transaction');
 const Goal = require('../models/Goal');
 const Budget = require('../models/Budget');
 const Installment = require('../models/Installment');
+const Recurring = require('../models/Recurring');
 const PlanAdvice = require('../models/PlanAdvice');
 const AiEvent = require('../models/AiEvent');
 const { aiConfig, AiError, intEnv } = require('../services/ai/aiClient');
@@ -81,11 +82,16 @@ async function loadPlan(userId, monthParam) {
   const from = new Date(Date.UTC(base.year, base.month - 1, 1));
   const to = new Date(Date.UTC(pm.year, pm.month, 1));
   const [txns, cats, goals] = await Promise.all([
-    Transaction.find({ user: userId, date: { $gte: from, $lt: to } }).select('date type amount category').limit(MAX_TXNS).lean(),
+    Transaction.find({ user: userId, date: { $gte: from, $lt: to } }).select('date type amount category note recurring installment').limit(MAX_TXNS).lean(),
     Category.find({ $or: [{ user: null }, { user: userId }] }).lean(),
     Goal.find({ user: userId }).sort({ createdAt: 1 }).lean(),
   ]);
-  const analysis = analyze({ txns, categories: cats, todayIso, month: monthKeyOf(pm.year, pm.month) });
+  // ค่าประจำที่รู้แน่นอน: งวดผ่อน และรายการเกิดซ้ำรายเดือน/รายปี (รายวัน/รายสัปดาห์ เช่น ค่าข้าว ยังนับเป็นพฤติกรรมการใช้จ่าย)
+  const recIds = [...new Set(txns.filter((t) => t.recurring).map((t) => String(t.recurring)))];
+  const recs = recIds.length ? await Recurring.find({ _id: { $in: recIds }, user: userId }).select('frequency').lean() : [];
+  const fixedRec = new Set(recs.filter((r) => r.frequency === 'monthly' || r.frequency === 'yearly').map((r) => String(r._id)));
+  const marked = txns.map((t) => ({ date: t.date, type: t.type, amount: t.amount, category: t.category, note: t.note || '', fixed: !!t.installment || (t.recurring && fixedRec.has(String(t.recurring))), installment_paid: !!t.installment }));
+  const analysis = analyze({ txns: marked, categories: cats, todayIso, month: monthKeyOf(pm.year, pm.month) });
   await autoComplete(goals);
   const active = goals.filter((g) => !isDone(g));
   const achievements = goals.filter(isDone).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).map(achievementOut);
@@ -100,6 +106,20 @@ async function loadPlan(userId, monthParam) {
   if (analysis.is_current) {
     const plans = await Installment.find({ user: userId, status: 'active' }).lean();
     inst = installmentFacts(plans, todayIso, analysis.projection.income_ref);
+  }
+  // ค่าใช้จ่ายประจำทั้งเดือน: เติมงวดผ่อน (เดือนปัจจุบัน = จ่ายแล้ว + ที่ครบกำหนดเดือนนี้แต่ยังไม่จ่าย / เดือนที่ผ่านมา = ที่จ่ายจริง)
+  const fm = analysis.fixed_month;
+  if (fm) {
+    const paid = inst ? Number(inst.paid_month) || 0 : fm.inst_paid || 0;
+    const pending = inst ? Number(inst.left_month) || 0 : 0;
+    if (paid + pending > 0) {
+      fm.by_category.push({ category_id: 'installments', name: 'งวดผ่อน', paid: Math.round(paid), pending: Math.round(pending), amount: Math.round(paid + pending), status: pending > 0 ? (paid > 0 ? 'partial' : 'pending') : 'paid', due_date: pending > 0 && inst ? inst.next_due : null });
+      fm.by_category.sort((x, y) => y.amount - x.amount);
+      fm.total += Math.round(paid + pending);
+      fm.paid += Math.round(paid);
+      fm.pending += Math.round(pending);
+    }
+    fm.pct_of_income = fm.income_ref ? Math.round((fm.total / fm.income_ref) * 1000) / 10 : null;
   }
   const facts = buildFacts(analysis, analysis.is_current ? goalEvals : [], inst);
   return { todayIso, analysis, goalEvals, achievements, facts, inst, currentMonth: todayIso.slice(0, 7) };
@@ -393,7 +413,7 @@ router.post('/simulate', async (req, res) => {
       const pct = a && typeof a.pct === 'number' ? a.pct : NaN;
       const cat = a ? baseCats.get(String(a.category_id)) : null;
       if (!Number.isFinite(pct) || pct < -100 || pct > 100 || !cat) return fail(res, 400, 'ข้อมูลการปรับแผนไม่ถูกต้อง');
-      const change = (cat.base_avg * -pct) / 100; // + = ออมเพิ่ม
+      const change = ((cat.base_avg - (cat.fixed_avg || 0)) * -pct) / 100; // + = ออมเพิ่ม (ปรับได้เฉพาะส่วนที่ไม่ใช่ค่าประจำ)
       delta += change;
       applied.push({ category_id: cat.category_id, name: cat.name, pct, base_avg: cat.base_avg, monthly_change: round0(change) });
     }

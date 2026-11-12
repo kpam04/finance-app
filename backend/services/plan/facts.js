@@ -28,8 +28,9 @@ function buildFacts(analysis, goalEvals = [], inst = null) {
   add('expense_month', `รายจ่าย${when}`, analysis.totals.expense, 'บาท', `รายจ่าย${when}`);
   add('income_month', `รายรับ${when}`, analysis.totals.income, 'บาท', `รายรับ${when}`);
   add('savings_rate', `อัตราการออม${when}`, analysis.totals.savings_rate, '%', 'อัตราการออม');
-  add('avg_daily', `ใช้จ่ายเฉลี่ยต่อวัน (${when})`, analysis.daily.avg, 'บาท', 'เฉลี่ย/วัน');
-  add('avg_daily_base', `ใช้จ่ายเฉลี่ยต่อวัน (${baseLabel})`, analysis.daily.base_avg, 'บาท', 'เฉลี่ยเดิม/วัน');
+  const exLumpy = analysis.daily.excludes_lumpy ? ' ไม่รวมค่าประจำและรายจ่ายก้อน' : '';
+  add('avg_daily', `ใช้จ่ายเฉลี่ยต่อวัน (${when}${exLumpy})`, analysis.daily.avg, 'บาท', 'เฉลี่ย/วัน');
+  add('avg_daily_base', `ใช้จ่ายเฉลี่ยต่อวัน (${baseLabel}${exLumpy})`, analysis.daily.base_avg, 'บาท', 'เฉลี่ยเดิม/วัน');
   add('avg_daily_pct', 'ใช้จ่ายต่อวันเทียบกับค่าเฉลี่ยเดิม', analysis.daily.pct_vs_base, '%', '');
   if (current) add('projection', 'คาดการณ์รายจ่ายสิ้นเดือน', analysis.projection.expense_end, 'บาท', 'คาดการณ์');
   add('income_ref', 'รายรับอ้างอิงของเดือน', analysis.projection.income_ref, 'บาท', 'รายรับอ้างอิง');
@@ -45,6 +46,10 @@ function buildFacts(analysis, goalEvals = [], inst = null) {
     add(`cat${i}_base`, c.lumpy ? `หมวด “${nm}” ค่าเฉลี่ยทั้งเดือน` : `หมวด “${nm}” ระดับปกติถึงวันนี้ (ค่าเฉลี่ยตามสัดส่วนวัน)`, c.expected_to_date, 'บาท', c.lumpy ? 'เฉลี่ย/เดือน' : 'ปกติถึงวันนี้');
     add(`cat${i}_pct`, `หมวด “${nm}” สูงกว่าปกติ`, c.pct_vs_expected, '%', '');
   });
+  if (analysis.special && analysis.special.total > 0) {
+    add('special_total', `รายจ่ายพิเศษ${when} (รายการก้อนใหญ่ที่ไม่ได้เกิดเป็นประจำ)`, analysis.special.total, 'บาท', 'รายจ่ายพิเศษ');
+    add('special_count', `จำนวนรายจ่ายพิเศษ${when}`, analysis.special.items.length, 'รายการ', 'จำนวน');
+  }
   if (analysis.weekday.peak) {
     add('peak_day', 'วันที่ใช้จ่ายมากที่สุดของสัปดาห์', analysis.weekday.peak.name, '', 'วันสูงสุด');
     add('peak_share', 'สัดส่วนรายจ่ายของวันนั้น', analysis.weekday.peak.share_pct, '%', 'สัดส่วน');

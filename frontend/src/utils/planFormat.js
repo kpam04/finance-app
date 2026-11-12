@@ -23,8 +23,13 @@ export function thaiMonth(ym) {
 }
 
 // ค่าของ "ข้อเท็จจริง" ที่ใช้ในป้ายตัวเลขใต้คำแนะนำ (หน่วยบาทมี ฿ / % ที่เป็นผลเทียบมี + นำหน้าเมื่อสูงกว่า)
+// % ที่เทียบกับระดับปกติ: ตั้งแต่ +100% (สองเท่าขึ้นไป) แสดงเป็น "n เท่า" อ่านง่ายกว่า (เช่น +857.7% → 9.6 เท่า)
+export const timesOf = (pct) => Math.round((1 + Number(pct) / 100) * 10) / 10;
+export const pctOrTimes = (pct) => (pct >= 100 ? `${num1(timesOf(pct))} เท่า` : `${pct > 0 ? '+' : ''}${num1(pct)}%`);
+
 export function factValue(f) {
   if (typeof f.value !== 'number') return String(f.value);
+  if (f.unit === '%' && /^cat\d_pct$/.test(f.id) && f.value >= 100) return `${num1(timesOf(f.value))} เท่า`;
   if (f.unit === 'บาท') return baht(f.value);
   if (f.unit === '%') return `${/_pct$/.test(f.id) && f.value > 0 ? '+' : ''}${num1(f.value)}%`;
   return `${num1(f.value)}${f.unit ? ` ${f.unit}` : ''}`;
