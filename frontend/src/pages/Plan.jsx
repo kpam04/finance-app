@@ -315,6 +315,36 @@ const css = `
 .pl-wd-legend .pl-lg-peak { margin: 0; }
 .pl-wd-legend .pl-lg-pk { margin: 0; }
 .pl-lg-dash { display: inline-block; width: 16px; border-top: 1.5px dashed #BDB4A6; }
+.pl-prog { position: relative; display: inline-flex; align-items: center; flex: none; width: 150px; height: 18px; border-radius: 999px; background: #EFEBE3; overflow: hidden; }
+.pl-prog i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: #C9D6C2; }
+.pl-prog em { position: relative; width: 100%; font-style: normal; font-size: 11px; font-weight: 600; color: #5E7558; text-align: center; }
+.pl-learn { margin: 0 0 14px; padding: 12px 16px; border-radius: 14px; background: #F4F7F1; border: 1px solid #DCE6D5; }
+.pl-learn-h { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #40563C; }
+.pl-learn ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.pl-learn li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #4B4740; }
+.pl-learn li .ck { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #C9D6C2; font-size: 11px; color: #fff; }
+.pl-learn li.done .ck { background: #7E9677; border-color: #7E9677; }
+.pl-learn li.done .tx { color: #6b7280; }
+.pl-learn li .tx { flex: 1; min-width: 0; }
+.pl-learn-date { flex: none; font-size: 12px; font-weight: 600; color: #5E7558; }
+@media (max-width: 560px) { .pl-learn li { flex-wrap: wrap; } .pl-learn li .pl-prog, .pl-learn li .pl-learn-date { margin-left: 28px; } }
+.pl-wait { display: grid; gap: 8px; justify-items: start; margin-top: 12px; padding: 14px; border-radius: 12px; background: #F8F6F0; }
+.pl-wait p { margin: 0; font-size: 13px; line-height: 1.6; color: #6b6358; }
+.pl-welcome { max-width: 720px; margin: 8px auto 14px; padding: 28px 28px 22px; text-align: center; }
+.pl-welcome-ic { font-size: 34px; line-height: 1; }
+.pl-welcome h3 { margin: 8px 0 4px; font-size: 20px; color: #3F3A34; }
+.pl-welcome-sub { margin: 0 auto; max-width: 480px; font-size: 13.5px; line-height: 1.6; color: #6b7280; }
+.pl-steps { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; text-align: left; }
+.pl-steps li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #fff; border: 1px solid #ECE6DA; }
+.pl-steps li .n { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #EEF1EA; color: #5E7558; font-weight: 700; font-size: 13px; }
+.pl-steps li.done .n { background: #7E9677; color: #fff; }
+.pl-steps li .t { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.pl-steps li .t b { font-size: 14px; color: #3F3A34; }
+.pl-steps li .t small { font-size: 12px; color: #8A8177; }
+.pl-steps li.done .t b { color: #6b7280; text-decoration: line-through; text-decoration-color: #C9D4C2; }
+.pl-steps .pl-act { flex: none; }
+.pl-welcome-note { margin: 14px 0 0; font-size: 11.5px; line-height: 1.6; color: #A39A8C; }
+@media (max-width: 480px) { .pl-welcome { padding: 22px 16px 18px; } .pl-steps li { flex-wrap: wrap; } .pl-steps li .t { flex-basis: calc(100% - 40px); } .pl-steps .pl-act { margin-left: 40px; } }
 .pl-lg-pk { display: inline-block; margin-right: 3px; padding: 0 6px; border-radius: 999px; background: #F6EBD9; color: #8A6A1F; font-size: 10.5px; font-weight: 700; line-height: 1.6; }
 .pl-lg-peak { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; background: #7E9677; vertical-align: -1px; }
 .pl-wd-tip .p { color: #5E7558; font-weight: 600; }
@@ -483,6 +513,67 @@ function Chips({ facts }) {
 }
 
 const BEH_KEY = 'finance_plan_behavior_hidden';
+// แถบความคืบหน้าเล็ก (หน้าผู้ใช้ใหม่)
+function Progress({ value, max, label }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <span className="pl-prog" role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
+      <i style={{ width: `${pct}%` }} /><em>{label}</em>
+    </span>
+  );
+}
+// "ระบบกำลังเรียนรู้": มีรายการแล้วแต่ยังไม่มีเดือนเต็มก่อนหน้าให้เทียบ แสดงสิ่งที่จะเปิดใช้ได้เมื่อข้อมูลพอ
+function LearningBanner({ an }) {
+  const d = an.data || {};
+  const days = an.days_elapsed || 0;
+  const pmin = d.projection_min_days || 7;
+  const wmin = d.weekday_min_days || 10;
+  const items = [
+    { key: 'proj', done: days >= pmin, text: 'ค่าเฉลี่ยต่อวันและคาดการณ์สิ้นเดือน', prog: <Progress value={Math.min(days, pmin)} max={pmin} label={`${Math.min(days, pmin)}/${pmin} วัน`} /> },
+    { key: 'week', done: !!(an.weekday && an.weekday.reliable), text: 'วันไหนของสัปดาห์ใช้เงินมาก', prog: <Progress value={Math.min(d.record_days || 0, wmin)} max={wmin} label={`บันทึกแล้ว ${Math.min(d.record_days || 0, wmin)}/${wmin} วัน`} /> },
+    { key: 'base', done: !!d.has_baseline, text: 'เทียบกับค่าปกติของคุณ และเตือนหมวดที่สูงผิดปกติ', prog: d.baseline_from ? <span className="pl-learn-date">เริ่ม {thaiDate(d.baseline_from)}</span> : null },
+  ];
+  return (
+    <div className="pl-learn" data-learning>
+      <div className="pl-learn-h"><span aria-hidden="true">🌱</span><b>ระบบกำลังเรียนรู้นิสัยการใช้จ่ายของคุณ</b></div>
+      <ul>
+        {items.map((it) => (
+          <li key={it.key} className={it.done ? 'done' : ''} data-learn-item={it.key}>
+            <span className="ck" aria-hidden="true">{it.done ? '✓' : ''}</span>
+            <span className="tx">{it.text}</span>
+            {!it.done && it.prog}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+// หน้าต้อนรับ: ยังไม่มีรายการเลย → 3 ขั้นตอนเริ่มต้น
+function WelcomePlan({ data, navigate, onGoal }) {
+  const d = (data.analysis && data.analysis.data) || {};
+  const steps = [
+    { key: 'txn', done: (d.txn_count || 0) > 0, title: 'บันทึกรายรับรายจ่าย', desc: 'จดทุกวันสักระยะ ระบบจะเริ่มวิเคราะห์ให้เอง', btn: 'บันทึกรายการ', go: () => navigate('/transactions', { state: { openAdd: true } }) },
+    { key: 'budget', done: (data.budget_category_ids || []).length > 0, title: 'ตั้งงบประมาณ', desc: 'กำหนดเพดานให้หมวดที่อยากคุม เช่น อาหาร ช้อปปิ้ง', btn: 'ตั้งงบ', go: () => navigate('/budgets') },
+    { key: 'goal', done: (data.goals || []).length > 0 || (data.achievements || []).length > 0, title: 'ตั้งเป้าหมายออม', desc: 'ระบบจะบอกว่าต้องออมเดือนละเท่าไรถึงจะทัน', btn: 'ตั้งเป้าหมาย', go: onGoal },
+  ];
+  return (
+    <div className="card pl-welcome" data-plan-welcome>
+      <div className="pl-welcome-ic" aria-hidden="true">🌱</div>
+      <h3>เริ่มวางแผนการเงินกัน</h3>
+      <p className="pl-welcome-sub">หน้านี้จะวิเคราะห์พฤติกรรมการใช้จ่าย และแนะนำสิ่งที่ควรทำ เมื่อมีรายการของคุณ</p>
+      <ol className="pl-steps">
+        {steps.map((st, i) => (
+          <li key={st.key} className={st.done ? 'done' : ''} data-welcome-step={st.key}>
+            <span className="n" aria-hidden="true">{st.done ? '✓' : i + 1}</span>
+            <span className="t"><b>{st.title}</b><small>{st.desc}</small></span>
+            {!st.done && <button type="button" className={`pl-act${i === 0 ? ' main' : ''}`} onClick={st.go}>{st.btn}</button>}
+          </li>
+        ))}
+      </ol>
+      <p className="pl-welcome-note">วิเคราะห์ได้เมื่อ: บันทึกครบ 7 วัน (ค่าเฉลี่ยต่อวัน) · 10 วัน (วันที่ใช้เงินมาก) · มีประวัติครบ 1 เดือน (เทียบกับค่าปกติของคุณ)</p>
+    </div>
+  );
+}
 // การ์ดสรุปด้านบน: ชี้เมาส์ (คอม) หรือแตะ (มือถือ) เพื่อเปิดกล่องรายละเอียด / แตะซ้ำ แตะที่อื่น หรือกด Esc เพื่อปิด
 function HeroCard({ id, open, setOpen, warn, tip, children }) {
   const ptr = useRef('mouse');
@@ -1075,6 +1166,10 @@ export default function Plan() {
   const canSim = isCur && an.baseline && an.baseline.avg_surplus !== null && (an.base_categories || []).some(simable);
 
   const wk = an.weekly || null; // ใช้จ่าย 7 วันล่าสุด (ไม่รวมรายจ่ายก้อน)
+  // ผู้ใช้ใหม่: ยังไม่มีรายการเลย (เดือนปัจจุบัน) → หน้าต้อนรับ / มีรายการแต่ยังไม่มีเดือนเต็มก่อนหน้า → แถบ "ระบบกำลังเรียนรู้"
+  const isNewUser = isCur && an.data && an.data.has_data === false;
+  const isLearning = isCur && an.data && an.data.has_data && !an.data.has_baseline;
+  const topCat = an.categories && an.categories.length ? an.categories[0] : null;
 
   // รายการคำแนะนำรวม: ของ AI + ของระบบ (ข้ามข้อของระบบที่ใช้ตัวเลขชุดเดียวกับของ AI เพราะพูดเรื่องเดียวกัน)
   // เรียงตามประเภท ระวัง → โอกาสออม → ทำได้ดี (ในประเภทเดียวกัน AI ก่อน) แล้วกรองตามปุ่มที่เลือก
@@ -1143,12 +1238,21 @@ export default function Plan() {
         </div>
       )}
 
-      {an.limits.length > 0 && (
+      {!isNewUser && isLearning && <LearningBanner an={an} />}
+      {!isNewUser && !isLearning && an.limits.length > 0 && (
         <div className="pl-limits" data-plan-limits>
           {an.limits.map((l) => <p key={l}>{l}</p>)}
         </div>
       )}
 
+      {isNewUser ? (
+        <WelcomePlan
+          data={data}
+          navigate={navigate}
+          onGoal={() => { pickTab('goals'); setGoalView('active'); setGoalModal({ goal: null }); }}
+        />
+      ) : (
+      <>
       {/* ===== 1 การ์ดสรุป 4 ใบ ===== */}
       <div className="pl-hero" data-plan-hero>
         <div className={`pl-hero-c${pctBase !== null && pctBase >= 10 ? ' warn' : ''}`} data-hero="daily">
@@ -1175,9 +1279,9 @@ export default function Plan() {
             <p className="n">เทียบกับระดับปกติถึงวันนี้ ไม่รวมค่าประจำและรายจ่ายพิเศษ</p>
           </>
         )}>
-          <div className="l">หมวดที่สูงผิดปกติ</div>
-          <div className="v">{top ? top.name : 'ไม่พบ'}</div>
-          <div className="s">{top ? `${baht(top.amount)} ${top.pct_vs_expected >= 100 ? `· ${num1(timesOf(top.pct_vs_expected))} เท่าของปกติ` : `สูงกว่าปกติ ${num1(top.pct_vs_expected)}%`}${an.anomalies.length > 1 ? ` · อีก ${an.anomalies.length - 1} หมวด` : ''}` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
+          <div className="l">{!an.data.has_baseline && topCat ? 'ใช้มากสุดเดือนนี้' : 'หมวดที่สูงผิดปกติ'}</div>
+          <div className="v">{top ? top.name : !an.data.has_baseline && topCat ? topCat.name : 'ไม่พบ'}</div>
+          <div className="s">{top ? `${baht(top.amount)} ${top.pct_vs_expected >= 100 ? `· ${num1(timesOf(top.pct_vs_expected))} เท่าของปกติ` : `สูงกว่าปกติ ${num1(top.pct_vs_expected)}%`}${an.anomalies.length > 1 ? ` · อีก ${an.anomalies.length - 1} หมวด` : ''}` : an.data.has_baseline ? 'ทุกหมวดอยู่ในระดับปกติของคุณ' : topCat ? `${baht(topCat.amount)} · ${num1(topCat.share_pct)}% ของรายจ่าย` : 'ยังไม่มีค่าเฉลี่ยให้เทียบ'}</div>
         </HeroCard>
         {(() => {
           // ค่าใช้จ่ายประจำ (ค่าเช่า ค่าน้ำไฟ ค่าสมาชิก งวดผ่อน ฯลฯ) + ภาระผ่อนต่อเดือน กดไปแท็บรายการผ่อนได้
@@ -1246,13 +1350,18 @@ export default function Plan() {
                       <span><i className="pl-lg-pk">สูงสุด</i>วันที่ใช้มากที่สุด</span>
                     </p>
                   </>
-                ) : <p className="pl-empty">ข้อมูลยังไม่พอที่จะดูรูปแบบรายวัน ลองบันทึกรายการต่อเนื่องอีกสักระยะ</p>}
+                ) : (
+                  <div className="pl-wait" data-weekday-wait>
+                    <p>บันทึกรายจ่ายครบ {an.data.weekday_min_days || 10} วัน จะเห็นว่าวันไหนของสัปดาห์คุณมักใช้เงินมาก</p>
+                    <Progress value={Math.min(an.data.record_days || 0, an.data.weekday_min_days || 10)} max={an.data.weekday_min_days || 10} label={`${Math.min(an.data.record_days || 0, an.data.weekday_min_days || 10)}/${an.data.weekday_min_days || 10} วัน`} />
+                  </div>
+                )}
                 {an.small_purchases.flagged && (
                   <p className="pl-note" data-small>รายจ่ายน้อยกว่า {an.small_purchases.threshold} บาทมี {an.small_purchases.count} ครั้งใน {an.small_purchases.days} วัน รวม {baht(an.small_purchases.total)} ({num1(an.small_purchases.share_pct)}% ของรายจ่าย)</p>
                 )}
               </div>
               <div className="pl-beh-col" data-beh-cats>
-                <div className="pl-beh-sub">รายหมวดเทียบระดับปกติ <span><i className="pl-lg-bar" />{isCur ? 'เดือนนี้' : 'เดือนนั้น'} <i className="pl-lg-mark" />ระดับปกติ</span></div>
+                <div className="pl-beh-sub">{an.data.has_baseline ? 'รายหมวดเทียบระดับปกติ' : `ใช้จ่ายรายหมวด${isCur ? 'เดือนนี้' : 'เดือนนั้น'}`} {an.data.has_baseline && <span><i className="pl-lg-bar" />{isCur ? 'เดือนนี้' : 'เดือนนั้น'} <i className="pl-lg-mark" />ระดับปกติ</span>}</div>
                 {catRows.length === 0 ? <p className="pl-empty">ยังไม่มีรายจ่าย{isCur ? 'เดือนนี้' : 'ในเดือนนั้น'}</p> : (
                   <div className="pl-cbars">
                     {catRows.map((c) => (
@@ -1455,6 +1564,8 @@ export default function Plan() {
         )}
         </div>
       </div>
+      </>
+      )}
       </div>
       )}
 

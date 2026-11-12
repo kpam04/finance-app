@@ -332,7 +332,14 @@ function analyze({ txns = [], categories = [], todayIso = bangkokToday(), month 
     is_current: isCurrent,
     days_elapsed: daysElapsed,
     days_in_month: dim,
-    data: { txn_count: cur.count, base_months: baseN, has_baseline: hasBaseline, enough_for_trend: enoughForTrend, enough_for_projection: projectable, has_data: cur.count > 0 || baseN > 0 },
+    data: {
+      txn_count: cur.count, base_months: baseN, has_baseline: hasBaseline, enough_for_trend: enoughForTrend, enough_for_projection: projectable, has_data: cur.count > 0 || baseN > 0,
+      // สำหรับหน้าผู้ใช้ใหม่: จำนวนวันที่มีรายจ่าย (90 วัน) / รายการที่ต้องมีขั้นต่ำของกราฟวันในสัปดาห์ / วันที่จะเริ่มเทียบกับค่าปกติได้
+      record_days: new Set(rows.filter((r) => r.type === 'expense' && r.iso >= wStart && r.iso <= endIso).map((r) => r.iso)).size,
+      record_rows: rows.filter((r) => r.type === 'expense' && r.iso >= wStart && r.iso <= endIso).length,
+      weekday_min_days: 10, weekday_min_rows: 20, projection_min_days: MIN_DAYS_PROJECTION,
+      baseline_from: hasBaseline ? null : (() => { const n = addMonths(year, mon, 1); return `${monthKeyOf(n.year, n.month)}-01`; })(),
+    },
     totals: { income: round0(cur.income), expense: round0(cur.expense), net: round0(cur.income - cur.expense), savings_rate: cur.income > 0 ? round1(((cur.income - cur.expense) / cur.income) * 100) : null },
     daily: { avg: avgDaily, base_avg: baseline.avg_daily_expense, pct_vs_base: pctVsBase, excludes_lumpy: exclTotals.size > 0, lumpy_names: lumpyNames },
     baseline,
