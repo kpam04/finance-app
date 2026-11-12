@@ -20,7 +20,7 @@ const { rulesAdvice } = require('../services/plan/rulesAdvice');
 const { decorateAdvice } = require('../services/plan/adviceActions');
 const { installmentFacts } = require('../services/plan/instFacts');
 const { dataSignature, goalsSignature, isStale } = require('../services/plan/signature');
-const { generateAdvice } = require('../services/plan/aiAdvice');
+const { generateAdvice, polishText } = require('../services/plan/aiAdvice');
 const { PLAN_CONSENT_VERSION, MAX_GOALS, MAX_GOAL_NAME, MAX_GOAL_YEARS } = require('../services/plan/constants');
 const { bangkokToday, monthKeyOf, parseMonthKey, addMonths, addYearsIso, validIso } = require('../services/plan/dateUtil');
 const { parseAmount, MAX_AMOUNT } = require('../utils/inputRules');
@@ -146,7 +146,7 @@ const savedOut = (doc, stale = false, ctx = null, facts = []) => {
   if (!doc) return null;
   const cur = new Map(facts.map((f) => [f.id, f]));
   const relabel = (f) => (cur.has(f.id) && cur.get(f.id).unit === f.unit ? { ...f, label: cur.get(f.id).label, ...(cur.get(f.id).short !== undefined ? { short: cur.get(f.id).short } : {}) } : f);
-  const items = doc.items.map((i) => ({ tag: i.tag, text: i.text, facts_used: (i.facts_used || []).map(relabel), rating: i.rating || 0, source: 'ai' }));
+  const items = doc.items.map((i) => ({ tag: i.tag, text: polishText(i.text, i.facts_used || []), facts_used: (i.facts_used || []).map(relabel), rating: i.rating || 0, source: 'ai' }));
   return { items: ctx ? decorateAdvice(items, ctx) : items, generated_at: doc.generated_at, model: doc.model, stale };
 };
 

@@ -62,6 +62,20 @@ function formatMoney(text, facts) {
   ));
 }
 
+// ปรับรูปแบบข้อความของ AI ให้ตรงกับป้ายในแอป (ใช้ทั้งตอนรับคำตอบ และตอนแสดงคำแนะนำที่เก็บไว้แล้ว)
+//  - ยอดเงินใส่จุลภาค / หมวดที่สูงกว่าปกติตั้งแต่ +100% ที่ AI เขียนเป็น "1105.5%" → "12.1 เท่า"
+function polishText(text, facts) {
+  let out = formatMoney(text, facts);
+  const pcts = new Map(facts.filter(isTimesFact).map((f) => [key(f.value), timesOf(f.value)]));
+  if (pcts.size) {
+    out = out.replace(/\+?(\d[\d,]*(?:\.\d+)?)\s*(%|เปอร์เซ็นต์)/g, (m, n) => {
+      const t = pcts.get(key(Number(n.replace(/,/g, ''))));
+      return t !== undefined ? `${t} เท่า` : m;
+    });
+  }
+  return out;
+}
+
 // ตรวจผลจาก AI คืนข้อความที่ผ่านทั้งหมด + สถิติ (จำนวนตัวเลขที่ตรวจ/ผ่าน, จำนวนข้อที่ตัดทิ้ง)
 function validateAdvice(json, facts) {
   const byId = new Map(facts.map((f) => [f.id, f]));
@@ -73,7 +87,7 @@ function validateAdvice(json, facts) {
   let dropped = 0;
   for (const it of raw) {
     if (!it || typeof it !== 'object' || typeof it.text !== 'string') { dropped += 1; continue; }
-    const text = formatMoney(it.text.trim(), facts);
+    const text = polishText(it.text.trim(), facts);
     const ids = Array.isArray(it.refs) ? [...new Set(it.refs.filter((r) => typeof r === 'string' && byId.has(r)))].slice(0, 4) : [];
     const nums = numbersIn(text);
     const good = nums.filter((n) => allowed.has(key(n))).length;
@@ -94,4 +108,4 @@ async function generateAdvice(facts, { chat = chatJSON, timeoutMs } = {}) {
   return { ...v, model };
 }
 
-module.exports = { generateAdvice, validateAdvice, buildPrompt, allowedNumbers, numbersIn, formatMoney, timesOf, MAX_ITEMS, MAX_TEXT, TAGS };
+module.exports = { generateAdvice, validateAdvice, buildPrompt, allowedNumbers, numbersIn, formatMoney, polishText, timesOf, MAX_ITEMS, MAX_TEXT, TAGS };
