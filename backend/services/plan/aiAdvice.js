@@ -9,6 +9,9 @@ const TAGS = ['warning', 'goal', 'tip'];
 
 const clip = (s, n) => Array.from(String(s || '')).slice(0, n).join('');
 const key = (n) => String(Number(Number(n).toFixed(1)));
+// หมวดที่สูงกว่าปกติตั้งแต่ +100% แสดงเป็น "n เท่า" (ตรงกับป้ายในแอป: planFormat.timesOf)
+const isTimesFact = (f) => /^cat\d_pct$/.test(f.id) && f.unit === '%' && typeof f.value === 'number' && f.value >= 100;
+const timesOf = (pct) => Math.round((1 + Number(pct) / 100) * 10) / 10;
 const numbersIn = (text) => (String(text).match(/\d[\d,]*(?:\.\d+)?/g) || []).map((s) => Number(s.replace(/,/g, ''))).filter((n) => Number.isFinite(n));
 
 const SYSTEM = [
@@ -16,6 +19,8 @@ const SYSTEM = [
   'Reply with ONLY one JSON object: {"items":[{"tag":"warning"|"goal"|"tip","text":string,"refs":[fact ids]}]}',
   '- 1 to 4 items, friendly polite Thai, each text at most 200 characters, one idea per item.',
   '- Use ONLY numbers that appear in FACTS, copied exactly. Never round, add, subtract or compute new numbers. If unsure, do not mention a number.',
+  '- When a fact line says "(= about N times the usual level)", describe that comparison as "ราว N เท่า" using that N, not the percent.',
+  '- Write money amounts with thousands separators, e.g. 2,954 บาท.',
   '- Every item must list in refs the ids of the facts it relies on (1 to 4 ids).',
   '- Money already spent cannot be undone: never tell the user to cut an amount already spent this month down to an average. Suggest what they can still do: slow down for the rest of this month, or plan or set a budget for next month.',
   '- Budgeting and saving only: no investment, loan, tax, insurance or product advice. Do not diagnose or judge the person. Do not say you are an AI.',
@@ -27,7 +32,8 @@ function buildPrompt(facts) {
   // ข้อเท็จจริงที่มี ai: false (เช่น ชื่อรายการผ่อนที่ผู้ใช้ตั้งเอง) ใช้เฉพาะในแอป ไม่ส่งให้ AI
   const lines = facts.filter((f) => f.ai !== false).map((f) => {
     const label = redactSensitive(clip(f.label, 80)).text;
-    return `[${f.id}] ${label} = ${f.value}${f.unit ? ` ${f.unit}` : ''}`;
+    const times = isTimesFact(f) ? ` (= about ${timesOf(f.value)} times the usual level)` : '';
+    return `[${f.id}] ${label} = ${f.value}${f.unit ? ` ${f.unit}` : ''}${times}`;
   });
   return { system: SYSTEM, user: `FACTS:\n${lines.join('\n')}` };
 }
@@ -41,10 +47,19 @@ function allowedNumbers(facts) {
       set.add(key(Math.abs(f.value)));
       set.add(key(Math.round(f.value)));
       set.add(key(Math.abs(Math.round(f.value))));
+      if (isTimesFact(f)) set.add(key(timesOf(f.value)));
     } else numbersIn(f.value).forEach((n) => set.add(key(n)));
     numbersIn(f.label).forEach((n) => set.add(key(n)));
   }
   return set;
+}
+
+// ใส่จุลภาคให้ยอดเงินที่ AI เขียนติดกัน (เช่น 2954 → 2,954) เฉพาะตัวเลขที่ตรงกับข้อเท็จจริงหน่วยบาท (ไม่แตะปี พ.ศ. ฯลฯ)
+function formatMoney(text, facts) {
+  const money = new Set(facts.filter((f) => f.unit === 'บาท' && typeof f.value === 'number').flatMap((f) => [key(f.value), key(Math.abs(f.value)), key(Math.round(f.value))]));
+  return String(text).replace(/(^|[^\d.,])(\d{4,})(\.\d+)?(?![\d,])/g, (m, pre, int, dec = '') => (
+    money.has(key(Number(int + dec))) ? `${pre}${Number(int).toLocaleString('en-US')}${dec}` : m
+  ));
 }
 
 // ตรวจผลจาก AI คืนข้อความที่ผ่านทั้งหมด + สถิติ (จำนวนตัวเลขที่ตรวจ/ผ่าน, จำนวนข้อที่ตัดทิ้ง)
@@ -58,7 +73,7 @@ function validateAdvice(json, facts) {
   let dropped = 0;
   for (const it of raw) {
     if (!it || typeof it !== 'object' || typeof it.text !== 'string') { dropped += 1; continue; }
-    const text = it.text.trim();
+    const text = formatMoney(it.text.trim(), facts);
     const ids = Array.isArray(it.refs) ? [...new Set(it.refs.filter((r) => typeof r === 'string' && byId.has(r)))].slice(0, 4) : [];
     const nums = numbersIn(text);
     const good = nums.filter((n) => allowed.has(key(n))).length;
@@ -79,4 +94,4 @@ async function generateAdvice(facts, { chat = chatJSON, timeoutMs } = {}) {
   return { ...v, model };
 }
 
-module.exports = { generateAdvice, validateAdvice, buildPrompt, allowedNumbers, numbersIn, MAX_ITEMS, MAX_TEXT, TAGS };
+module.exports = { generateAdvice, validateAdvice, buildPrompt, allowedNumbers, numbersIn, formatMoney, timesOf, MAX_ITEMS, MAX_TEXT, TAGS };

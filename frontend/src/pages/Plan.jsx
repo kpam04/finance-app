@@ -394,6 +394,9 @@ const css = `
 .pl-sec-wrap { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.3s ease; }
 .pl-sec.closed .pl-sec-wrap { grid-template-rows: 0fr; }
 .pl-sec-inner { min-height: 0; overflow: hidden; }
+.pl-more { display: inline-flex; align-items: center; gap: 5px; margin: 6px 0 2px; padding: 4px 2px; border: none; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary-dark, #74896F); cursor: pointer; }
+.pl-more:hover { text-decoration: underline; }
+.pl-more svg { transition: transform 0.2s; }
 .pl-sec.closed .pl-sec-inner { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .pl-sec-wrap, .pl-sec .pl-chev { transition: none; } }
 .pl-sec-acts { align-items: center; gap: 6px; }
@@ -423,6 +426,12 @@ const css = `
 .pl-item.g-watch .adv-ic { color: #D08A5E; }
 .pl-item.g-good .adv-ic { color: #5E8A58; }
 .pl-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pl-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.pl-meta-row .pl-chips { margin-top: 0; }
+.pl-meta-row .pl-acts { order: 2; margin: 0; }
+/* ปุ่มให้คะแนนคำแนะนำ (ของ AI) ไปอยู่ท้ายสุด หลังปุ่มลงมือทำ */
+.pl-meta-row .pl-chips { display: contents; }
+.pl-meta-row .pl-rate { order: 3; }
 .pl-act { padding: 5px 12px; border: 1px solid #D5DECF; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #4F6B47; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
 .pl-act:hover:not(:disabled) { background: #F1F3ED; border-color: #9AAB91; }
 .pl-act.main { border-color: #7E9677; background: #7E9677; color: #fff; }
@@ -667,6 +676,7 @@ function SecToggle({ hidden, onClick, controls, label }) {
   );
 }
 const GROUP_ORDER = ['watch', 'save', 'good'];
+const ADV_SHOW = 3; // จำนวนคำแนะนำที่แสดงก่อนกด "ดูเพิ่ม" (ต่อส่วน)
 const GROUP_LABEL = { watch: <><IconWarning size={13} /> ระวัง</>, save: <><IconPiggy size={13} /> โอกาสออม</>, good: <><IconThumb size={13} /> ทำได้ดี</> };
 function actionLabel(a) {
   switch (a.type) {
@@ -804,6 +814,7 @@ export default function Plan() {
     return () => document.removeEventListener('pointerdown', close);
   }, [heroTip]);
   const [advFilter, setAdvFilter] = useState('all'); // กรองคำแนะนำ: all / watch / save / good
+  const [advMore, setAdvMore] = useState({ ai: false, sys: false }); // แสดงคำแนะนำทั้งหมด (ปกติแสดง ADV_SHOW ข้อแรกของแต่ละส่วน)
   const [simOpen, setSimOpen] = useState(false); // เปิดแผง "ลองปรับเอง"
   const [budgetAsk, setBudgetAsk] = useState(null); // { key, action } ยืนยันก่อนตั้งงบจากคำแนะนำ
   const [actBusy, setActBusy] = useState(false);
@@ -1189,39 +1200,50 @@ export default function Plan() {
   const shownItems = filterOn === 'all' ? allItems : allItems.filter((it) => (it.group || 'save') === filterOn);
   const shownAi = shownItems.filter((it) => it.source === 'ai');
   const shownSys = shownItems.filter((it) => it.source !== 'ai');
+  // แต่ละส่วนแสดง ADV_SHOW ข้อแรก (เรียงตามความสำคัญแล้ว) ที่เหลือกด "ดูเพิ่ม"
+  const visAi = advMore.ai ? shownAi : shownAi.slice(0, ADV_SHOW);
+  const visSys = advMore.sys ? shownSys : shownSys.slice(0, ADV_SHOW);
+  const moreBtn = (key, list) => list.length > ADV_SHOW && (
+    <button type="button" className="pl-more" aria-expanded={advMore[key]} data-adv-more={key} onClick={() => setAdvMore((m) => ({ ...m, [key]: !m[key] }))}>
+      {advMore[key] ? 'ย่อ' : `ดูเพิ่มอีก ${list.length - ADV_SHOW} ข้อ`}
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: advMore[key] ? 'rotate(180deg)' : 'none' }}><path d="M6 9l6 6 6-6" /></svg>
+    </button>
+  );
   // คำแนะนำ 1 ข้อ (ใช้ทั้งในกรอบ AI และส่วนของระบบ ไม่ต้องมีป้ายบอกที่มาแล้ว เพราะแยกกรอบชัดเจน)
   const renderItem = (it) => (
     <div className={`pl-item g-${it.group || 'save'}`} key={it.key} data-ai-item={it.source === 'ai' ? '' : undefined} data-rule-item={it.source === 'ai' ? undefined : ''} data-group={it.group || 'save'}>
       <AdviceIcon tag={it.tag} />
       <div className="tx">
         <div>{it.text}</div>
-        {((it.facts_used && it.facts_used.length > 0) || it.source === 'ai') && (
-          <div className="pl-chips" data-chips>
-            <Chips facts={it.facts_used} />
-            {it.source === 'ai' && (
-              <span className="pl-rate">
-                <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(it.index, 1)}><IconThumb size={15} /></button>
-                <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(it.index, -1)}><IconThumb size={15} down /></button>
-              </span>
-            )}
-          </div>
-        )}
-        {it.actions && it.actions.length > 0 && (
-          budgetAsk && budgetAsk.key === it.key ? (
-            <div className="pl-ask" data-budget-ask>
-              <span>ตั้งงบหมวด “{budgetAsk.action.name}” เดือนละ <b>{baht(budgetAsk.action.amount)}</b> (ค่าเฉลี่ยของคุณ ปัดเป็นหลักร้อย){budgetAsk.action.next && budgetAsk.action.period ? <> เริ่ม <b>{thaiMonth(`${budgetAsk.action.period.year}-${String(budgetAsk.action.period.month).padStart(2, '0')}`)}</b> เพราะเดือนนี้ใช้เกินยอดนี้ไปแล้ว</> : ''} ใช้ต่อเนื่องทุกเดือน แก้ได้ทีหลังที่หน้างบประมาณ</span>
-              <span className="pl-ask-btns">
-                <button type="button" className="pl-act main" disabled={actBusy} data-budget-confirm onClick={confirmBudget}>{actBusy ? 'กำลังตั้งงบ...' : 'ตั้งงบ'}</button>
-                <button type="button" className="pl-act" disabled={actBusy} onClick={() => setBudgetAsk(null)}>ยกเลิก</button>
-              </span>
+        {/* ตัวเลขอ้างอิง + ปุ่มลงมือทำ อยู่บรรทัดเดียวกัน (จอแคบขึ้นบรรทัดใหม่เอง) */}
+        <div className="pl-meta-row">
+          {((it.facts_used && it.facts_used.length > 0) || it.source === 'ai') && (
+            <div className="pl-chips" data-chips>
+              <Chips facts={it.facts_used} />
+              {it.source === 'ai' && (
+                <span className="pl-rate">
+                  <button type="button" aria-pressed={it.rating === 1} aria-label="คำแนะนำนี้เป็นประโยชน์" data-rate-up onClick={() => rate(it.index, 1)}><IconThumb size={15} /></button>
+                  <button type="button" aria-pressed={it.rating === -1} aria-label="คำแนะนำนี้ไม่เป็นประโยชน์" data-rate-down onClick={() => rate(it.index, -1)}><IconThumb size={15} down /></button>
+                </span>
+              )}
             </div>
-          ) : (
+          )}
+          {it.actions && it.actions.length > 0 && !(budgetAsk && budgetAsk.key === it.key) && (
             <div className="pl-acts" data-acts>
               {it.actions.map((a) => (
                 <button type="button" key={a.type} className={`pl-act${a.type === 'set_budget' || a.type === 'new_goal' ? ' main' : ''}`} data-act={a.type} onClick={() => runAction(it, a)}>{actionLabel(a)}</button>
               ))}
             </div>
-          )
+          )}
+        </div>
+        {budgetAsk && budgetAsk.key === it.key && it.actions && it.actions.length > 0 && (
+          <div className="pl-ask" data-budget-ask>
+            <span>ตั้งงบหมวด “{budgetAsk.action.name}” เดือนละ <b>{baht(budgetAsk.action.amount)}</b> (ค่าเฉลี่ยของคุณ ปัดเป็นหลักร้อย){budgetAsk.action.next && budgetAsk.action.period ? <> เริ่ม <b>{thaiMonth(`${budgetAsk.action.period.year}-${String(budgetAsk.action.period.month).padStart(2, '0')}`)}</b> เพราะเดือนนี้ใช้เกินยอดนี้ไปแล้ว</> : ''} ใช้ต่อเนื่องทุกเดือน แก้ได้ทีหลังที่หน้างบประมาณ</span>
+            <span className="pl-ask-btns">
+              <button type="button" className="pl-act main" disabled={actBusy} data-budget-confirm onClick={confirmBudget}>{actBusy ? 'กำลังตั้งงบ...' : 'ตั้งงบ'}</button>
+              <button type="button" className="pl-act" disabled={actBusy} onClick={() => setBudgetAsk(null)}>ยกเลิก</button>
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -1454,7 +1476,8 @@ export default function Plan() {
                   <button type="button" className="pl-link" data-ai-cancel onClick={cancelAdvice}>ยกเลิก</button>
                 </div>
               )}
-              {!aiBusy && shownAi.map(renderItem)}
+              {!aiBusy && visAi.map(renderItem)}
+              {!aiBusy && moreBtn('ai', shownAi)}
               {!aiBusy && saved && saved.stale && <p className="pl-stale" role="status" data-ai-stale>{isCur ? 'ข้อมูลของคุณเปลี่ยนไปหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว กด “วิเคราะห์ใหม่” เพื่ออัปเดต' : 'รายการของเดือนนั้นถูกแก้ไขหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว'}</p>}
               {!aiBusy && aiDropped > 0 && <p className="pl-note" data-ai-dropped>AI เสนอเพิ่มอีก {aiDropped} ข้อที่ตัวเลขไม่ตรงกับที่ระบบคำนวณ ระบบจึงไม่แสดง</p>}
               {(saved || (isCur && ai.configured)) && (
@@ -1480,7 +1503,8 @@ export default function Plan() {
                 </span>
               </div>
               <div className="pl-sec-wrap" id="pl-sys-body" data-sys-body><div className="pl-sec-inner">
-                {shownSys.map(renderItem)}
+                {visSys.map(renderItem)}
+                {moreBtn('sys', shownSys)}
               </div></div>
             </section>
           )}
