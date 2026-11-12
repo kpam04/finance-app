@@ -7,6 +7,7 @@ import AiConsentModal from './AiConsentModal.jsx';
 import { normalizeThaiNumbers } from '../utils/thaiNumbers.js';
 import { createSpeechSession, isSpeechSupported, SPEECH_MESSAGES } from '../utils/speechInput.js';
 import PrivacyModal from './PrivacyModal.jsx';
+import { IconPlus, IconMic, IconCamera, IconImage, IconEdit, IconSpark } from './PlanIcons.jsx';
 
 const VOICE_OK_KEY = 'finance_voice_notice_ok';
 const readFlag = () => {
@@ -53,6 +54,9 @@ const linkBtn = {
 //  คอมพิวเตอร์: [ ช่องพิมพ์ ➤ ] [🎤 พูด] [📷 สแกน] แถวเดียวกัน
 //  มือถือ (ไม่เกิน 640px): แถวบน = ช่องพิมพ์ / แถวล่าง = ปุ่มพูดและปุ่มสแกนเท่ากัน (กฎกลางของ .form-row เรียงเป็นคอลัมน์อยู่แล้ว)
 const css = `
+.aq-rec { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #E2A27E; vertical-align: 0.05em; animation: aq-pulse 1.2s ease-in-out infinite; }
+@keyframes aq-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .aq-rec { animation: none; } }
 .ai-title { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ai-title h3 { margin: 0; }
 .ai-sub { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #6b7280; }
@@ -139,7 +143,7 @@ function AiTitle() {
 
   return (
     <div className={`ai-title${open ? ' open' : ''}`} ref={ref}>
-      <h3>➕ เพิ่มรายการใหม่</h3>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><IconPlus size={18} style={{ color: 'var(--primary-dark, #74896F)' }} />เพิ่มรายการใหม่</h3>
       <span className="ai-info-anchor">
       <button
         type="button"
@@ -153,7 +157,7 @@ function AiTitle() {
         i
       </button>
       <div id="ai-info-pop" className="ai-info-pop" role="tooltip" data-info-pop>
-        <p>พิมพ์หรือกด 🎤 แล้วพูดเป็นประโยคธรรมดา ระบบจะเปิดการ์ดให้ตรวจก่อนบันทึกทุกครั้ง เช่น</p>
+        <p>พิมพ์ หรือกดปุ่ม <IconMic size={14} /> พูด แล้วพูดเป็นประโยคธรรมดา ระบบจะเปิดการ์ดให้ตรวจก่อนบันทึกทุกครั้ง เช่น</p>
         <ul>
           <li>“เมื่อวาน ค่ากาแฟ 65”</li>
           <li>“วันที่ 25 ก.ย. ได้รับเงินเดือน 38000”</li>
@@ -429,7 +433,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
         <div className="grow ai-input">
           <input
             className="ai-text"
-            placeholder='พิมพ์หรือกด 🎤 แล้วพูด เช่น "เมื่อวาน ค่ากาแฟ 65"'
+            placeholder='พิมพ์ หรือกดปุ่ม “พูด” เช่น "เมื่อวาน ค่ากาแฟ 65"'
             aria-label="พิมพ์รายการที่ต้องการบันทึก"
             enterKeyHint="send"
             value={text}
@@ -462,7 +466,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
             aria-label={listening ? 'หยุดฟัง' : 'พูดเพื่อบันทึกรายการ'}
             data-mic
           >
-            {listening ? '🔴 กำลังฟัง... (กดเพื่อหยุด)' : '🎤 พูด'}
+            {listening ? <><span className="aq-rec" aria-hidden="true" /> กำลังฟัง... (กดเพื่อหยุด)</> : <><IconMic size={16} /> พูด</>}
           </button>
           <button
             type="button"
@@ -472,14 +476,14 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
             onClick={onScanClick}
             title="ถ่ายหรือเลือกรูปใบเสร็จ ให้ AI อ่านยอดที่ชำระ วันที่ ร้านค้า และหมวดให้"
           >
-            {scanState === 'preparing' ? 'กำลังเตรียมรูป...' : scanState === 'reading' ? `กำลังอ่านใบเสร็จ... ${scanElapsed} วินาที` : '📷 สแกนใบเสร็จ'}
+            {scanState === 'preparing' ? 'กำลังเตรียมรูป...' : scanState === 'reading' ? `กำลังอ่านใบเสร็จ... ${scanElapsed} วินาที` : <><IconCamera size={16} /> สแกนใบเสร็จ</>}
           </button>
           <input type="file" accept="image/*" capture="environment" ref={camRef} data-scan-camera onChange={handleFile} style={{ display: 'none' }} />
           <input type="file" accept="image/*" ref={fileRef} data-scan-file onChange={handleFile} style={{ display: 'none' }} />
           {/* กรอกเอง: เปิดฟอร์มเพิ่มรายการ (ย้ายมาไว้ในการ์ดนี้ เพื่อให้ทุกวิธีเพิ่มรายการอยู่ที่เดียวกัน) */}
           {onManualAdd && (
             <button type="button" className="btn btn-light" data-manual disabled={scanning || listening || aiBusy} onClick={onManualAdd} title="เปิดฟอร์มกรอกรายการเอง">
-              ✏️ กรอกเอง
+              <IconEdit size={15} /> กรอกเอง
             </button>
           )}
         </div>
@@ -487,21 +491,21 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
 
       {menuOpen && (
         <div data-scan-menu style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          <button type="button" className="btn btn-sm" data-scan-take onClick={() => { setMenuOpen(false); if (camRef.current) camRef.current.click(); }}>📷 ถ่ายรูปใบเสร็จ</button>
-          <button type="button" className="btn btn-sm btn-light" data-scan-pick onClick={() => { setMenuOpen(false); if (fileRef.current) fileRef.current.click(); }}>🖼 เลือกรูปจากเครื่อง</button>
+          <button type="button" className="btn btn-sm" data-scan-take onClick={() => { setMenuOpen(false); if (camRef.current) camRef.current.click(); }}><IconCamera size={15} /> ถ่ายรูปใบเสร็จ</button>
+          <button type="button" className="btn btn-sm btn-light" data-scan-pick onClick={() => { setMenuOpen(false); if (fileRef.current) fileRef.current.click(); }}><IconImage size={15} /> เลือกรูปจากเครื่อง</button>
         </div>
       )}
 
       {aiBusy && (
         <div data-ai-thinking style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: '#4b5563' }}>
-          <span>✨ AI กำลังวิเคราะห์ข้อความ... {aiElapsed} วินาที <span style={{ color: '#9ca3af' }}>(ถ้าเกิน {AI_WAIT_MS / 1000} วินาที ระบบจะใช้การแยกแบบกฎแทน)</span></span>
+          <span><IconSpark size={14} /> AI กำลังวิเคราะห์ข้อความ... {aiElapsed} วินาที <span style={{ color: '#9ca3af' }}>(ถ้าเกิน {AI_WAIT_MS / 1000} วินาที ระบบจะใช้การแยกแบบกฎแทน)</span></span>
           <button type="button" className="btn btn-sm btn-light" data-ai-cancel onClick={cancelAi}>ยกเลิก ใช้แบบกฎ</button>
         </div>
       )}
 
       {scanning && (
         <div data-scan-progress style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 13, color: '#4b5563' }}>
-          <span>{scanState === 'preparing' ? '📷 กำลังเตรียมรูป...' : '✨ AI กำลังอ่านใบเสร็จ ปกติ 10-20 วินาที บางครั้งนานได้ถึง 1-2 นาที (บริการฟรี) ไม่ต้องปิดหน้านี้ กดยกเลิกแล้วกรอกเองได้'}</span>
+          <span>{scanState === 'preparing' ? <><IconCamera size={14} /> กำลังเตรียมรูป...</> : <><IconSpark size={14} /> AI กำลังอ่านใบเสร็จ ปกติ 10-20 วินาที บางครั้งนานได้ถึง 1-2 นาที (บริการฟรี) ไม่ต้องปิดหน้านี้ กดยกเลิกแล้วกรอกเองได้</>}</span>
           <button type="button" className="btn btn-sm btn-light" data-scan-cancel onClick={cancelScan}>ยกเลิก</button>
         </div>
       )}

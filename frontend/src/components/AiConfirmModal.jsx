@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CategorySelect from './CategorySelect.jsx';
 import ReceiptPanel from './ReceiptPanel.jsx';
+import { IconBot, IconSpark, IconCheckCircle } from './PlanIcons.jsx';
 
 const overlay = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
@@ -77,7 +78,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
   return (
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ marginTop: 0 }}>🤖 ตรวจสอบก่อนบันทึก</h3>
+        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}><IconBot size={20} style={{ color: 'var(--primary-dark, #74896F)' }} />ตรวจสอบก่อนบันทึก</h3>
 
         {total > 1 && (
           <div data-queue style={{ fontSize: 13, color: '#6b7280', margin: '-4px 0 10px' }}>
@@ -87,7 +88,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
 
         {ai && (
           <div data-ai-badge style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: '#EEEDFE', color: '#3C3489' }}>{isReceipt ? '✨ AI อ่านจากรูปใบเสร็จ' : '✨ AI แยกรายการให้'}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: '#EEEDFE', color: '#3C3489' }}><IconSpark size={13} /> {isReceipt ? 'AI อ่านจากรูปใบเสร็จ' : 'AI แยกรายการให้'}</span>
             <span data-ai-confidence style={{ fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 999, background: tone.bg, color: tone.fg }}>
               {tone.label} {Math.round(ai.confidence * 100)}%
             </span>
@@ -187,7 +188,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
             <button type="button" className="btn btn-light" data-cancel onClick={onClose} disabled={busy}>{total > 1 ? 'ยกเลิกทั้งหมด' : 'ยกเลิก'}</button>
             {total > 1 && onSkip && <button type="button" className="btn btn-light" data-skip onClick={onSkip} disabled={busy}>ข้ามรายการนี้</button>}
             <button className="btn" style={{ flex: 1 }} disabled={busy}>
-              {busy ? 'กำลังบันทึก...' : '✅ ยืนยันบันทึก'}
+              {busy ? 'กำลังบันทึก...' : <><IconCheckCircle size={16} /> ยืนยันบันทึก</>}
             </button>
           </div>
         </form>

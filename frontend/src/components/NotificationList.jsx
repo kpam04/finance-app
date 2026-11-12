@@ -1,3 +1,4 @@
+import { IconDot, IconTrendUp, IconCard } from './PlanIcons.jsx';
 const fmtTime = (s) => {
   const d = new Date(s);
   return Number.isNaN(d.getTime())
@@ -7,14 +8,14 @@ const fmtTime = (s) => {
 
 // สัญลักษณ์ตามระดับการแจ้งเตือนงบประมาณ: 1 ใกล้ถึงวงเงิน, 2 ถึง/เกินวงเงิน (การแจ้งเตือนเก่าไม่มีระดับ)
 const LEVEL = {
-  1: { icon: '🟡', label: 'ใกล้ถึงวงเงิน' },
-  2: { icon: '🔴', label: 'ถึงหรือเกินวงเงิน' },
+  1: { icon: <IconDot color="#E0B35A" size={11} />, label: 'ใกล้ถึงวงเงิน' },
+  2: { icon: <IconDot color="#E2A27E" size={11} />, label: 'ถึงหรือเกินวงเงิน' },
 };
 
 // การแจ้งเตือนเชิงพยากรณ์ "ที่ความเร็วนี้คาดว่าจะเกินงบ" (kind = forecast)
-const FORECAST = { icon: '🔮', label: 'คาดการณ์ว่าจะเกินงบ' };
+const FORECAST = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'คาดการณ์ว่าจะเกินงบ' };
 // บิลผ่อนใกล้ครบกำหนด / ครบกำหนดวันนี้ (kind = installment) กดแล้วไปแท็บรายการผ่อน
-const INSTALLMENT = { icon: '💳', label: 'บิลผ่อน' };
+const INSTALLMENT = { icon: <IconCard size={15} style={{ color: '#74896F' }} />, label: 'บิลผ่อน' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
 //  - onRead(id): ทำเครื่องหมายอ่านแล้ว (ใช้เมื่อไม่ส่ง onSelect)
@@ -60,7 +61,7 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
                 role="img"
                 aria-label={lv.label}
                 title={lv.label}
-                style={{ fontSize: 14, lineHeight: '20px', flexShrink: 0 }}
+                style={{ fontSize: 14, lineHeight: '20px', flexShrink: 0, display: 'inline-flex', alignItems: 'center', height: 20 }}
               >
                 {lv.icon}
               </span>

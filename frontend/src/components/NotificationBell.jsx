@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import NotificationList from './NotificationList.jsx';
+import { IconBell } from './PlanIcons.jsx';
 
 // กระดิ่งแจ้งเตือน: วางในแถบเมนูด้านบน (Layout.jsx)
 export default function NotificationBell() {
@@ -120,9 +121,9 @@ export default function NotificationBell() {
         type="button"
         onClick={toggle}
         aria-label="การแจ้งเตือน"
-        style={{ position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px' }}
+        style={{ position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 20, padding: '4px 8px', color: '#5F5A52', lineHeight: 0 }}
       >
-        🔔
+        <IconBell size={22} />
         {unread > 0 && (
           <span
             style={{

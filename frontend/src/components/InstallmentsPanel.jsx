@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import InstallmentModal from './InstallmentModal.jsx';
-import { IconEdit, IconTrash } from './PlanIcons.jsx';
+import { IconEdit, IconTrash, IconCheckCircle } from './PlanIcons.jsx';
+import { thaiMonthYearShort } from '../utils/planFormat.js';
 
 // เนื้อหาแท็บ "รายการผ่อน" ในหน้าวางแผน
 //  สรุปเดือนนี้ / แผนผ่อนจัดกลุ่มตามช่องทาง (หัวกลุ่ม = บิลของช่องทางนั้น กด "จ่ายทั้งบิล") / ผ่อนเสร็จแล้ว
@@ -57,8 +58,22 @@ const css = `
 .in-menu button.danger { color: #b91c1c; }
 .in-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 13px; }
 .in-confirm small { width: 100%; color: #8A8177; }
-.in-done { opacity: 0.95; background: #FBFAF6; }
-.in-done-tag { display: inline-block; margin-top: 8px; padding: 1px 8px; border-radius: 999px; background: #E4F2E6; color: #166534; font-size: 11px; font-weight: 700; }
+.in-plan.in-done { display: flex; flex-direction: column; padding: 16px 18px; border-color: #DCE5D6; background: #F9FBF6; }
+.in-done .in-plan-name { font-size: 16px; }
+.in-done-sub { margin-top: 2px; font-size: 12px; color: #6b7280; }
+.in-done-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.in-done-amt { display: inline-flex; align-items: center; gap: 8px; }
+.in-done-amt b { font-size: 18px; color: #4F6B47; font-variant-numeric: tabular-nums; }
+.in-done-ic { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; background: #E3EBDD; color: #5E7558; }
+.in-done-pill { padding: 1px 8px; border-radius: 999px; background: #EEF1EA; color: #5E7558; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.in-done-pill.early { background: #E4F2E6; color: #166534; }
+.in-bar.in-done-bar { height: 4px; margin: 6px 0 10px; }
+.in-bar.in-done-bar i { background: #9AAB91; }
+.in-done-facts { display: grid; gap: 6px; margin: 0; font-size: 13px; }
+.in-done-facts div { display: flex; justify-content: space-between; gap: 8px; }
+.in-done-facts dt { color: #9A9185; }
+.in-done-facts dd { margin: 0; font-weight: 500; color: #5F5A52; text-align: right; }
+.in-done-facts dd.ok { color: #166534; }
 .in-msg { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .in-msg.ok { background: #E4F2E6; color: #166534; }
 .in-msg.err { background: #fef2f2; color: #b91c1c; }
@@ -320,6 +335,45 @@ export default function InstallmentsPanel({ inst, view, categories, onCategoryCr
     }
   };
 
+  // การ์ดรายการที่ผ่อนเสร็จ (แบบเดียวกับการ์ดเป้าหมายที่ออมสำเร็จ: มินิมอล ยอดจ่ายรวมเด่น รายละเอียดสั้น)
+  const doneCard = (p) => {
+    const per = p.schedule[0] ? p.schedule[0].scheduled : null;
+    const startYm = p.first_month ? `${p.first_month}-01` : null;
+    const saved = p.payoff && p.payoff.saved > 0 ? p.payoff.saved : 0;
+    return (
+      <div className="in-plan in-done" key={p.plan_id} data-inst-plan>
+        <div className="in-tools">
+          <button type="button" className="del" aria-label={`ลบ ${p.name}`} title="ลบ" data-inst-del onClick={() => setConfirmDel(p.plan_id)}><IconTrash size={15} /></button>
+        </div>
+        <div className="in-plan-name">{p.name}</div>
+        <div className="in-done-sub">ผ่อนเสร็จ {thaiDate(p.closed_at)} · {p.channel_label}</div>
+        <div className="in-done-top">
+          <span className="in-done-amt"><span className="in-done-ic" aria-hidden="true"><IconCheckCircle size={15} /></span><b>{baht(p.paid_total + (p.down_payment || 0))}</b></span>
+          <span className={`in-done-pill${p.payoff ? ' early' : ''}`}>{p.payoff ? 'ปิดยอดก่อนกำหนด' : `ครบ ${p.months} งวด`}</span>
+        </div>
+        <div className="in-bar in-done-bar" aria-hidden="true"><i style={{ width: '100%' }} /></div>
+        <dl className="in-done-facts">
+          <div><dt>หมวด</dt><dd>{catName(p.category_id) || 'ไม่ระบุหมวด'}</dd></div>
+          <div><dt>การผ่อน</dt><dd>{p.months} งวด{per ? ` · งวดละ ${baht(per)}` : ''}</dd></div>
+          {startYm && <div><dt>ช่วงที่ผ่อน</dt><dd>{thaiMonthYearShort(startYm)} – {thaiMonthYearShort(String(p.closed_at).slice(0, 10))}</dd></div>}
+          {saved > 0 ? (
+            <div><dt>ประหยัดได้</dt><dd className="ok">{baht(saved)}</dd></div>
+          ) : (
+            <div><dt>ดอกเบี้ย/ค่าธรรมเนียม</dt><dd>{p.fee > 0 ? baht(p.fee) : 'ผ่อน 0%'}</dd></div>
+          )}
+        </dl>
+        {confirmDel === p.plan_id && (
+          <div className="in-confirm" data-inst-confirm>
+            <span>ลบรายการผ่อนนี้?</span>
+            <button type="button" className="btn btn-sm btn-danger" data-inst-del-yes onClick={() => del(p)}>ลบ</button>
+            <button type="button" className="btn btn-sm btn-light" onClick={() => setConfirmDel(null)}>ยกเลิก</button>
+            <small>รายการรายจ่ายที่บันทึกจากงวดที่จ่ายไปแล้วยังอยู่ในหน้ารายการ</small>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const card = (p, isDone, showChannel) => {
     const pct = p.months ? Math.round((p.paid_count / p.months) * 100) : 0;
     const due = !isDone && dueOf.get(p.plan_id);
@@ -396,7 +450,7 @@ export default function InstallmentsPanel({ inst, view, categories, onCategoryCr
         done.length === 0 ? (
           <p className="in-empty">ยังไม่มีรายการที่ผ่อนเสร็จ เมื่อจ่ายครบทุกงวดหรือปิดยอด รายการจะย้ายมาอยู่ที่นี่</p>
         ) : (
-          <div className="in-plans" data-inst-done>{done.map((p) => card(p, true, true))}</div>
+          <div className="in-plans" data-inst-done>{done.map((p) => doneCard(p))}</div>
         )
       ) : (
         <>

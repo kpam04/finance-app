@@ -6,7 +6,7 @@ import GoalModal from '../components/GoalModal.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import AiConsentModal from '../components/AiConsentModal.jsx';
 import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
-import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, AdviceIcon } from '../components/PlanIcons.jsx';
+import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, IconWarning, IconPiggy, IconSprout, IconTrophy, IconParty, IconCheckCircle, AdviceIcon } from '../components/PlanIcons.jsx';
 import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions, timesOf, pctOrTimes } from '../utils/planFormat.js';
 
 // หน้า "วางแผน": วิเคราะห์พฤติกรรมการใช้จ่าย + คำแนะนำ (จากระบบ / จาก AI) + เป้าหมายการออม + ลองปรับแผน
@@ -120,7 +120,7 @@ const css = `
 .pl-goal-name { min-width: 0; font-size: 16px; font-weight: 700; color: #3F3A34; overflow-wrap: anywhere; }
 .pl-goal-meta { margin-top: 2px; font-size: 12px; color: #6b7280; }
 .pl-goal-pct { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-.pl-goal-pct b { font-size: 22px; color: #3F3A34; }
+.pl-goal-pct b { font-size: 18px; color: #3F3A34; }
 .pl-goal .pl-bar { margin: 6px 0 10px; }
 .pl-goal-facts { display: grid; gap: 4px; margin: 0; font-size: 13px; }
 .pl-goal-facts div { display: flex; justify-content: space-between; gap: 8px; }
@@ -150,19 +150,22 @@ const css = `
 .pl-add-card small { font-size: 12px; font-weight: 400; color: #8A8177; }
 .pl-add-plus { font-size: 28px; font-weight: 400; line-height: 1; }
 @media (max-width: 640px) { .pl-add-card { min-height: 0; padding: 18px 16px; } }
-.pl-ach-sum { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding: 14px 18px; border-radius: 14px; border: 1px solid #EEDDB4; background: linear-gradient(135deg, #FBF5E6, #F6EBD0); color: #6E5520; }
-.pl-ach-sum-icon { font-size: 28px; line-height: 1; }
-.pl-ach-sum-big { font-size: 18px; font-weight: 700; color: #5C4615; }
-.pl-ach-sum-sub { margin-top: 2px; font-size: 13px; line-height: 1.6; }
-.pl-ach-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
-@media (max-width: 1023px) { .pl-ach-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .pl-ach-grid { grid-template-columns: minmax(0, 1fr); } .pl-ach-sum { padding: 12px 14px; } .pl-ach-sum-big { font-size: 16px; } }
-.pl-ach { position: relative; padding: 14px 16px; border-radius: 14px; border: 1px solid #EFE2C2; background: #FFFCF4; box-shadow: 0 1px 4px rgba(120,90,20,0.06); }
-.pl-ach-trophy { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; background: #F7EBCB; font-size: 18px; }
-.pl-ach-name { margin-top: 8px; padding-right: 20px; font-weight: 700; color: #3F3A34; overflow-wrap: anywhere; }
-.pl-ach-amt { margin-top: 2px; font-size: 18px; font-weight: 700; color: #8A6A1F; }
-.pl-ach-meta { margin-top: 6px; font-size: 12px; line-height: 1.8; color: #8A8177; }
-.pl-ach-pill { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.pl-ach-total { margin: 0 0 10px; font-size: 13px; color: #8A8177; }
+.pl-ach-total b { color: #5F5A52; font-weight: 600; }
+.pl-goal-grid > .pl-ach { position: relative; display: flex; flex-direction: column; padding: 16px 18px; border-color: #EFE2C2; background: #FFFCF4; }
+.pl-ach-name { padding-right: 30px; font-size: 16px; font-weight: 700; color: #3F3A34; overflow-wrap: anywhere; }
+.pl-ach-sub { margin-top: 2px; font-size: 12px; color: #6b7280; }
+.pl-ach-pct { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.pl-ach-done { display: inline-flex; align-items: center; gap: 8px; }
+.pl-ach-done b { font-size: 18px; color: #8A6A1F; font-variant-numeric: tabular-nums; }
+.pl-ach-trophy { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; background: #F7EBCB; color: #A9812C; }
+.pl-ach-bar { margin: 6px 0 10px; }
+.pl-bar.pl-ach-bar { height: 4px; }
+.pl-bar.pl-ach-bar i { display: block; height: 100%; border-radius: 4px; background: #D9B45E; }
+.pl-ach-facts { gap: 6px; }
+.pl-ach-facts dt { color: #9A9185; }
+.pl-ach-facts dd { font-weight: 500; color: #5F5A52; }
+.pl-ach-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .pl-ach-pill.early { background: #E4F2E6; color: #166534; }
 .pl-ach-pill.late { background: #F3EFE6; color: #6b7280; }
 .pl-ach-menu-wrap { position: absolute; top: 8px; right: 8px; }
@@ -175,12 +178,12 @@ const css = `
 .pl-ach-line { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 12px; padding: 8px 12px; border: 1px solid #EEDDB4; border-radius: 10px; background: #FBF5E6; font: inherit; font-size: 13px; color: #6E5520; text-align: left; cursor: pointer; transition: border-color 0.2s; }
 .pl-ach-line:hover { border-color: #DDBF7A; }
 .pl-ach-go { margin-left: auto; }
-.pl-soon-icon.gold { background: #F7EBCB; font-size: 24px; }
+.pl-soon-icon.gold { background: #F7EBCB; color: #A9812C; font-size: 24px; }
 .pl-cele-bg { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(40,35,25,0.4); }
 .pl-cele { width: 100%; max-width: 360px; padding: 26px 22px 18px; border-radius: 18px; background: #fff; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.25); animation: pl-pop 0.25s ease-out; }
 @keyframes pl-pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pl-cele { animation: none; } }
-.pl-cele-em { font-size: 40px; line-height: 1.2; }
+.pl-cele-em { font-size: 40px; line-height: 1.2; color: #A9812C; }
 .pl-cele h3 { margin: 6px 0 2px; color: #3F3A34; }
 .pl-cele p { margin: 4px 0; font-size: 13px; line-height: 1.7; color: #6b7280; }
 .pl-cele .pl-cele-name { font-size: 14px; color: #4B4740; }
@@ -320,6 +323,7 @@ const css = `
 .pl-prog em { position: relative; width: 100%; font-style: normal; font-size: 11px; font-weight: 600; color: #5E7558; text-align: center; }
 .pl-learn { margin: 0 0 14px; padding: 12px 16px; border-radius: 14px; background: #F4F7F1; border: 1px solid #DCE6D5; }
 .pl-learn-h { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #40563C; }
+.pl-learn-h svg { color: var(--primary-dark, #74896F); }
 .pl-learn ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
 .pl-learn li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #4B4740; }
 .pl-learn li .ck { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #C9D6C2; font-size: 11px; color: #fff; }
@@ -331,7 +335,7 @@ const css = `
 .pl-wait { display: grid; gap: 8px; justify-items: start; margin-top: 12px; padding: 14px; border-radius: 12px; background: #F8F6F0; }
 .pl-wait p { margin: 0; font-size: 13px; line-height: 1.6; color: #6b6358; }
 .pl-welcome { max-width: 720px; margin: 8px auto 14px; padding: 28px 28px 22px; text-align: center; }
-.pl-welcome-ic { font-size: 34px; line-height: 1; }
+.pl-welcome-ic { font-size: 34px; line-height: 1; color: var(--primary-dark, #74896F); }
 .pl-welcome h3 { margin: 8px 0 4px; font-size: 20px; color: #3F3A34; }
 .pl-welcome-sub { margin: 0 auto; max-width: 480px; font-size: 13.5px; line-height: 1.6; color: #6b7280; }
 .pl-steps { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; text-align: left; }
@@ -535,7 +539,7 @@ function LearningBanner({ an }) {
   ];
   return (
     <div className="pl-learn" data-learning>
-      <div className="pl-learn-h"><span aria-hidden="true">🌱</span><b>ระบบกำลังเรียนรู้นิสัยการใช้จ่ายของคุณ</b></div>
+      <div className="pl-learn-h"><IconSprout size={18} /><b>ระบบกำลังเรียนรู้นิสัยการใช้จ่ายของคุณ</b></div>
       <ul>
         {items.map((it) => (
           <li key={it.key} className={it.done ? 'done' : ''} data-learn-item={it.key}>
@@ -558,7 +562,7 @@ function WelcomePlan({ data, navigate, onGoal }) {
   ];
   return (
     <div className="card pl-welcome" data-plan-welcome>
-      <div className="pl-welcome-ic" aria-hidden="true">🌱</div>
+      <div className="pl-welcome-ic" aria-hidden="true"><IconSprout size={30} /></div>
       <h3>เริ่มวางแผนการเงินกัน</h3>
       <p className="pl-welcome-sub">หน้านี้จะวิเคราะห์พฤติกรรมการใช้จ่าย และแนะนำสิ่งที่ควรทำ เมื่อมีรายการของคุณ</p>
       <ol className="pl-steps">
@@ -663,7 +667,7 @@ function SecToggle({ hidden, onClick, controls, label }) {
   );
 }
 const GROUP_ORDER = ['watch', 'save', 'good'];
-const GROUP_LABEL = { watch: '⚠️ ระวัง', save: '💰 โอกาสออม', good: '👍 ทำได้ดี' };
+const GROUP_LABEL = { watch: <><IconWarning size={13} /> ระวัง</>, save: <><IconPiggy size={13} /> โอกาสออม</>, good: <><IconThumb size={13} /> ทำได้ดี</> };
 function actionLabel(a) {
   switch (a.type) {
     case 'set_budget': return a.next ? `ตั้งงบเดือนหน้า ${baht(a.amount)}` : `ตั้งงบ ${baht(a.amount)}`;
@@ -723,7 +727,7 @@ function SimPanel({ cats, hasGoals, onClose }) {
     const faster = b.eta_months !== null && b.eta_months !== undefined && g.eta_months !== null && g.eta_months !== undefined ? b.eta_months - g.eta_months : null;
     let text;
     if (g.status === 'reached') text = 'ครบแล้ว';
-    else if (b.status !== 'on_track' && g.status === 'on_track') text = 'ทันกำหนดแล้ว 🎉';
+    else if (b.status !== 'on_track' && g.status === 'on_track') text = 'ทันกำหนดแล้ว';
     else if (b.status === 'no_surplus' && g.eta_months) text = `เริ่มออมได้ ถึงในราว ${monthsText(g.eta_months)}`;
     else if (faster !== null && faster >= 0.5) text = `เร็วขึ้นราว ${monthsText(faster)}`;
     else if (g.status === 'behind') text = `ยังช้ากว่ากำหนดราว ${monthsText(g.delay_months || 0)}`;
@@ -1081,7 +1085,7 @@ export default function Plan() {
               กำลังผ่อน <span className="pl-seg-n">{inst.plans.length}</span>
             </button>
             <button type="button" className={instView === 'done' ? 'on' : ''} aria-pressed={instView === 'done'} data-inst-seg-done onClick={() => setInstView('done')}>
-              ✓ ผ่อนเสร็จแล้ว <span className="pl-seg-n">{inst.done.length}</span>
+              <IconCheckCircle size={14} /> ผ่อนเสร็จแล้ว <span className="pl-seg-n">{inst.done.length}</span>
             </button>
           </div>
         )}
@@ -1104,7 +1108,7 @@ export default function Plan() {
                 กำลังออม <span className="pl-seg-n">{data.goals.length}</span>
               </button>
               <button type="button" className={goalView === 'done' ? 'on' : ''} aria-pressed={goalView === 'done'} data-goal-seg-done onClick={() => setGoalView('done')}>
-                <span aria-hidden="true">🏆</span> สำเร็จแล้ว <span className="pl-seg-n gold">{(data.achievements || []).length}</span>
+                <IconTrophy size={14} /> สำเร็จแล้ว <span className="pl-seg-n gold">{(data.achievements || []).length}</span>
               </button>
             </div>
         )}
@@ -1574,23 +1578,20 @@ export default function Plan() {
           {goalView === 'done' ? (
             (data.achievements || []).length === 0 ? (
               <div className="card pl-goal-empty" data-ach-empty>
-                <span className="pl-soon-icon gold" aria-hidden="true">🏆</span>
+                <span className="pl-soon-icon gold" aria-hidden="true"><IconTrophy size={26} /></span>
                 <p>ยังไม่มีเป้าหมายที่ออมสำเร็จ เมื่อยอด “ออมแล้ว” ถึงเป้า ระบบจะย้ายมาเก็บไว้ที่นี่ให้อัตโนมัติ</p>
               </div>
             ) : (
               <>
-                <div className="pl-ach-sum" data-ach-summary>
-                  <span className="pl-ach-sum-icon" aria-hidden="true">🏆</span>
-                  <div>
-                    <div className="pl-ach-sum-big">ออมสำเร็จแล้ว {data.achievements.length} เป้าหมาย</div>
-                    <div className="pl-ach-sum-sub">รวมทั้งหมด {baht(data.achievements.reduce((t, a) => t + a.target_amount, 0))} · ล่าสุด {data.achievements[0].name} ({thaiDate(data.achievements[0].completed_at)})</div>
-                  </div>
-                </div>
-                <div className="pl-ach-grid" data-achievements>
+                {/* ยอดรวม: แสดงเฉพาะเมื่อมีตั้งแต่ 2 เป้าหมาย (จำนวนอยู่ที่ปุ่มแท็บ / เป้าหมายเดียวยอดอยู่บนการ์ดแล้ว) */}
+                {data.achievements.length >= 2 && (
+                  <div className="pl-ach-total" data-ach-summary>รวมออมสำเร็จ <b>{baht(data.achievements.reduce((t, a) => t + a.target_amount, 0))}</b></div>
+                )}
+                <div className="pl-goal-grid pl-ach-grid" data-achievements>
                   {data.achievements.map((a) => {
                     const pill = timingPill(a.early_days);
                     return (
-                      <div className="pl-ach" key={a.goal_id} data-ach-item>
+                      <div className="card pl-ach" key={a.goal_id} data-ach-item>
                         <div className="pl-ach-menu-wrap" data-ach-menu-wrap>
                           <button type="button" className="pl-ach-more" aria-label={`ตัวเลือกของ ${a.name}`} aria-expanded={achMenu === a.goal_id} data-ach-more onClick={() => setAchMenu(achMenu === a.goal_id ? null : a.goal_id)}>⋯</button>
                           {achMenu === a.goal_id && (
@@ -1600,14 +1601,18 @@ export default function Plan() {
                             </div>
                           )}
                         </div>
-                        <span className="pl-ach-trophy" aria-hidden="true">🏆</span>
                         <div className="pl-ach-name">{a.name}</div>
-                        <div className="pl-ach-amt">{baht(a.target_amount)}</div>
-                        <div className="pl-ach-meta">
-                          สำเร็จ {thaiDate(a.completed_at)}
-                          <br />
-                          {durationText(a.duration_days)} <span className={`pl-ach-pill ${pill.cls}`} data-ach-timing>{pill.text}</span>
+                        <div className="pl-ach-sub">สำเร็จ {thaiDate(a.completed_at)}</div>
+                        <div className="pl-ach-pct">
+                          <span className="pl-ach-done"><span className="pl-ach-trophy" aria-hidden="true"><IconTrophy size={15} /></span><b>{baht(a.target_amount)}</b></span>
+                          <span className={`pl-ach-pill ${pill.cls}`} data-ach-timing>{pill.text}</span>
                         </div>
+                        <div className="pl-bar pl-ach-bar" aria-hidden="true"><i style={{ width: '100%' }} /></div>
+                        <dl className="pl-goal-facts pl-ach-facts">
+                          <div><dt>ระยะเวลา</dt><dd>{a.duration_days < 1 ? 'ภายในวันเดียว' : spanText(a.duration_days)}</dd></div>
+                          <div><dt>ช่วงที่ออม</dt><dd>{a.started_at ? `${thaiDate(a.started_at)} – ${thaiDate(a.completed_at)}` : thaiDate(a.completed_at)}</dd></div>
+                          {a.target_date && <div><dt>กำหนดเดิม</dt><dd>{thaiDate(a.target_date)}</dd></div>}
+                        </dl>
                         {confirmDel === a.goal_id && (
                           <div className="pl-confirm" data-goal-confirm>
                             <span>ลบออกจากประวัติ?</span>
@@ -1706,7 +1711,7 @@ export default function Plan() {
       {celebrate && (
         <div className="pl-cele-bg" data-celebrate onClick={() => setCelebrate(null)}>
           <div className="pl-cele" role="dialog" aria-modal="true" aria-labelledby="pl-cele-title" onClick={(e) => e.stopPropagation()}>
-            <div className="pl-cele-em" aria-hidden="true">🎉</div>
+            <div className="pl-cele-em" aria-hidden="true"><IconParty size={44} /></div>
             <h3 id="pl-cele-title">ออมครบแล้ว!</h3>
             <p className="pl-cele-name">{celebrate.name}</p>
             <div className="pl-cele-amt">{baht(celebrate.target_amount)}</div>

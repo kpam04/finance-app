@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import Avatar from './Avatar.jsx';
+import { IconWallet, IconUser, IconLogout, IconChevronDown } from './PlanIcons.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -27,7 +28,7 @@ export default function Layout() {
 
         {/* ชื่อแอป */}
         <div className="brand">
-          💰 Finance App
+          <IconWallet size={22} style={{ color: 'var(--primary-dark, #74896F)', marginRight: 6, verticalAlign: '-0.25em' }} />Finance App
         </div>
 
         {/* เมนูหลัก */}
@@ -59,7 +60,7 @@ export default function Layout() {
               </span>
 
               <span className="profile-arrow">
-                ⌄
+                <IconChevronDown size={16} />
               </span>
 
             </summary>
@@ -87,7 +88,7 @@ export default function Layout() {
                   e.currentTarget.closest('details').open = false;
                 }}
               >
-                <span>👤</span>
+                <span><IconUser size={16} /></span>
                 โปรไฟล์ของฉัน
               </NavLink>
 
@@ -96,7 +97,7 @@ export default function Layout() {
                 className="profile-dropdown-item logout-item"
                 onClick={handleLogout}
               >
-                <span>🚪</span>
+                <span><IconLogout size={16} /></span>
                 ออกจากระบบ
               </button>
 

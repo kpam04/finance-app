@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import CategorySelect from '../components/CategorySelect.jsx';
+import MonthYearPicker from '../components/MonthYearPicker.jsx';
+import { IconBell } from '../components/PlanIcons.jsx';
 
 const MONTHS = [
   'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -76,8 +78,6 @@ const css = `
 }
 .bd-title h2 { margin: 0; }
 .bd-selects { display: flex; align-items: center; gap: 8px; }
-.bd-selects select { width: auto; min-width: 120px; flex-shrink: 0; }
-.bd-selects select.bd-year { min-width: 90px; }
 .bd-add { white-space: nowrap; }
 
 .bd-info-btn {
@@ -120,7 +120,7 @@ const css = `
   .bd-title { grid-area: title; margin-right: 0; }
   .bd-add { grid-area: add; }
   .bd-selects { grid-area: selects; }
-  .bd-selects select, .bd-selects select.bd-year { flex: 1 1 0; min-width: 0; width: auto; }
+  .bd-selects .myp { display: flex; width: 100%; } .bd-selects .myp .myp-m { flex: 1; width: auto; min-width: 0; }
 }
 `;
 
@@ -185,7 +185,7 @@ function PageTitle() {
         <ul>
           <li>งบที่ตั้งไว้จะยกมาใช้ต่อเนื่องทุกเดือนอัตโนมัติ</li>
           <li>ปิดเดือนนี้ได้ หรือกด “ลบ” ถ้าไม่ต้องการใช้งบนี้อีก</li>
-          <li>ระบบแจ้งเตือนที่กระดิ่ง 🔔 เมื่อยอดใช้ถึงเกณฑ์ ถึงวงเงิน หรือคาดว่าจะเกินงบก่อนสิ้นเดือน</li>
+          <li>ระบบแจ้งเตือนที่กระดิ่ง <IconBell size={13} /> เมื่อยอดใช้ถึงเกณฑ์ ถึงวงเงิน หรือคาดว่าจะเกินงบก่อนสิ้นเดือน</li>
         </ul>
       </div>
     </div>
@@ -363,16 +363,7 @@ export default function Budgets() {
         <PageTitle />
 
         <div className="bd-selects">
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            {MONTHS.map((m, i) => (
-              <option key={m} value={i + 1}>{m}</option>
-            ))}
-          </select>
-          <select className="bd-year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {years.map((y) => (
-              <option key={y} value={y}>{y + 543}</option>
-            ))}
-          </select>
+          <MonthYearPicker month={month} year={year} years={years} onChange={(m, y) => { setMonth(m); setYear(y); }} />
         </div>
 
         <button className="btn bd-add" onClick={openAdd}>

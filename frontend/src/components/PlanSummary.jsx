@@ -67,7 +67,6 @@ export default function PlanSummary({ summary }) {
       ) : (
         <SafeLink to="/plan?tab=goals" className="ps-link" data-ps-setgoal>ตั้งเป้าหมายการออม →</SafeLink>
       )}
-      <div><SafeLink to="/plan" className="ps-link" data-ps-link>ดูการวิเคราะห์ทั้งหมด →</SafeLink></div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import CategorySelect from '../components/CategorySelect.jsx';
 import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
 import InfoTitle from '../components/InfoTitle.jsx';
 import ExportCsvModal from '../components/ExportCsvModal.jsx';
+import { IconList, IconFilter, IconDownload } from '../components/PlanIcons.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
 const today = () => {
@@ -65,7 +66,8 @@ const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ�
 const txCss = `
 .ai-quick-section > .card { border: 1px solid var(--primary, #9AAB91); }
 .tx-list-head { margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.tx-export { white-space: nowrap; }
+.tx-export { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.tx-export svg { color: var(--primary-dark, #74896F); }
 .tx-list-head h3 { margin: 0; font-size: 17px; }
 .tx-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #4b5563; }
 .tx-clear { padding: 0; border: none; background: none; font: inherit; font-size: 13px; font-weight: 400; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
@@ -468,7 +470,7 @@ export default function Transactions() {
 
         {/* ชื่อโซน: บอกว่าข้างล่างคือรายการที่บันทึกแล้ว คำอธิบายอยู่ในไอคอน i (ไม่ให้การ์ดแน่น) */}
         <div className="tx-list-head" data-tx-list-head>
-          <InfoTitle title="📋 รายการที่บันทึกแล้ว" label="คำอธิบายส่วนนี้" popId="tx-info-pop">
+          <InfoTitle title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><IconList size={18} style={{ color: 'var(--primary-dark, #74896F)' }} />รายการที่บันทึกแล้ว</span>} label="คำอธิบายส่วนนี้" popId="tx-info-pop">
             <p>ใช้ตัวกรองเพื่อค้นหาเท่านั้น ไม่ได้ใช้เพิ่มรายการ ถ้าจะเพิ่มรายการใช้กล่อง “เพิ่มรายการใหม่” ด้านบน</p>
             <p>ปุ่ม “ส่งออก CSV” ดาวน์โหลดรายการเป็นไฟล์ที่เปิดด้วย Excel ได้ เลือกได้ทั้งช่วงเดือน ทั้งหมด หรือตามตัวกรองที่เลือกอยู่</p>
           </InfoTitle>
@@ -479,13 +481,14 @@ export default function Transactions() {
             onClick={() => setShowExport(true)}
             title="ดาวน์โหลดรายการเป็นไฟล์ CSV (เลือกช่วงเดือนได้)"
           >
-            ⬇️ ส่งออก CSV
+            <IconDownload size={16} />
+            <span>ส่งออก CSV</span>
           </button>
         </div>
 
         {/* ตัวกรองรายการ (มีป้ายชื่อทุกช่อง) */}
         <div className="tx-filter-head" data-tx-filter-head>
-          <span>🔎 กรองรายการ</span>
+          <span><IconFilter size={14} /> กรองรายการ</span>
           {hasFilter && (
             <button type="button" className="tx-clear" data-tx-clear onClick={clearFilters}>
               ล้างตัวกรอง

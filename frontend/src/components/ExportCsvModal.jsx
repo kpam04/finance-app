@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import MonthPicker from './MonthPicker.jsx';
+import { IconDownload } from './PlanIcons.jsx';
 
 // หน้าต่าง "ส่งออก CSV": เลือกช่วงเดือน (เดือนเดียวหรือหลายเดือน) / ทั้งหมด / ตามตัวกรองที่เลือกอยู่ + ประเภท
 // ช่วงเดือนเลือก เดือน + ปี (พ.ศ.) แยกกัน: ปีมีตั้งแต่ปีของรายการแรกถึงปีนี้ / เดือนของปีแรกเริ่มที่เดือนของรายการแรก
@@ -199,7 +200,7 @@ export default function ExportCsvModal({ filter, filterSummary, onClose }) {
     <div className="xm-overlay" data-export-modal onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <style>{css}</style>
       <div className="xm-box" role="dialog" aria-modal="true" aria-label="ส่งออก CSV">
-        <h3>⬇️ ส่งออก CSV</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><IconDownload size={18} style={{ color: 'var(--primary-dark, #74896F)' }} />ส่งออก CSV</h3>
 
         <div className="xm-sec">
           <span className="xm-label">ช่วงข้อมูล</span>
@@ -243,8 +244,8 @@ export default function ExportCsvModal({ filter, filterSummary, onClose }) {
 
         <div className="xm-actions">
           <button type="button" className="btn btn-light" onClick={onClose} disabled={busy}>ยกเลิก</button>
-          <button type="button" className="btn" style={{ flex: 1 }} data-xm-download onClick={download} disabled={busy || !count}>
-            {busy ? 'กำลังส่งออก...' : '⬇️ ดาวน์โหลด'}
+          <button type="button" className="btn" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }} data-xm-download onClick={download} disabled={busy || !count}>
+            {busy ? 'กำลังส่งออก...' : <><IconDownload size={16} /><span>ดาวน์โหลด</span></>}
           </button>
         </div>
       </div>
