@@ -463,8 +463,18 @@ function ExpensePieChart({ data }) {
 
 // แถบ "ใช้ได้อีก" + รายการยอดเหลือแยกหมวด (เลื่อนขยายด้วย grid-template-rows 0fr ↔ 1fr)
 const spendCss = `
-  .sp-strip { margin: -4px 0 16px; padding: 10px 14px; border-radius: 12px; font-size: 14px; background: #fff; color: #4F6B47; border: 1px solid #E3E8DE; border-left: 4px solid #9AAB91; box-shadow: 0 1px 4px rgba(0,0,0,0.06); transition: border-color 0.2s, box-shadow 0.2s; }
-  .sp-strip:hover { border-color: #D5DECF; border-left-color: #74896F; box-shadow: 0 2px 8px rgba(79,107,71,0.10); }
+  .sp-strip { margin: -4px 0 16px; padding: 14px 18px; border-radius: var(--radius, 14px); font-size: 14px; background: var(--card, #FFFDFA); color: #4F6B47; border: 1px solid var(--border, #E9E1D6); border-left: 4px solid var(--primary, #9AAB91); box-shadow: var(--shadow, 0 2px 8px rgba(100,82,60,0.05)); transition: border-color 0.2s, box-shadow 0.2s; }
+  .sp-strip:hover { border-color: #DCD3C5; border-left-color: var(--primary-dark, #74896F); box-shadow: 0 4px 14px rgba(100,82,60,0.09); }
+  .sp-title { margin-right: 8px; font-weight: 700; color: #40563C; }
+  .sp-pct { color: #8A8177; font-size: 13px; }
+  .sp-over { color: #A2522A; font-weight: 600; }
+  .sp-meter { position: relative; display: flex; height: 8px; margin: 10px 0 2px; border-radius: 4px; background: #EFEBE3; overflow: hidden; }
+  .sp-meter i { display: block; height: 100%; }
+  .sp-meter .u { background: #9AAB91; }
+  .sp-meter.full .u { background: #E2A27E; }
+  .sp-strip .sp-text { color: #4B4740; }
+  .sp-meter .r { background: repeating-linear-gradient(135deg, #C9D4C2 0 4px, #E3E8DE 4px 8px); }
+  .sp-reserved { margin: 8px 0 0; font-size: 12.5px; color: #8A8177; }
   .sp-strip.neg { color: #A2522A; border-color: #F3E1D5; border-left-color: #E2A27E; }
   .sp-strip.neg:hover { border-color: #F1CDB7; border-left-color: #D08A60; box-shadow: 0 2px 8px rgba(162,82,42,0.10); }
   .sp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -500,12 +510,23 @@ const spendCss = `
   @media (max-width: 620px) {
     .sp-list { grid-template-columns: 1fr; row-gap: 10px; }
   }
-  .sp-nextbill { display: flex; align-items: center; gap: 8px; margin: -8px 0 16px; padding: 8px 14px; border-radius: 10px; font-size: 13px; color: #5E5A52; text-decoration: none; transition: background 0.2s; }
-  .sp-nextbill:hover { background: rgba(116,137,111,0.08); }
-  .sp-nextbill b { color: #3F3A34; }
-  .sp-nextbill.over { color: #9A3412; }
-  .sp-nextbill.over b { color: #9A3412; }
-  .sp-nextbill-go { margin-left: auto; color: #74896F; }
+  .sp-nextbill { display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; margin: -4px 0 18px; padding: 14px 18px; border-radius: var(--radius, 14px); background: var(--card, #FFFDFA); border: 1px solid var(--border, #E9E1D6); border-left: 4px solid var(--primary, #9AAB91); box-shadow: var(--shadow, 0 2px 8px rgba(100,82,60,0.05)); font-size: 13px; color: var(--muted, #8A8177); text-decoration: none; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
+  .sp-nextbill:hover { border-color: #DCD3C5; border-left-color: var(--primary-dark, #74896F); box-shadow: 0 4px 14px rgba(100,82,60,0.09); }
+  .sp-nextbill.soon { border-left-color: #D9B26A; }
+  .sp-nextbill.over { border-left-color: #E2A27E; }
+  .sp-nb-ic { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 12px; background: #EEF1EA; color: var(--primary-dark, #74896F); }
+  .sp-nextbill.soon .sp-nb-ic { background: #F7EFDC; color: #8A6A1F; }
+  .sp-nextbill.over .sp-nb-ic { background: #FBEBDD; color: #A2522A; }
+  .sp-nb-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
+  .sp-nb-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted, #8A8177); }
+  .sp-nb-txt b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; color: var(--text, #3F3A34); }
+  .sp-nb-amt { margin-left: auto; font-size: 18px; font-weight: 700; color: var(--text, #3F3A34); white-space: nowrap; }
+  .sp-nb-pill { flex: none; padding: 3px 12px; border-radius: 999px; background: #F1EDE4; color: #6b6358; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .sp-nb-pill.soon { background: #F7EFDC; color: #8A6A1F; }
+  .sp-nb-pill.over { background: #FBEBDD; color: #A2522A; }
+  .sp-nextbill-go { flex: none; display: inline-flex; color: #C2B9AB; transition: transform 0.2s, color 0.2s; }
+  .sp-nextbill:hover .sp-nextbill-go { color: var(--primary-dark, #74896F); transform: translateX(3px); }
+  @media (max-width: 480px) { .sp-nextbill { gap: 10px; padding: 12px 14px; } .sp-nb-amt { font-size: 15px; } .sp-nb-ic { width: 36px; height: 36px; } }
   @media (prefers-reduced-motion: reduce) { .sp-chev, .sp-details, .sp-link svg { transition: none; } }
 `;
 
@@ -705,19 +726,23 @@ export default function Dashboard() {
 
       {/* แถบ "ใช้ได้อีก" ตามงบ (เฉพาะเดือนปัจจุบัน และมีงบอย่างน้อย 1 หมวด) กดลูกศรเพื่อดูยอดเหลือแยกหมวด */}
       {spendable && spendable.has_budget && (() => {
-        const neg = spendable.available < 0;
+        // งบเดือนนี้: ใช้ไปเท่าไรจากงบรวม (ไม่ใช่เงินคงเหลือในบัญชี) / สีส้มเฉพาะเมื่อมีหมวดที่ใช้เกินงบจริง
         const cats = spendable.categories || [];
+        const overCats = cats.filter((c) => c.spent > c.limit);
+        const neg = overCats.length > 0;
+        const pct = spendable.limit > 0 ? Math.round((spendable.spent / spendable.limit) * 100) : 0;
+        const spentW = spendable.limit > 0 ? Math.min(100, (spendable.spent / spendable.limit) * 100) : 0;
+        const resW = spendable.limit > 0 ? Math.min(100 - spentW, (spendable.reserved / spendable.limit) * 100) : 0;
         const shown = cats.slice(0, 5);
         const more = cats.length - shown.length;
         return (
           <div data-spendable className={`sp-strip${neg ? ' neg' : ''}`}>
             <div className="sp-head">
               <span className="sp-text">
-                {!neg
-                  ? <>💰 ใช้ได้อีก <strong>฿{baht0(spendable.available)}</strong> ตามงบ</>
-                  : <>ใช้เกินแผนไป <strong>฿{baht0(-spendable.available)}</strong> ลองดูหมวดที่ยังเหลือ</>}
-                {spendable.reserved > 0 && (
-                  <span className="sp-muted"> (กันค่าประจำและงวดผ่อนไว้แล้ว ฿{baht0(spendable.reserved)})</span>
+                <span className="sp-title">งบเดือนนี้</span>
+                ใช้ไป <strong>฿{baht0(spendable.spent)}</strong> จาก ฿{baht0(spendable.limit)} <span className="sp-pct">({pct}%)</span>
+                {neg && (
+                  <span className="sp-over" data-spendable-over> · เกินงบ {overCats.length} หมวด <span className="sp-muted">({overCats.slice(0, 2).map((c) => c.name).join(', ')}{overCats.length > 2 ? ' ฯลฯ' : ''})</span></span>
                 )}
               </span>
               <span className="sp-actions">
@@ -744,9 +769,14 @@ export default function Dashboard() {
                 )}
               </span>
             </div>
+            <div className={`sp-meter${pct > 100 ? ' full' : ''}`} aria-hidden="true" title={spendable.reserved > 0 ? `ส่วนลายคือเงินที่กันไว้สำหรับค่าประจำและงวดผ่อน ฿${baht0(spendable.reserved)}` : ''}>
+              <i className="u" style={{ width: `${spentW}%` }} />
+              {resW > 0 && <i className="r" style={{ width: `${resW}%` }} />}
+            </div>
             {cats.length > 0 && (
               <div className={`sp-details${spendOpen ? ' open' : ''}`} data-spendable-details data-open={spendOpen ? 'true' : 'false'} aria-hidden={!spendOpen} inert={spendOpen ? undefined : ''}>
                 <div className="sp-details-inner">
+                  {spendable.reserved > 0 && <p className="sp-reserved" data-spendable-reserved>กันไว้สำหรับค่าประจำและงวดผ่อนที่ยังไม่จ่าย ฿{baht0(spendable.reserved)} (ส่วนลายในแถบ)</p>}
                   <div className="sp-list">
                     {shown.map((c) => {
                       const used = c.limit > 0 ? Math.min(100, ((c.spent + c.reserved) / c.limit) * 100) : 100;
@@ -778,10 +808,17 @@ export default function Dashboard() {
 
       {/* บิลผ่อนถัดไป กดแล้วไปแท็บรายการผ่อน */}
       {nextBill && (
-        <Link to="/plan?tab=installments" className={`sp-nextbill${nextBill.overdue ? ' over' : ''}`} data-next-bill>
-          <span aria-hidden="true">💳</span>
-          <span>บิลผ่อนถัดไป <b>{nextBill.channel_label}</b> {new Date(`${nextBill.due_date}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} · ฿{baht0(nextBill.total)} · {nextBill.overdue ? `ค้างชำระ ${-nextBill.days} วัน` : nextBill.days === 0 ? 'ครบกำหนดวันนี้' : `อีก ${nextBill.days} วัน`}</span>
-          <span className="sp-nextbill-go" aria-hidden="true">→</span>
+        <Link to="/plan?tab=installments" className={`sp-nextbill${nextBill.overdue ? ' over' : nextBill.days <= 3 ? ' soon' : ''}`} data-next-bill>
+          <span className="sp-nb-ic" aria-hidden="true">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /><path d="M6.5 15h4" /></svg>
+          </span>
+          <span className="sp-nb-txt">
+            <small>บิลผ่อนถัดไป · {new Date(`${nextBill.due_date}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</small>
+            <b>{nextBill.channel_label}</b>
+          </span>
+          <span className="sp-nb-amt">฿{baht0(nextBill.total)}</span>
+          <span className={`sp-nb-pill${nextBill.overdue ? ' over' : nextBill.days <= 3 ? ' soon' : ''}`}>{nextBill.overdue ? `ค้างชำระ ${-nextBill.days} วัน` : nextBill.days === 0 ? 'วันนี้' : `อีก ${nextBill.days} วัน`}</span>
+          <span className="sp-nextbill-go" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg></span>
         </Link>
       )}
 
