@@ -387,6 +387,9 @@ const css = `
 .pl-aibox .pl-item:first-of-type { border-top: none; }
 .pl-aibox .pl-busy { margin: 4px 0 6px; }
 .pl-ai-usage { margin-top: 2px; text-align: right; }
+.pl-ai-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
+.pl-ai-foot .pl-more { margin: 0; }
+.pl-ai-foot .pl-ai-usage { margin: 0 0 0 auto; }
 .pl-sysbox { margin-top: 12px; }
 .pl-collapse.sm { padding: 3px 8px 3px 10px; font-size: 12px; }
 .pl-sec .pl-chev { transform: rotate(180deg); transition: transform 0.25s; }
@@ -1477,14 +1480,19 @@ export default function Plan() {
                 </div>
               )}
               {!aiBusy && visAi.map(renderItem)}
-              {!aiBusy && moreBtn('ai', shownAi)}
               {!aiBusy && saved && saved.stale && <p className="pl-stale" role="status" data-ai-stale>{isCur ? 'ข้อมูลของคุณเปลี่ยนไปหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว กด “วิเคราะห์ใหม่” เพื่ออัปเดต' : 'รายการของเดือนนั้นถูกแก้ไขหลังจาก AI เขียน ตัวเลขอาจไม่ตรงแล้ว'}</p>}
               {!aiBusy && aiDropped > 0 && <p className="pl-note" data-ai-dropped>AI เสนอเพิ่มอีก {aiDropped} ข้อที่ตัวเลขไม่ตรงกับที่ระบบคำนวณ ระบบจึงไม่แสดง</p>}
-              {(saved || (isCur && ai.configured)) && (
-                <p className="pl-note pl-ai-usage" data-ai-usage>
-                  {saved && <span className="pl-mob-only">เขียนเมื่อ {new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}{isCur && ai.configured ? ' · ' : ''}</span>}
-                  {isCur && ai.configured && `วันนี้ขอไปแล้ว ${ai.plans_used_today}/${ai.plan_daily_limit} ครั้ง`}
-                </p>
+              {/* แถวท้ายกรอบ AI: ปุ่มดูเพิ่ม/ย่อ (ซ้าย) + จำนวนครั้งที่ขอวันนี้ (ขวา) */}
+              {!aiBusy && (shownAi.length > ADV_SHOW || saved || (isCur && ai.configured)) && (
+                <div className="pl-ai-foot">
+                  {moreBtn('ai', shownAi)}
+                  {(saved || (isCur && ai.configured)) && (
+                    <p className="pl-note pl-ai-usage" data-ai-usage>
+                      {saved && <span className="pl-mob-only">เขียนเมื่อ {new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}{isCur && ai.configured ? ' · ' : ''}</span>}
+                      {isCur && ai.configured && `วันนี้ขอไปแล้ว ${ai.plans_used_today}/${ai.plan_daily_limit} ครั้ง`}
+                    </p>
+                  )}
+                </div>
               )}
               </div></div>
             </section>
