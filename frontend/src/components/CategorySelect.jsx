@@ -63,6 +63,7 @@ export default function CategorySelect({
   onCreated,
   extra,
   placeholder = '-- เลือกหมวดหมู่ --',
+  alwaysDown = false, // true = เปิดลงด้านล่างเสมอ โดยย่อความสูงกล่องให้พอดีพื้นที่ที่เหลือข้างล่าง (ไม่พลิกขึ้นด้านบน)
   disabled,
   required,
   className,
@@ -124,9 +125,10 @@ export default function CategorySelect({
     if (!(bottom - top > 0) || !(b.bottom > 0 || b.top > 0)) return { up: false, max: MAX_PANEL }; // ไม่มีข้อมูลเลย์เอาต์
     const below = bottom - b.bottom - 12;
     const above = b.top - top - 12;
+    if (alwaysDown) return { up: false, max: Math.max(MIN_LIST + FOOTER, Math.min(MAX_PANEL, below)) };
     if (below >= Math.min(MAX_PANEL, MIN_LIST + FOOTER + 40) || below >= above) return { up: false, max: Math.max(MIN_LIST + FOOTER, Math.min(MAX_PANEL, below)) };
     return { up: true, max: Math.max(MIN_LIST + FOOTER, Math.min(MAX_PANEL, above)) };
-  }, []);
+  }, [alwaysDown]);
 
   const openPanel = useCallback(() => {
     if (disabled) return;

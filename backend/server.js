@@ -21,6 +21,7 @@ if (dnsServers) dns.setServers(dnsServers);
 const seedDefaultCategories = require('./seed/defaultCategories');
 const { runDueRecurring } = require('./services/recurringRunner');
 const { runInstallmentReminders } = require('./services/installmentReminders');
+const { runSuggestionNotices } = require('./services/recurringSuggest');
 const { recordJobRun } = require('./services/jobRuns');
 const { createApp } = require('./app');
 
@@ -53,6 +54,19 @@ async function processInstallmentReminders(trigger) {
   }
 }
 
+// แจ้งรายจ่ายที่น่าจะเป็นรายการประจำ (พบใหม่ แจ้งครั้งเดียวต่อกลุ่ม)
+async function processRecurringSuggest(trigger) {
+  const startedAt = new Date();
+  try {
+    const r = await runSuggestionNotices();
+    console.log(`[recurring-suggest:${trigger}] ${r.users} user(s), ${r.created} notice(s)`);
+    await recordJobRun({ job: 'recurring-suggest', trigger, startedAt, rules: r.users, created: r.created, errors: r.errors, ok: r.errors.length === 0 });
+  } catch (e) {
+    console.error(`[recurring-suggest:${trigger}] error:`, e.message);
+    await recordJobRun({ job: 'recurring-suggest', trigger, startedAt, errors: [e.message], ok: false });
+  }
+}
+
 let server = null;
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
@@ -62,8 +76,10 @@ mongoose.connect(process.env.MONGO_URI)
     // รันชดเชยตอนเริ่มระบบ (กรณีเซิร์ฟเวอร์ปิด/หลับไปหลายวัน) แล้วตั้งเวลารันทุกวัน 00:05 น. เวลาไทย
     processRecurring('startup');
     processInstallmentReminders('startup');
+    processRecurringSuggest('startup');
     cron.schedule('5 0 * * *', () => processRecurring('daily'), { timezone: 'Asia/Bangkok' });
     cron.schedule('10 0 * * *', () => processInstallmentReminders('daily'), { timezone: 'Asia/Bangkok' });
+    cron.schedule('20 0 * * *', () => processRecurringSuggest('daily'), { timezone: 'Asia/Bangkok' });
 
     server = app.listen(PORT, () => console.log('Server running on port ' + PORT));
   })

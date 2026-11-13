@@ -1412,7 +1412,7 @@ label {
 /* กล่อง Popup */
 .rc-modal-container {
   width: 100%;
-  max-width: 680px;
+  max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
 

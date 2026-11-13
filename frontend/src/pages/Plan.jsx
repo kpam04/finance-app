@@ -689,6 +689,7 @@ function actionLabel(a) {
     case 'simulate': return 'ลองปรับเอง';
     case 'new_goal': return 'ตั้งเป้าหมายออม';
     case 'view_inst': return 'ดูรายการผ่อน';
+    case 'view_recurring': return 'ดูรายการที่ควรตั้ง';
     default: return '';
   }
 }
@@ -984,6 +985,7 @@ export default function Plan() {
         break;
       case 'new_goal': pickTab('goals'); setGoalView('active'); setGoalModal({ goal: null }); break;
       case 'view_inst': pickTab('installments'); setInstView('active'); break;
+      case 'view_recurring': navigate('/recurring'); break;
       default: break;
     }
   };

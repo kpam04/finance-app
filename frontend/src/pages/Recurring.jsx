@@ -5,8 +5,12 @@ import {
   updateRecurring,
   deleteRecurring,
   getCategoriesForRecurring,
+  getRecurringSuggestions,
+  dismissRecurringSuggestion,
 } from '../recurringApi.js';
+import { IconRepeat } from '../components/PlanIcons.jsx';
 import CategorySelect from '../components/CategorySelect.jsx';
+import MonthPicker from '../components/MonthPicker.jsx';
 
 const FREQ_LABEL = {
   daily: 'รายวัน',
@@ -37,6 +41,12 @@ const fmtDate = (v) => {
 const fmtMoney = (n) =>
   Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// ช่วงเดือนที่พบ เช่น "ส.ค.–พ.ย."
+const monShort = (iso) => {
+  const [y, m] = String(iso).split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('th-TH', { month: 'short' });
+};
+
 const ruleId = (r) => r.recurring_id ?? r._id ?? r.id;
 const catId = (c) => c.category_id ?? c._id ?? c.id;
 const isActive = (r) => r.is_active === true || r.is_active === 1;
@@ -62,6 +72,7 @@ const emptyForm = () => ({
 
 export default function Recurring() {
   const [rules, setRules] = useState([]);
+  const [sugs, setSugs] = useState([]); // รายจ่ายที่น่าจะเป็นรายการประจำ (ระบบชวนตั้ง)
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState(null); // { kind: 'ok' | 'error', text }
@@ -76,9 +87,14 @@ export default function Recurring() {
 
   const load = async () => {
     try {
-      const [r, c] = await Promise.all([getRecurring(), getCategoriesForRecurring()]);
+      const [r, c, s] = await Promise.all([
+        getRecurring(),
+        getCategoriesForRecurring(),
+        getRecurringSuggestions().catch(() => ({ data: [] })), // ดึงคำชวนไม่ได้ต้องไม่กระทบหน้าหลัก
+      ]);
       setRules(r.data || []);
       setCategories(c.data || []);
+      setSugs(s.data || []);
     } catch (e) {
       showMsg('error', e.message);
     } finally {
@@ -115,6 +131,26 @@ export default function Recurring() {
     setFormError('');
     setShowForm(true);
     setMsg(null);
+  };
+
+  // ตั้งจากคำชวน: เปิดฟอร์มเพิ่มใหม่ที่เติมค่าให้แล้ว (รายเดือน เริ่มรอบถัดไปหลังรายการล่าสุด)
+  const openFromSuggestion = (s) => {
+    setEditingId(null);
+    setEditExtra(null);
+    setForm({ ...emptyForm(), amount: String(s.amount), category_id: String(s.category_id), note: s.note, frequency: 'monthly', start_date: s.start_date });
+    setFormError('');
+    setShowForm(true);
+    setMsg(null);
+  };
+
+  const dismissSuggestion = async (s) => {
+    try {
+      await dismissRecurringSuggestion(s.key);
+      setSugs((list) => list.filter((x) => x.key !== s.key));
+      showMsg('ok', `รับทราบ จะไม่ชวน “${s.note}” อีก`);
+    } catch (err) {
+      showMsg('error', err.message);
+    }
   };
 
   const openEdit = (r) => {
@@ -253,7 +289,7 @@ export default function Recurring() {
             </button>
           </div>
 
-          <div className="rc-field">
+          <div className="rc-field rc-type">
             <label>ประเภท</label>
             <div className="rc-seg">
               <button
@@ -280,7 +316,18 @@ export default function Recurring() {
             )}
           </div>
 
+          {/* เลย์เอาต์ 2 คอลัมน์: บันทึกช่วยจำ | จำนวนเงิน / ความถี่ | หมวดหมู่ / วันเริ่ม | วันสิ้นสุด */}
           <div className="rc-grid">
+            <div className="rc-field">
+              <label>บันทึกช่วยจำ</label>
+              <input
+                type="text"
+                value={form.note}
+                onChange={(e) => setField('note', e.target.value)}
+                placeholder="เช่น ค่าเน็ตบ้าน, Netflix"
+                maxLength={200}
+              />
+            </div>
             <div className="rc-field">
               <label>จำนวนเงิน (บาท)</label>
               <input
@@ -292,7 +339,17 @@ export default function Recurring() {
                 placeholder="เช่น 599"
               />
             </div>
-
+            <div className="rc-field">
+              <label>ความถี่</label>
+              {/* กล่องเลือกแบบเดียวกับช่องหมวดหมู่/เดือน (แทน select ของเบราว์เซอร์) */}
+              <MonthPicker
+                options={Object.entries(FREQ_LABEL).map(([k, v]) => ({ value: k, label: v }))}
+                value={form.frequency}
+                currentValue={null}
+                onChange={(v) => setField('frequency', v)}
+                ariaLabel="เลือกความถี่"
+              />
+            </div>
             <div className="rc-field">
               <label>หมวดหมู่</label>
               <CategorySelect
@@ -302,31 +359,9 @@ export default function Recurring() {
                 onChange={(v) => setField('category_id', v)}
                 onCreated={addCategory}
                 extra={editExtra}
+                alwaysDown
               />
             </div>
-
-            <div className="rc-field">
-              <label>ความถี่</label>
-              <select value={form.frequency} onChange={(e) => setField('frequency', e.target.value)}>
-                {Object.entries(FREQ_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="rc-field">
-              <label>บันทึกช่วยจำ</label>
-              <input
-                type="text"
-                value={form.note}
-                onChange={(e) => setField('note', e.target.value)}
-                placeholder="เช่น ค่าเน็ต"
-                maxLength={200}
-              />
-            </div>
-
             <div className="rc-field">
               <label>วันที่เริ่มต้น</label>
               <input
@@ -337,7 +372,6 @@ export default function Recurring() {
               />
               {editingId && <small>เปลี่ยนวันเริ่มต้นของกฎเดิมไม่ได้</small>}
             </div>
-
             <div className="rc-field">
               <label>วันสิ้นสุด (ไม่บังคับ)</label>
               <input
@@ -345,7 +379,7 @@ export default function Recurring() {
                 value={form.end_date}
                 onChange={(e) => setField('end_date', e.target.value)}
               />
-              <small>เว้นว่างไว้ = ทำซ้ำไปเรื่อยๆ</small>
+              <small>เว้นว่าง = ทำซ้ำไปเรื่อยๆ</small>
             </div>
           </div>
 
@@ -372,6 +406,34 @@ export default function Recurring() {
         </form>
           </div>
         </div>
+      )}
+
+      {/* ระบบชวนตั้งรายการเกิดซ้ำ: รายจ่ายที่ผู้ใช้จดเองทุกเดือน */}
+      {sugs.length > 0 && (
+        <section className="rs-box" aria-label="รายจ่ายที่น่าจะเป็นรายการประจำ" data-rec-suggest>
+          <div className="rs-h">
+            <IconRepeat size={18} />
+            พบรายจ่ายที่น่าจะเป็นรายการประจำ
+            <span className="rs-n">{sugs.length}</span>
+          </div>
+          <p className="rs-sub">คุณจดรายการเหล่านี้เองทุกเดือน ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้อัตโนมัติและกันเงินไว้ในงบ</p>
+          {sugs.map((s) => (
+            <div className="rs-row" key={s.key} data-rec-suggest-item>
+              <div className="rs-nm">
+                <b>{s.note}</b>
+                <small>{s.category_name ? `${s.category_name} · ` : ''}พบ {s.count} เดือนติด ({monShort(s.first_date)}–{monShort(s.last_date)})</small>
+              </div>
+              <div className="rs-amt">
+                <b>฿{Number(s.amount).toLocaleString('th-TH', { maximumFractionDigits: 2 })}</b>
+                <small>ทุกวันที่ {s.day}</small>
+              </div>
+              <div className="rs-acts">
+                <button type="button" className="rs-a main" data-rec-suggest-set onClick={() => openFromSuggestion(s)}>ตั้งเป็นรายการเกิดซ้ำ</button>
+                <button type="button" className="rs-a ghost" data-rec-suggest-no onClick={() => dismissSuggestion(s)}>ไม่ใช่</button>
+              </div>
+            </div>
+          ))}
+        </section>
       )}
 
       <div className="rc-card">
@@ -433,6 +495,24 @@ export default function Recurring() {
 
 
 const css = `
+.rs-box { margin: 0 0 16px; padding: 14px 18px; border-radius: var(--radius, 14px); border: 1px solid var(--border, #E9E1D6); border-left: 4px solid var(--primary, #9AAB91); background: var(--card, #FFFDFA); box-shadow: var(--shadow, 0 2px 8px rgba(100,82,60,0.05)); }
+.rs-h { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #40563C; }
+.rs-h svg { color: var(--primary-dark, #74896F); }
+.rs-n { padding: 0 8px; border-radius: 999px; background: #E3EBDD; color: #4F6B47; font-size: 12px; }
+.rs-sub { margin: 4px 0 8px; font-size: 13px; line-height: 1.6; color: #8A8177; }
+.rs-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 10px 0; border-top: 1px solid #F0EBE0; }
+.rs-nm { flex: 1; min-width: 0; }
+.rs-nm b { display: block; font-size: 14.5px; color: #3F3A34; overflow-wrap: anywhere; }
+.rs-nm small, .rs-amt small { display: block; font-size: 12px; color: #8A8177; }
+.rs-amt { text-align: right; }
+.rs-amt b { font-size: 16px; color: #3F3A34; font-variant-numeric: tabular-nums; }
+.rs-acts { display: flex; gap: 6px; }
+.rs-a { padding: 6px 13px; border: 1px solid #D5DECF; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #4F6B47; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.rs-a.main { border-color: #7E9677; background: #7E9677; color: #fff; }
+.rs-a.main:hover { background: #6B8364; border-color: #6B8364; }
+.rs-a.ghost { border-color: transparent; background: none; color: #8A8177; }
+.rs-a.ghost:hover { background: #F3EFE6; color: #4B4740; }
+@media (max-width: 560px) { .rs-acts { width: 100%; justify-content: flex-end; } }
 /* ===== หน้ารายการที่เกิดซ้ำ ===== */
 .rc-page {
   max-width: 1000px;
@@ -654,6 +734,26 @@ const css = `
   padding-top: 14px;
   border-top: 1px solid #EEE9E1;
 }
+
+/* ===== ฟอร์มเพิ่ม/แก้ไข (ป๊อปอัป) แบบกระชับ ===== */
+.rc-form .rc-modal-header { margin-bottom: 14px; }
+.rc-form > .rc-field { margin-bottom: 12px; }
+.rc-form .rc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rc-form .rc-grid .rc-field { margin-bottom: 0; gap: 5px; min-width: 0; }
+.rc-form .rc-field.full { grid-column: 1 / -1; }
+.rc-form .rc-field label { margin: 0; font-size: 13px; line-height: 1.4; }
+.rc-form .rc-field input, .rc-form .rc-field select, .rc-form .cs-button { height: 40px; min-height: 40px; padding: 8px 12px; border-radius: 9px; }
+.rc-form .cs-button { border-color: #DDDCD3; background: #F8F8F4; }
+.rc-form .rc-field small { font-size: 12px; }
+/* ประเภท: ป้ายกับปุ่มเลือกอยู่บรรทัดเดียวกัน ปุ่มขนาดเล็ก (ข้อความล็อกประเภทตอนแก้ไขขึ้นบรรทัดใหม่) */
+.rc-form .rc-type small { flex-basis: 100%; }
+.rc-form .rc-type label { width: auto; }
+.rc-form .rc-type { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.rc-form .rc-seg { display: inline-flex; width: fit-content; border-radius: 999px; }
+.rc-form .rc-seg button { min-width: 84px; padding: 7px 20px; font-size: 14px; }
+.rc-form .rc-hint { margin: 12px 0 0; font-size: 13px; }
+.rc-form .rc-form-actions { margin-top: 16px; padding-top: 12px; }
+.rc-form .rc-form-actions .rc-btn { min-width: 92px; }
 
 /* ===== ตารางรายการ ===== */
 .rc-empty {

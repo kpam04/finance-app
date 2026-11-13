@@ -27,3 +27,4 @@ backend/scripts/.demo-seed.json
 
 backend/scripts/.demo-cards.json
 backend/scripts/.demo-goals.json
+backend/scripts/.demo-recsug.json

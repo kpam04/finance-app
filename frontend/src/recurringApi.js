@@ -10,6 +10,11 @@ export const updateRecurring = async (id, body) => (await api.put(`/recurring/${
 
 export const deleteRecurring = async (id) => (await api.delete(`/recurring/${id}`)).data;
 
+// รายจ่ายที่น่าจะเป็นรายการประจำ (จดเองทุกเดือน ยังไม่ได้ตั้ง) / ตอบ "ไม่ใช่"
+export const getRecurringSuggestions = async () => (await api.get('/recurring/suggestions')).data;
+
+export const dismissRecurringSuggestion = async (key) => (await api.post('/recurring/suggestions/dismiss', { key })).data;
+
 export const runRecurringDue = async () => (await api.post('/recurring/run-due')).data;
 
 // รวมหมวดที่ซ่อนด้วย เพื่อให้กฎเดิมที่ใช้หมวดซึ่งถูกซ่อนไปแล้วยังแสดงชื่อหมวดได้ (ช่องเลือกหมวดจะไม่แสดงหมวดที่ซ่อนให้เลือกใหม่)

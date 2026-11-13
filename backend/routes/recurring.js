@@ -6,6 +6,8 @@ const Transaction = require('../models/Transaction');
 const auth = require('../middleware/auth');
 const { parseAmount, cleanNote, yearInRange } = require('../utils/inputRules');
 const { runDueRecurring, nextOnOrAfter, todayTH } = require('../services/recurringRunner');
+const { suggestionsFor, keyOf } = require('../services/recurringSuggest');
+const RecurringDismiss = require('../models/RecurringDismiss');
 
 const router = express.Router();
 router.use(auth);
@@ -48,6 +50,29 @@ router.param('id', (req, res, next, id) => {
     return res.status(400).json({ success: false, message: 'รหัสรายการที่เกิดซ้ำไม่ถูกต้อง' });
   }
   next();
+});
+
+// รายจ่ายที่น่าจะเป็นรายการประจำ (จดเองทุกเดือน ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ)
+router.get('/suggestions', async (req, res) => {
+  try {
+    const data = await suggestionsFor(req.userId, ymd(todayTH()));
+    res.json({ success: true, data });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
+// ผู้ใช้ตอบ "ไม่ใช่" → ไม่ชวนกลุ่มนี้อีก
+router.post('/suggestions/dismiss', async (req, res) => {
+  try {
+    const key = typeof req.body.key === 'string' ? req.body.key.trim().slice(0, 200) : '';
+    const [cat] = key.split('|');
+    if (!key.includes('|') || !mongoose.isValidObjectId(cat)) return res.status(400).json({ success: false, message: 'ข้อมูลไม่ถูกต้อง' });
+    await RecurringDismiss.updateOne({ user: req.userId, key }, { $setOnInsert: { user: req.userId, key } }, { upsert: true });
+    res.json({ success: true, message: 'รับทราบ จะไม่ชวนรายการนี้อีก' });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
 });
 
 // ดูรายการที่เกิดซ้ำทั้งหมด
@@ -204,11 +229,17 @@ router.put('/:id', async (req, res) => {
 // ลบกฎ (รายการที่สร้างไปแล้วยังอยู่ แต่ตัดการผูกกับกฎ)
 router.delete('/:id', async (req, res) => {
   try {
-    const r = await Recurring.deleteOne({ _id: req.params.id, user: req.userId });
-    if (r.deletedCount === 0) {
+    const rule = await Recurring.findOneAndDelete({ _id: req.params.id, user: req.userId }).lean();
+    if (!rule) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการที่เกิดซ้ำ' });
     }
     await Transaction.updateMany({ user: req.userId, recurring: req.params.id }, { recurring: null });
+    // รายการที่กฎนี้สร้างไว้กลายเป็นรายการธรรมดา → ระบบจะเห็นเป็นรายจ่ายรายเดือนแล้วชวนตั้งใหม่ทันที
+    // ผู้ใช้ตั้งใจลบเอง จึงนับเหมือนตอบ "ไม่ใช่" (ไม่ชวนอีก)
+    if (rule.type === 'expense' && rule.frequency === 'monthly' && String(rule.note || '').trim()) {
+      const key = keyOf(String(rule.category), rule.note);
+      await RecurringDismiss.updateOne({ user: req.userId, key }, { $setOnInsert: { user: req.userId, key } }, { upsert: true }).catch(() => {});
+    }
     res.json({ success: true, message: 'ลบรายการสำเร็จ' });
   } catch (e) {
     console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });

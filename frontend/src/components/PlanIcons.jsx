@@ -38,6 +38,7 @@ export const IconFilter = (p) => (<Svg {...p}><path d="M3 5h18l-7 8v6l-4 2v-8z" 
 export const IconCheckCircle = (p) => (<Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.5 2.5L16 9.5" /></Svg>);
 export const IconDot = ({ color = 'currentColor', size = 12, ...p }) => (<svg width={size} height={size} viewBox="0 0 12 12" aria-hidden="true" style={{ verticalAlign: '-0.05em', flexShrink: 0 }} {...p}><circle cx="6" cy="6" r="5" fill={color} /></svg>);
 
+export const IconRepeat = (p) => (<Svg {...p}><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" /><path d="M3 21v-5h5" /></Svg>);
 export const IconDownload = (p) => (<Svg {...p}><path d="M12 4v11" /><path d="M7 10l5 5 5-5" /><path d="M4 20h16" /></Svg>);
 export const IconChevronDown = (p) => (<Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>);
 

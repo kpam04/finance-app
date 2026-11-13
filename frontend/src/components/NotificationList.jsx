@@ -1,4 +1,4 @@
-import { IconDot, IconTrendUp, IconCard } from './PlanIcons.jsx';
+import { IconDot, IconTrendUp, IconCard, IconRepeat } from './PlanIcons.jsx';
 const fmtTime = (s) => {
   const d = new Date(s);
   return Number.isNaN(d.getTime())
@@ -16,6 +16,8 @@ const LEVEL = {
 const FORECAST = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'คาดการณ์ว่าจะเกินงบ' };
 // บิลผ่อนใกล้ครบกำหนด / ครบกำหนดวันนี้ (kind = installment) กดแล้วไปแท็บรายการผ่อน
 const INSTALLMENT = { icon: <IconCard size={15} style={{ color: '#74896F' }} />, label: 'บิลผ่อน' };
+// พบรายจ่ายที่น่าจะเป็นรายการประจำ (kind = recurring) กดแล้วไปหน้ารายการเกิดซ้ำ
+const RECURRING = { icon: <IconRepeat size={15} style={{ color: '#74896F' }} />, label: 'ชวนตั้งรายการเกิดซ้ำ' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
 //  - onRead(id): ทำเครื่องหมายอ่านแล้ว (ใช้เมื่อไม่ส่ง onSelect)
@@ -29,12 +31,12 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {items.map((n) => {
         const unread = !n.is_read;
-        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : LEVEL[n.level];
+        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : n.kind === 'recurring' ? RECURRING : LEVEL[n.level];
         // เปิดหน้างบประมาณของเดือนนั้นได้เมื่อยังมีงบอยู่ (งบถูกลบแล้ว = ไม่มีเดือน/ปี)
-        const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment'));
+        const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment' || n.kind === 'recurring'));
         const clickable = canOpen || unread;
         const title = canOpen
-          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
+          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : n.kind === 'recurring' ? 'คลิกเพื่อไปหน้ารายการเกิดซ้ำ' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
           : unread
             ? 'คลิกเพื่อทำเครื่องหมายว่าอ่านแล้ว'
             : '';

@@ -97,7 +97,7 @@ export default function MonthPicker({ options, value, currentValue, onChange, ar
         onKeyDown={onKeyDown}
       >
         <span className="cs-value">{cur ? text(cur) : ''}</span>
-        <span className="cs-chevron" aria-hidden="true">▾</span>
+        <svg className="cs-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>
       {open && (
         <div className={`cs-panel${up ? ' up' : ''}`} data-mp-panel style={{ maxHeight: `${maxH}px` }}>

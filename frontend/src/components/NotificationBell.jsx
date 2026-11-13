@@ -100,6 +100,9 @@ export default function NotificationBell() {
     if (n.kind === 'installment') {
       setOpen(false);
       navigate('/plan?tab=installments');
+    } else if (n.kind === 'recurring') {
+      setOpen(false);
+      navigate('/recurring');
     } else if (n.period_month && n.period_year) {
       setOpen(false);
       navigate(`/budgets?month=${n.period_month}&year=${n.period_year}`);

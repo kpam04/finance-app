@@ -8,6 +8,7 @@
 //   simulate    {}                               เปิด "ลองปรับเอง"
 //   new_goal    { amount? }                      ตั้งเป้าหมายออมใหม่
 //   view_inst   {}                               ไปแท็บรายการผ่อน
+//   view_recurring {}                            ไปหน้ารายการเกิดซ้ำ (ชวนตั้งรายจ่ายประจำที่จดเอง)
 const MAX_ACTIONS = 3;
 const ceil100 = (n) => Math.max(100, Math.ceil(Number(n) / 100) * 100);
 
@@ -61,6 +62,7 @@ function actionsOf(item, { current, anomalies = [], budgetCats = new Set(), next
     if (ids.includes('special_total')) add({ type: 'new_goal' });
   }
   if (ids.includes('small_count')) add({ type: 'view_txns' });
+  if (ids.includes('rec_suggest')) add({ type: 'view_recurring' });
   return out;
 }
 

@@ -18,6 +18,8 @@ const { evaluateGoal } = require('../services/plan/goals');
 const { buildFacts } = require('../services/plan/facts');
 const { rulesAdvice } = require('../services/plan/rulesAdvice');
 const { decorateAdvice } = require('../services/plan/adviceActions');
+const { suggestionsFor, notifySuggestions } = require('../services/recurringSuggest');
+const { todayTH } = require('../services/recurringRunner');
 const { installmentFacts } = require('../services/plan/instFacts');
 const { dataSignature, goalsSignature, isStale } = require('../services/plan/signature');
 const { generateAdvice, polishText } = require('../services/plan/aiAdvice');
@@ -166,12 +168,15 @@ router.get('/overview', async (req, res) => {
   try {
     const { analysis, goalEvals, achievements, facts, inst, currentMonth } = await loadPlan(req.userId, req.query.month);
     const [saved, ctx] = await Promise.all([PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean(), adviceCtx(req.userId, analysis, goalEvals)]);
+    // รายจ่ายที่จดเองทุกเดือนแต่ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ (เฉพาะเดือนปัจจุบัน) → คำแนะนำ 1 ข้อ + แจ้งกระดิ่งครั้งเดียวต่อรายการ
+    const recSug = analysis.is_current ? await suggestionsFor(req.userId, todayTH().toISOString().slice(0, 10)).catch(() => []) : [];
+    if (recSug.length) notifySuggestions(req.userId, recSug).catch((e) => console.error('[plan/rec-suggest]', e.message));
     res.json({
       success: true,
       data: {
         month: analysis.month, current_month: currentMonth, is_current: analysis.is_current, analysis, goals: goalEvals, achievements, max_goals: MAX_GOALS,
         installments: inst, budget_category_ids: [...ctx.budgetCats],
-        rules_advice: decorateAdvice(rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ctx),
+        rules_advice: decorateAdvice([...rulesAdvice(facts, goalEvals, { current: analysis.is_current }), ...recSuggestAdvice(recSug)], ctx),
         ai_advice: savedOut(saved, isStale(saved, analysis, goalEvals), ctx, facts),
         ai: await aiState(req.userId),
       },
@@ -181,6 +186,17 @@ router.get('/overview', async (req, res) => {
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });
+
+// คำแนะนำ "ตั้งเป็นรายการเกิดซ้ำ" (ไม่ส่งให้ AI: ชื่อรายการเป็นข้อความที่ผู้ใช้จดเอง)
+function recSuggestAdvice(list) {
+  if (!list.length) return [];
+  const s = list[0];
+  const amt = `${(Math.round(s.amount * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })} บาท`;
+  const text = list.length === 1
+    ? `“${s.note}” ${amt} ดูเหมือนเป็นรายจ่ายที่คุณจดเองทุกเดือน ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`
+    : `พบรายจ่ายที่คุณจดเองทุกเดือน ${list.length} รายการ เช่น “${s.note}” ${amt} ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`;
+  return [{ tag: 'tip', group: 'save', source: 'rules', text, facts_used: [{ id: 'rec_suggest', label: 'รายจ่ายประจำที่ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ', short: 'ยังไม่ได้ตั้ง', value: list.length, unit: 'รายการ', ai: false }] }];
+}
 
 // สรุปย่อสำหรับการ์ดบนแดชบอร์ด (เฉพาะเดือนปัจจุบัน ไม่เรียก AI)
 router.get('/summary', async (req, res) => {
