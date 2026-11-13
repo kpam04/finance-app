@@ -499,19 +499,19 @@ const css = `
 .rs-h { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #40563C; }
 .rs-h svg { color: var(--primary-dark, #74896F); }
 .rs-n { padding: 0 8px; border-radius: 999px; background: #E3EBDD; color: #4F6B47; font-size: 12px; }
-.rs-sub { margin: 4px 0 8px; font-size: 13px; line-height: 1.6; color: #8A8177; }
+.rs-sub { margin: 4px 0 8px; font-size: 13px; line-height: 1.6; color: #6F675D; }
 .rs-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 10px 0; border-top: 1px solid #F0EBE0; }
 .rs-nm { flex: 1; min-width: 0; }
 .rs-nm b { display: block; font-size: 14.5px; color: #3F3A34; overflow-wrap: anywhere; }
-.rs-nm small, .rs-amt small { display: block; font-size: 12px; color: #8A8177; }
+.rs-nm small, .rs-amt small { display: block; font-size: 12px; color: #6F675D; }
 .rs-amt { text-align: right; }
 .rs-amt b { font-size: 16px; color: #3F3A34; font-variant-numeric: tabular-nums; }
 .rs-acts { display: flex; gap: 6px; }
 .rs-a { padding: 6px 13px; border: 1px solid #D5DECF; border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 600; color: #4F6B47; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
 .rs-a.main { border-color: #7E9677; background: #7E9677; color: #fff; }
 .rs-a.main:hover { background: #6B8364; border-color: #6B8364; }
-.rs-a.ghost { border-color: transparent; background: none; color: #8A8177; }
-.rs-a.ghost:hover { background: #F3EFE6; color: #4B4740; }
+.rs-a.ghost { border-color: #DDD6C8; background: #fff; color: #5F5A52; }
+.rs-a.ghost:hover { background: #F3EFE6; border-color: #C9C0AF; color: #3F3A34; }
 @media (max-width: 560px) { .rs-acts { width: 100%; justify-content: flex-end; } }
 /* ===== หน้ารายการที่เกิดซ้ำ ===== */
 .rc-page {

@@ -17,6 +17,11 @@ const css = `
 .ps-goal { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #F8F6F0; font-size: 13px; }
 .ps-bar { height: 6px; margin: 6px 0 4px; border-radius: 3px; background: #EEE9DD; overflow: hidden; }
 .ps-bar i { display: block; height: 100%; background: #7E9677; }
+/* ปุ่มอยู่ขวาล่าง ใต้บรรทัดข้อความ */
+.ps-item-act { flex-wrap: wrap; }
+.ps-item-act .ps-tx { flex: 1 1 calc(100% - 28px); min-width: 0; }
+.ps-act { display: inline-block; flex: none; margin: 2px 0 0 auto; white-space: nowrap; padding: 3px 12px; border: 1px solid #7E9677; border-radius: 999px; background: #7E9677; font-size: 12px; font-weight: 600; color: #fff; text-decoration: none; }
+.ps-act:hover { background: #6B8364; border-color: #6B8364; }
 .ps-link { display: inline-block; margin-top: 8px; font-size: 13px; color: #40563C; text-decoration: underline; }
 `;
 const GOAL_STATUS = { reached: 'ออมครบแล้ว', on_track: 'ทันตามกำหนด', behind: 'ยังไม่ทันตามกำหนด', no_surplus: 'ยังออมไม่ได้', overdue: 'เลยกำหนดแล้ว', unknown: 'ยังประเมินไม่ได้' };
@@ -58,6 +63,13 @@ export default function PlanSummary({ summary }) {
           </div>
         </div>
       ))}
+      {summary.rec_suggest && (
+        <div className="ps-item ps-item-act" data-ps-recsug>
+          <AdviceIcon tag={summary.rec_suggest.tag} size={16} />
+          <div className="ps-tx">{summary.rec_suggest.text}</div>
+          <SafeLink to="/recurring" className="ps-act">ดูรายการที่ควรตั้ง</SafeLink>
+        </div>
+      )}
       {g ? (
         <div className="ps-goal" data-ps-goal>
           <div><b>{g.name}</b> · {baht(g.saved_amount)} / {baht(g.target_amount)} ({num1(g.progress_pct)}%)</div>

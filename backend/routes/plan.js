@@ -204,6 +204,9 @@ router.get('/summary', async (req, res) => {
     const { analysis, goalEvals, achievements, facts } = await loadPlan(req.userId);
     const saved = await PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean();
     const g = goalEvals[0] || null;
+    // ชวนตั้งรายการเกิดซ้ำ (แสดงเป็น 1 ข้อในการ์ด Insight ของแดชบอร์ด เฉพาะตอนมีรายการให้ชวน)
+    const recSug = await suggestionsFor(req.userId, todayTH().toISOString().slice(0, 10)).catch(() => []);
+    const rec = recSuggestAdvice(recSug)[0];
     res.json({
       success: true,
       data: {
@@ -214,6 +217,7 @@ router.get('/summary', async (req, res) => {
         expense_month: analysis.totals.expense,
         limits: analysis.limits,
         rules_advice: rulesAdvice(facts, goalEvals).slice(0, 2),
+        rec_suggest: rec ? { tag: rec.tag, text: rec.text, count: recSug.length } : null,
         ai_advice_first: saved && saved.items[0] ? { tag: saved.items[0].tag, text: saved.items[0].text, facts_used: saved.items[0].facts_used } : null,
         goal: g ? { goal_id: g.goal_id, name: g.name, target_amount: g.target_amount, saved_amount: g.saved_amount, progress_pct: g.progress_pct, status: g.status, required_monthly: g.required_monthly, capacity_monthly: g.capacity_monthly, target_date: g.target_date } : null,
         goal_count: goalEvals.length,

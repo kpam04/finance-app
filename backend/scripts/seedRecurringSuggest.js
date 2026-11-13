@@ -1,6 +1,7 @@
 // ข้อมูลตัวอย่างสำหรับทดสอบ "ชวนตั้งรายการเกิดซ้ำ" (รายจ่ายที่จดเองทุกเดือน แต่ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ)
 //  รันในโฟลเดอร์ backend:
 //    node scripts/seedRecurringSuggest.js <อีเมล>          สร้างใหม่ (ลบชุดเดิมของสคริปต์นี้ก่อนทุกครั้ง)
+//    node scripts/seedRecurringSuggest.js <อีเมล> --mini   ชุดเล็ก 7 รายการ: Netflix ฿419 (4 เดือน) + ค่าเน็ตบ้าน ฿599 ทุกวันที่ 1 (3 เดือน)
 //    node scripts/seedRecurringSuggest.js <อีเมล> --clean  ลบเฉพาะของที่สคริปต์นี้สร้าง
 //  ระบบควรชวน 4 รายการ:
 //    Netflix ฿419 ทุกวันที่ 15 (4 เดือน) / Spotify ฿129 ทุกวันที่ 3 (2 เดือน — ชื่อบริการ) /
@@ -45,8 +46,9 @@ async function clean(userId) {
 async function main() {
   const email = (process.argv[2] || '').trim().toLowerCase();
   const doClean = process.argv.includes('--clean');
+  const mini = process.argv.includes('--mini');
   if (!email || email.startsWith('--')) {
-    console.log('วิธีใช้: node scripts/seedRecurringSuggest.js <อีเมลบัญชีทดสอบ> [--clean]');
+    console.log('วิธีใช้: node scripts/seedRecurringSuggest.js <อีเมลบัญชีทดสอบ> [--mini] [--clean]');
     process.exit(1);
   }
   const servers = dnsServersFor(process.env);
@@ -84,6 +86,11 @@ async function main() {
   // เดือนล่าสุดที่จ่ายได้: วันที่ยังไม่ถึงในเดือนนี้ → ใช้เดือนก่อนเป็นครั้งล่าสุด
   const lastK = (d) => (d <= dayNow ? 0 : -1);
 
+  if (mini) {
+    // ชุดเล็ก: ชวน 2 รายการ (ค่าเน็ตบ้านวันที่ 1 มีรายการในเดือนนี้เสมอ แดชบอร์ดจึงแสดงการ์ด Insight)
+    for (let i = 0; i < 4; i += 1) add('บริการสมาชิก', 'Netflix', 419, 15, lastK(15) - i);
+    for (let i = 0; i < 3; i += 1) add('สาธารณูปโภค', 'ค่าเน็ตบ้าน', 599, 1, -i);
+  } else {
   // ---- ควรชวน ----
   for (let i = 0; i < 4; i += 1) add('บริการสมาชิก', 'Netflix', 419, 15, lastK(15) - i);
   for (let i = 0; i < 2; i += 1) add('บริการสมาชิก', 'Spotify', 129, 3, lastK(3) - i);
@@ -93,13 +100,14 @@ async function main() {
   for (let k = -2; k <= 0; k += 1) [2, 9, 16, 23].forEach((d) => add('อาหาร', 'กาแฟ', 65, d, k));
   [[-3, 6], [-2, 22], [-1, 11], [0, Math.min(dayNow, 8)]].forEach(([k, d]) => add('บันเทิง', 'ดูหนัง SF', 220, d, k));
   for (let k = -6; k <= -3; k += 1) add('สาธารณูปโภค', 'ค่าโทรศัพท์', 399, 10, k);
+  }
 
   const saved = await Transaction.insertMany(tx);
   const all = readIds();
   all[userId] = { transactions: saved.map((t) => String(t._id)), keys: [...groups], created_at: new Date().toISOString() };
   writeIds(all);
   console.log(`สร้างรายการตัวอย่างแล้ว ${tx.length} รายการ`);
-  console.log('ระบบควรชวน 4 รายการ: Netflix, Spotify, ค่าเน็ตบ้าน, ค่ายิม (เปิดหน้ารายการที่เกิดซ้ำ)');
+  console.log(mini ? 'ระบบควรชวน 2 รายการ: Netflix, ค่าเน็ตบ้าน (ดูได้ที่หน้ารายการที่เกิดซ้ำ / การ์ด Insight บนแดชบอร์ด / กระดิ่ง)' : 'ระบบควรชวน 4 รายการ: Netflix, Spotify, ค่าเน็ตบ้าน, ค่ายิม (เปิดหน้ารายการที่เกิดซ้ำ)');
   console.log('ลบทีหลังได้ด้วย: node scripts/seedRecurringSuggest.js <อีเมล> --clean');
 }
 

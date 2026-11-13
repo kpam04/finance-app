@@ -83,8 +83,8 @@ function TrendChart({ data, balances }) {
   }
 
   return (
-    <div>
-      {/* พื้นที่กราฟ */}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* พื้นที่กราฟ (ยืดให้การ์ดสูงเท่าการ์ดสัดส่วนรายจ่ายข้างๆ อย่างน้อย 180px) */}
       <div
         ref={plotRef}
         data-trend-plot
@@ -93,7 +93,8 @@ function TrendChart({ data, balances }) {
           display: 'flex',
           alignItems: 'flex-end',
           gap: 12,
-          height: 180,
+          flex: '1 1 auto',
+          minHeight: 180,
           padding: '0 4px'
         }}
       >
@@ -586,11 +587,13 @@ export default function Dashboard() {
   }, [month, year, curMonth, curYear]);
 
   const cardStyle = { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' };
-  const grid = (cols) => ({
+  const grid = (cols, align) => ({
     display: 'grid',
     gridTemplateColumns: `repeat(auto-fit, minmax(min(${cols === 3 ? 220 : 340}px, 100%), 1fr))`,
     gap: 16,
     marginBottom: 16,
+    // การ์ดสรุป 3 ใบ / แถวกราฟ: สูงเท่ากัน — แถวอันดับหมวด + Insight: สูงตามเนื้อหาของตัวเอง
+    alignItems: align || (cols === 3 ? 'stretch' : 'start'),
   });
 
   const header = (
@@ -802,12 +805,12 @@ export default function Dashboard() {
       )}
 
       {/* กราฟ */}
-      <div style={grid(2)}>
-        <div style={cardStyle}>
+      <div style={grid(2, 'stretch')}>
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
           <CardTitle icon="trend">แนวโน้มรายรับ-รายจ่าย 6 เดือนล่าสุด</CardTitle>
           <TrendChart data={summary.monthly_trend} balances={balances} />
         </div>
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column' }}>
           <CardTitle icon="pie">สัดส่วนรายจ่ายตามหมวดหมู่</CardTitle>
           <ExpensePieChart data={summary.expense_by_category} />
         </div>
