@@ -140,6 +140,7 @@ export const api = {
 
   // transactions
   getTransactions: (params) => request('/transactions', { params }),
+  getTypicalAmounts: () => request('/transactions/typical'), // ค่าปกติต่อรายการของแต่ละหมวด (เตือนยอดสูงผิดปกติ)
   exportTransactionsCsv: (params) => download('/transactions/export', params), // params: ตัวกรองเดียวกับ getTransactions (ไม่ส่ง page/limit)
   createTransaction: (data) => request('/transactions', { method: 'POST', body: data }),
   updateTransaction: (id, data) => request(`/transactions/${id}`, { method: 'PUT', body: data }),

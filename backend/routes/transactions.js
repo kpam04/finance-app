@@ -6,6 +6,15 @@ const auth = require('../middleware/auth');
 const checkBudgetAlert = require('../services/budgetAlert');
 const { parseAmount, cleanNote, yearInRange } = require('../utils/inputRules');
 const { syncFromTransaction } = require('./installments');
+const { statsFor, checkCategorySpike } = require('../services/unusual');
+const { bangkokToday } = require('../services/plan/dateUtil');
+
+const UNUSUAL_FLAGS = ['warned', 'corrected'];
+// รายจ่ายของเดือนปัจจุบัน: ตรวจว่ายอดทั้งเดือนของหมวดสูงผิดปกติไหม (แจ้งกระดิ่ง) ไม่รอผล ไม่ให้กระทบการบันทึก
+const spikeCheck = (userId, t) => {
+  if (t.type !== 'expense' || t.date.toISOString().slice(0, 7) !== bangkokToday().slice(0, 7)) return;
+  checkCategorySpike(userId, t.category).catch((e) => console.error('[spike]', e.message));
+};
 
 const router = express.Router();
 router.use(auth);
@@ -123,6 +132,18 @@ router.get('/export', async (req, res) => {
   }
 });
 
+// ค่าปกติต่อรายการของแต่ละหมวด (ใช้เตือนตอนบันทึกยอดที่สูงผิดปกติ) { [category_id]: { median, threshold, n } }
+router.get('/typical', async (req, res) => {
+  try {
+    const stats = await statsFor(req.userId, bangkokToday());
+    const data = {};
+    for (const [k, v] of Object.entries(stats)) data[k] = { median: v.median, threshold: v.threshold, n: v.n };
+    res.json({ success: true, data });
+  } catch (e) {
+    console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
+  }
+});
+
 // เพิ่มรายการ
 router.post('/', async (req, res) => {
   try {
@@ -148,10 +169,12 @@ router.post('/', async (req, res) => {
       amount,
       note: noteCheck.value,
       date,
+      unusual: type === 'expense' && UNUSUAL_FLAGS.includes(req.body.unusual) ? req.body.unusual : null,
     });
 
     // ขั้นที่ 5 จะเพิ่มการตรวจงบประมาณตรงนี้
     if (type === 'expense') await checkBudgetAlert(req.userId, category_id, date);
+    spikeCheck(req.userId, t);
 
     res.status(201).json({
       success: true,
@@ -231,6 +254,7 @@ router.put('/:id', async (req, res) => {
     if (!changed) {
       return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });
     }
+    if (t.type === 'expense' && UNUSUAL_FLAGS.includes(b.unusual)) t.unusual = b.unusual;
     await t.save();
     if (t.installment) await syncFromTransaction(t); // รายจ่ายจากงวดผ่อน: แก้ยอด → ยอดที่จ่ายของงวดนั้นเปลี่ยนตาม
     if (t.type === 'expense') {
@@ -239,6 +263,7 @@ router.put('/:id', async (req, res) => {
       if (String(before.category) !== String(t.category) || before.date.getTime() !== t.date.getTime()) {
         await checkBudgetAlert(req.userId, before.category, before.date);
       }
+      spikeCheck(req.userId, t);
     }
     
     res.json({ success: true, message: 'แก้ไขรายการสำเร็จ' });

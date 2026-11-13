@@ -5,7 +5,7 @@ const NOTIFICATION_TTL_DAYS = 90; // เก็บการแจ้งเตื�
 const schema = new mongoose.Schema({
   user:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   budget:  { type: mongoose.Schema.Types.ObjectId, ref: 'Budget' },
-  kind:    { type: String, enum: ['level', 'forecast', 'installment', 'recurring'], default: 'level' }, // level = ถึงเกณฑ์/ถึงวงเงิน, forecast = คาดการณ์ว่าจะเกินงบ, installment = บิลผ่อนใกล้ครบกำหนด, recurring = พบรายจ่ายที่น่าจะเป็นรายการประจำ
+  kind:    { type: String, enum: ['level', 'forecast', 'installment', 'recurring', 'spike'], default: 'level' }, // level = ถึงเกณฑ์/ถึงวงเงิน, forecast = คาดการณ์ว่าจะเกินงบ, installment = บิลผ่อนใกล้ครบกำหนด, recurring = พบรายจ่ายที่น่าจะเป็นรายการประจำ, spike = ยอดทั้งเดือนของหมวดสูงผิดปกติ
   key:     { type: String, default: null }, // กันแจ้งเตือนซ้ำ (เช่น บิลผ่อน: inst:<ช่องทาง>|<วันครบกำหนด>:<soon|due>)
   level:   { type: Number, enum: [1, 2] },           // 1 ใกล้ถึงวงเงิน, 2 ถึง/เกินวงเงิน (ข้อมูลเก่าและแบบคาดการณ์ไม่มีค่านี้)
   message: { type: String, required: true },

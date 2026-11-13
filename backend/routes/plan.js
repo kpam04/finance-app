@@ -13,7 +13,7 @@ const PlanAdvice = require('../models/PlanAdvice');
 const AiEvent = require('../models/AiEvent');
 const { aiConfig, AiError, intEnv } = require('../services/ai/aiClient');
 const { checkAndBump, planDailyLimit, usedToday, globalAllow } = require('../services/ai/quota');
-const { analyze } = require('../services/plan/analysis');
+const { analyzeMonth } = require('../services/plan/loadMonth');
 const { evaluateGoal } = require('../services/plan/goals');
 const { buildFacts } = require('../services/plan/facts');
 const { rulesAdvice } = require('../services/plan/rulesAdvice');
@@ -32,7 +32,6 @@ router.use(auth);
 
 const fail = (res, status, message, code) => res.status(status).json({ success: false, message, ...(code ? { code } : {}) });
 const round0 = (n) => Math.round(Number(n));
-const MAX_TXNS = 20000;
 
 const perMinute = rateLimit({
   windowMs: 60 * 1000,
@@ -78,22 +77,10 @@ async function autoComplete(goals) {
 }
 
 async function loadPlan(userId, monthParam) {
-  const todayIso = bangkokToday();
-  const pm = parseMonthKey(monthParam) || parseMonthKey(todayIso.slice(0, 7));
-  const base = addMonths(pm.year, pm.month, -3);
-  const from = new Date(Date.UTC(base.year, base.month - 1, 1));
-  const to = new Date(Date.UTC(pm.year, pm.month, 1));
-  const [txns, cats, goals] = await Promise.all([
-    Transaction.find({ user: userId, date: { $gte: from, $lt: to } }).select('date type amount category note recurring installment').limit(MAX_TXNS).lean(),
-    Category.find({ $or: [{ user: null }, { user: userId }] }).lean(),
+  const [{ todayIso, analysis }, goals] = await Promise.all([
+    analyzeMonth(userId, monthParam),
     Goal.find({ user: userId }).sort({ createdAt: 1 }).lean(),
   ]);
-  // ค่าประจำที่รู้แน่นอน: งวดผ่อน และรายการเกิดซ้ำรายเดือน/รายปี (รายวัน/รายสัปดาห์ เช่น ค่าข้าว ยังนับเป็นพฤติกรรมการใช้จ่าย)
-  const recIds = [...new Set(txns.filter((t) => t.recurring).map((t) => String(t.recurring)))];
-  const recs = recIds.length ? await Recurring.find({ _id: { $in: recIds }, user: userId }).select('frequency').lean() : [];
-  const fixedRec = new Set(recs.filter((r) => r.frequency === 'monthly' || r.frequency === 'yearly').map((r) => String(r._id)));
-  const marked = txns.map((t) => ({ date: t.date, type: t.type, amount: t.amount, category: t.category, note: t.note || '', fixed: !!t.installment || (t.recurring && fixedRec.has(String(t.recurring))), installment_paid: !!t.installment }));
-  const analysis = analyze({ txns: marked, categories: cats, todayIso, month: monthKeyOf(pm.year, pm.month) });
   await autoComplete(goals);
   const active = goals.filter((g) => !isDone(g));
   const achievements = goals.filter(isDone).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).map(achievementOut);

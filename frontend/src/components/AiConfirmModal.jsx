@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import CategorySelect from './CategorySelect.jsx';
 import ReceiptPanel from './ReceiptPanel.jsx';
+import UnusualHint, { useUnusual, resetTypical } from './UnusualHint.jsx';
 import { IconBot, IconSpark, IconCheckCircle } from './PlanIcons.jsx';
 
 const overlay = {
@@ -53,6 +54,8 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
     : !ai.flags.total_checked && ai.confidence < lowConf ? 'low' : null;
   const flagAmount = !!amountFlag && amountUntouched;
 
+  const unusual = useUnusual(form.type, form.category_id, form.amount, draft);
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
@@ -68,7 +71,9 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
         amount,
         transaction_date: form.transaction_date,
         note: form.note.trim(),
+        ...(unusual.flag ? { unusual: unusual.flag } : {}),
       });
+      resetTypical();
     } catch (err) {
       setError(err.message || 'บันทึกรายการไม่สำเร็จ');
       setBusy(false);
@@ -169,6 +174,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
               <label style={label}>จำนวนเงิน</label>
               <input style={flagAmount ? { ...field, ...warnRing } : field} type="number" min="0.01" step="0.01" value={form.amount} onChange={set('amount')} required />
               {flagAmount && <div data-flag-amount style={hint}>{amountFlag === 'conflict' ? 'ระบบใช้ตัวเลขหลังคำว่า ยอดสุทธิ/รวม แทนค่าที่ AI อ่าน ตรวจกับรูปใบเสร็จ' : amountFlag === 'rules' ? 'ยอดนี้ได้จากการค้นหาคำว่า ยอดสุทธิ/รวม ในใบเสร็จ ตรวจกับรูปใบเสร็จ' : amountFlag === 'mismatch' ? 'ยอดรวมไม่ตรงกับผลรวมรายการสินค้า ตรวจกับรูปใบเสร็จ' : amountFlag === 'items' ? 'อ่านยอดรวมไม่ชัด ใช้ผลรวมรายการแทน ตรวจกับรูปใบเสร็จ' : 'AI ไม่ค่อยมั่นใจ ตรวจจำนวนเงินอีกครั้ง'}</div>}
+              <UnusualHint info={unusual.info} />
             </div>
             <div>
               <label style={label}>วันที่</label>

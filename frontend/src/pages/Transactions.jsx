@@ -8,6 +8,7 @@ import CategorySelect from '../components/CategorySelect.jsx';
 import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
 import InfoTitle from '../components/InfoTitle.jsx';
 import ExportCsvModal from '../components/ExportCsvModal.jsx';
+import UnusualHint, { useUnusual, resetTypical } from '../components/UnusualHint.jsx';
 import { IconList, IconFilter, IconDownload } from '../components/PlanIcons.jsx';
 
 // คืนค่าวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
@@ -247,6 +248,9 @@ export default function Transactions() {
     });
   };
 
+  // เตือนยอดสูงผิดปกติของหมวด (นับใหม่ทุกครั้งที่เปิดฟอร์ม)
+  const unusual = useUnusual(form.type, form.category_id, form.amount, `${showForm}-${editingId || 'new'}`);
+
   // บันทึกข้อมูลเพิ่มหรือแก้ไขรายการ
   const submit = async (e) => {
     e.preventDefault();
@@ -263,6 +267,7 @@ export default function Transactions() {
     const payload = {
       ...form,
       amount: Number(form.amount),
+      ...(unusual.flag ? { unusual: unusual.flag } : {}),
     };
 
     try {
@@ -272,6 +277,7 @@ export default function Transactions() {
         await api.createTransaction(payload);
       }
 
+      resetTypical();
       closeForm();
       await load();
       refreshBell();
@@ -776,6 +782,7 @@ export default function Transactions() {
                     }
                     required
                   />
+                  <UnusualHint info={unusual.info} />
                 </div>
 
                 <div>

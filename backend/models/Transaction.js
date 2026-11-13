@@ -10,6 +10,8 @@ const schema = new mongoose.Schema({
   recurring: { type: mongoose.Schema.Types.ObjectId, ref: 'Recurring', default: null },
   installment:   { type: mongoose.Schema.Types.ObjectId, ref: 'Installment', default: null }, // รายจ่ายที่มาจากการกด "จ่ายแล้ว" ของงวดผ่อน
   installment_n: { type: Number, default: null },
+  // ตรวจยอดผิดปกติตอนบันทึก (เก็บไว้ทำสถิติ): warned = บันทึกตอนมีคำเตือน / corrected = เคยขึ้นคำเตือนแล้วผู้ใช้แก้ยอดจนหาย
+  unusual: { type: String, enum: ['warned', 'corrected'], default: null },
 }, { timestamps: true });
 
 schema.index({ user: 1, date: -1 });
