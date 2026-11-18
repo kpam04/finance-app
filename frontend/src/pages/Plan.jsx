@@ -7,7 +7,7 @@ import MonthPicker from '../components/MonthPicker.jsx';
 import AiConsentModal from '../components/AiConsentModal.jsx';
 import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
 import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, IconWarning, IconPiggy, IconSprout, IconTrophy, IconParty, IconCheckCircle, AdviceIcon } from '../components/PlanIcons.jsx';
-import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions, timesOf, pctOrTimes } from '../utils/planFormat.js';
+import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions, timesOf, pctOrTimes, catLevel, ratioLabel } from '../utils/planFormat.js';
 
 // หน้า "วางแผน": วิเคราะห์พฤติกรรมการใช้จ่าย + คำแนะนำ (จากระบบ / จาก AI) + เป้าหมายการออม + ลองปรับแผน
 // ตัวเลขทั้งหมดคำนวณโดยระบบ AI เขียนเฉพาะคำอธิบายและต้องผ่านการตรวจตัวเลขก่อนแสดง
@@ -332,13 +332,13 @@ const css = `
 .pl-cbar .tr { position: relative; height: 10px; border-radius: 5px; background: #F1EDE4; }
 .pl-cbar .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #CFC8BB; }
 .pl-cbar.lv-ok .tr i { background: #9DB894; }
-.pl-cbar.lv-near .tr i { background: #E6C65C; }
-.pl-cbar.lv-hit .tr i { background: #E8A06A; }
-.pl-cbar.lv-over .tr i { background: #D46A5E; }
+.pl-cbar.lv-near .tr i { background: #EBC345; }
+.pl-cbar.lv-hit .tr i { background: #EE8A3C; }
+.pl-cbar.lv-over .tr i { background: #D45C78; }
 .pl-cbar.lv-ok .am em { color: #4F7A4A; }
-.pl-cbar.lv-near .am em { color: #8A6A12; }
-.pl-cbar.lv-hit .am em { color: #B45A2A; }
-.pl-cbar.lv-over .am em { color: #B03A2E; }
+.pl-cbar.lv-near .am em { color: #B08900; }
+.pl-cbar.lv-hit .am em { color: #D0661A; }
+.pl-cbar.lv-over .am em { color: #B8304F; }
 .pl-lv-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 11.5px; color: #6b6358; }
 .pl-lv-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 3px; vertical-align: -1px; background: var(--c); }
 .pl-cbar .tr b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: #5b5348; }
@@ -497,21 +497,6 @@ function timingPill(earlyDays) {
   if (earlyDays <= -7) return { cls: 'late', text: `ช้ากว่ากำหนด ${spanText(earlyDays)}` };
   return { cls: 'early', text: 'ตรงกำหนด' };
 }
-// ระดับสีของแถบรายหมวด: เทียบยอดใช้จริงกับยอดปกติถึงวันนี้ (แดง = เกณฑ์เดียวกับ "ผิดปกติ" ของระบบ)
-const catLevel = (c) => {
-  if (!(c.expected_to_date > 0)) return null;
-  if (c.flagged) return 'over';
-  const r = c.amount / c.expected_to_date;
-  if (r >= 1) return 'hit';
-  if (r >= 0.8) return 'near';
-  return 'ok';
-};
-// ไม่เกินยอดปกติ -> "86%" / เกิน -> "1.7 เท่า" (เกินนิดเดียวใช้ทศนิยม 2 ตำแหน่ง เช่น 1.03 เท่า)
-const ratioLabel = (r) => {
-  const p = Math.round(r * 100);
-  if (p <= 100) return `${p}%`;
-  return `${r < 1.1 ? r.toFixed(2) : (Math.round(r * 10) / 10).toFixed(1)} เท่า`;
-};
 const durationText = (days) => (days < 1 ? 'ภายในวันเดียว' : `ใช้เวลา ${spanText(days)}`);
 
 // ป้ายตัวเลขใต้คำแนะนำ (ชื่อสั้น + ค่า) ชี้ที่ป้ายเพื่อดูคำอธิบายเต็ม
@@ -1335,9 +1320,9 @@ export default function Plan() {
                 {showLegend && (
                   <div className="pl-lv-legend" data-lv-legend>
                     <span style={{ '--c': '#9DB894' }}>ปกติ</span>
-                    <span style={{ '--c': '#E6C65C' }}>ใกล้ถึงยอดปกติ</span>
-                    <span style={{ '--c': '#E8A06A' }}>ถึงยอดปกติ</span>
-                    <span style={{ '--c': '#D46A5E' }}>เกินยอดปกติ</span>
+                    <span style={{ '--c': '#EBC345' }}>ใกล้ถึงยอดปกติ</span>
+                    <span style={{ '--c': '#EE8A3C' }}>ถึงยอดปกติ</span>
+                    <span style={{ '--c': '#D45C78' }}>เกินยอดปกติ</span>
                     {catRows.some((c) => !(c.expected_to_date > 0)) && <span style={{ '--c': '#CFC8BB' }}>ยังไม่มียอดปกติ</span>}
                   </div>
                 )}

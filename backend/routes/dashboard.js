@@ -88,6 +88,7 @@ router.get('/summary', async (req, res) => {
 
     // สัดส่วนรายจ่ายตามหมวด
     const byCat = (await expenseByCategory(userObjId, start, end)).map((c) => ({
+      category_id: String(c._id),
       category_name: c.category_name,
       color: c.color,
       total: round(c.total),

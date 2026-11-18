@@ -61,3 +61,26 @@ export function monthOptions(current, count = 12) {
   }
   return out;
 }
+
+// ระดับสีเทียบยอดปกติถึงวันนี้ (ใช้ทั้งหน้าวางแผนและแดชบอร์ด)
+// เขียว < 80% / เหลือง 80–99% / ส้ม ตั้งแต่ 100% / แดง = เกณฑ์ "ผิดปกติ" ของระบบ (flagged)
+export const LEVEL_COLORS = {
+  ok: { bar: '#9DB894', text: '#4F7A4A', label: 'ปกติ', short: 'ปกติ' },
+  near: { bar: '#EBC345', text: '#B08900', label: 'ใกล้ถึงยอดปกติ', short: 'ใกล้ถึง' },
+  hit: { bar: '#EE8A3C', text: '#D0661A', label: 'ถึงยอดปกติ', short: 'ถึงปกติ' },
+  over: { bar: '#D45C78', text: '#B8304F', label: 'เกินยอดปกติ', short: 'เกิน' },
+};
+export const catLevel = (c) => {
+  if (!c || !(c.expected_to_date > 0)) return null;
+  if (c.flagged) return 'over';
+  const r = c.amount / c.expected_to_date;
+  if (r >= 1) return 'hit';
+  if (r >= 0.8) return 'near';
+  return 'ok';
+};
+// ไม่เกินยอดปกติ -> "86%" / เกิน -> "1.7 เท่า" (เกินนิดเดียวใช้ทศนิยม 2 ตำแหน่ง เช่น 1.03 เท่า)
+export const ratioLabel = (r) => {
+  const p = Math.round(r * 100);
+  if (p <= 100) return `${p}%`;
+  return `${r < 1.1 ? r.toFixed(2) : (Math.round(r * 10) / 10).toFixed(1)} เท่า`;
+};

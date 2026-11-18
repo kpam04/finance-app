@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Link } from 'react-router-dom';
 import PlanSummary from '../components/PlanSummary.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
+import { catLevel, ratioLabel, LEVEL_COLORS } from '../utils/planFormat.js';
 
 // ตัวเลขแบบไม่มีทศนิยม (ใช้ในแถบ "ใช้ได้อีก") ถ้ามีสตางค์จริงยังแสดงทศนิยม
 const baht0 = (n) => (n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
@@ -291,8 +292,8 @@ function CardIcon({ name, size = 18 }) {
     </svg>
   );
 }
-function CardTitle({ icon, children }) {
-  return <h3 className="card-title"><CardIcon name={icon} />{children}</h3>;
+function CardTitle({ icon, children, right }) {
+  return <h3 className="card-title"><CardIcon name={icon} />{children}{right && <span className="card-title-r">{right}</span>}</h3>;
 }
 
 // การ์ดสัดส่วนรายจ่าย: กราฟโดนัทซ้าย (ยอดรวมตรงกลาง) รายการขวา / ชี้หรือแตะหมวดเพื่อดูยอดหมวดนั้นตรงกลาง
@@ -491,6 +492,13 @@ const spendCss = `
   @media (max-width: 620px) {
     .sp-list { grid-template-columns: 1fr; row-gap: 10px; }
   }
+  .sp-pair { display: grid; gap: 16px; margin: -4px 0 16px; }
+  .sp-pair.two { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  .sp-pair.two.open { align-items: start; }
+  .sp-pair > .sp-strip, .sp-pair > .sp-nextbill { margin: 0; }
+  .sp-pair.two > .sp-strip { display: flex; flex-direction: column; justify-content: center; }
+  @media (min-width: 761px) { .sp-pair.two .sp-head { flex-wrap: nowrap; align-items: flex-start; } .sp-pair.two .sp-text { flex: 1 1 auto; min-width: 0; line-height: 1.6; } .sp-pair.two .sp-actions { flex: none; } .sp-pair.two .sp-over { white-space: nowrap; } }
+  @media (max-width: 760px) { .sp-pair.two { grid-template-columns: minmax(0, 1fr); } }
   .sp-nextbill { display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; margin: -4px 0 18px; padding: 14px 18px; border-radius: var(--radius, 14px); background: var(--card, #FFFDFA); border: 1px solid var(--border, #E9E1D6); border-left: 4px solid var(--primary, #9AAB91); box-shadow: var(--shadow, 0 2px 8px rgba(100,82,60,0.05)); font-size: 13px; color: var(--muted, #8A8177); text-decoration: none; transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s; }
   .sp-nextbill:hover { border-color: #DCD3C5; border-left-color: var(--primary-dark, #74896F); box-shadow: 0 4px 14px rgba(100,82,60,0.09); }
   .sp-nextbill.soon { border-left-color: #D9B26A; }
@@ -502,15 +510,22 @@ const spendCss = `
   .sp-nb-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted, #8A8177); }
   .sp-nb-txt b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; color: var(--text, #3F3A34); }
   .sp-nb-amt { margin-left: auto; font-size: 18px; font-weight: 700; color: var(--text, #3F3A34); white-space: nowrap; }
-  .sp-nb-pill { flex: none; padding: 3px 12px; border-radius: 999px; background: #F1EDE4; color: #6b6358; font-size: 12px; font-weight: 600; white-space: nowrap; }
-  .sp-nb-pill.soon { background: #F7EFDC; color: #8A6A1F; }
-  .sp-nb-pill.over { background: #FBEBDD; color: #A2522A; }
+  .sp-nb-right { display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; line-height: 1.3; }
+  .sp-nb-right .sp-nb-amt { margin-left: 0; font-size: 19px; }
+  .sp-nb-due { font-size: 12px; font-weight: 600; color: var(--primary-dark, #74896F); white-space: nowrap; }
+  .sp-nb-due.soon { color: #8A6A1F; }
+  .sp-nb-due.over { color: #A2522A; }
+  .card-title-r { margin-left: auto; }
+  .tc-legend { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 12px; font-size: 11.5px; font-weight: 400; color: #8A8177; }
+  .tc-legend > span { display: inline-flex; align-items: center; white-space: nowrap; }
+  .tc-legend > span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: var(--c); }
+  .tc-dot { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; vertical-align: 1px; }
   .sp-nextbill-go { flex: none; display: inline-flex; color: #C2B9AB; transition: transform 0.2s, color 0.2s; }
   .sp-nextbill:hover .sp-nextbill-go { color: var(--primary-dark, #74896F); transform: translateX(3px); }
-  @media (max-width: 480px) { .sp-nextbill { gap: 10px; padding: 12px 14px; } .sp-nb-amt { font-size: 15px; } .sp-nb-ic { width: 36px; height: 36px; } }
+  @media (max-width: 480px) { .sp-nextbill { gap: 10px; padding: 12px 14px; } .sp-nb-right .sp-nb-amt { font-size: 16px; } .sp-nb-ic { width: 36px; height: 36px; } }
 .page-title { display: inline-flex; align-items: center; gap: 10px; margin: 0; }
 .page-title .card-ic { color: var(--primary-dark, #74896F); }
-.card-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 16px; }
+.card-title { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 16px; }
 .card-ic { flex: 0 0 auto; color: var(--primary-dark, #74896F); }
 .ins-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .ins-head h3 { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }
@@ -631,6 +646,7 @@ export default function Dashboard() {
   const changePct =
     prevExpense > 0 ? ((summary.total_expense - prevExpense) / prevExpense) * 100 : null;
   const topCategories = summary.expense_by_category || [];
+  const levelMap = new Map(((planSummary && planSummary.cat_levels) || []).map((c) => [String(c.category_id), c]));
   let changeLabel = null;
   if (changePct !== null) {
     const pctText = Math.abs(changePct).toFixed(1);
@@ -701,6 +717,9 @@ export default function Dashboard() {
       </div>
 
       {/* แถบ "ใช้ได้อีก" ตามงบ (เฉพาะเดือนปัจจุบัน และมีงบอย่างน้อย 1 หมวด) กดลูกศรเพื่อดูยอดเหลือแยกหมวด */}
+      {/* งบเดือนนี้ + บิลผ่อนถัดไป: มีทั้งคู่ = แบ่งครึ่งบรรทัดเดียวกัน (มือถือเรียงลงมา) / มีอย่างเดียว = เต็มความกว้าง */}
+      {((spendable && spendable.has_budget) || nextBill) && (
+      <div className={`sp-pair${spendable && spendable.has_budget && nextBill ? ' two' : ''}${spendOpen ? ' open' : ''}`} data-sp-pair>
       {spendable && spendable.has_budget && (() => {
         // งบเดือนนี้: ใช้ไปเท่าไรจากงบรวม (ไม่ใช่เงินคงเหลือในบัญชี) / สีส้มเฉพาะเมื่อมีหมวดที่ใช้เกินงบจริง
         const cats = spendable.categories || [];
@@ -792,10 +811,14 @@ export default function Dashboard() {
             <small>บิลผ่อนถัดไป · {new Date(`${nextBill.due_date}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</small>
             <b>{nextBill.channel_label}</b>
           </span>
-          <span className="sp-nb-amt">฿{baht0(nextBill.total)}</span>
-          <span className={`sp-nb-pill${nextBill.overdue ? ' over' : nextBill.days <= 3 ? ' soon' : ''}`}>{nextBill.overdue ? `ค้างชำระ ${-nextBill.days} วัน` : nextBill.days === 0 ? 'วันนี้' : `อีก ${nextBill.days} วัน`}</span>
+          <span className="sp-nb-right">
+            <span className="sp-nb-amt">฿{baht0(nextBill.total)}</span>
+            <span className={`sp-nb-due${nextBill.overdue ? ' over' : nextBill.days <= 3 ? ' soon' : ''}`}>{nextBill.overdue ? `ค้างชำระ ${-nextBill.days} วัน` : nextBill.days === 0 ? 'ครบกำหนดวันนี้' : `อีก ${nextBill.days} วัน`}</span>
+          </span>
           <span className="sp-nextbill-go" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg></span>
         </Link>
+      )}
+      </div>
       )}
 
       {hasCarry && (
@@ -819,7 +842,16 @@ export default function Dashboard() {
       {/* อันดับหมวด + Insight */}
       <div style={grid(2)}>
         <div style={cardStyle}>
-          <CardTitle icon="rank">หมวดหมู่ที่ใช้จ่ายสูงสุด</CardTitle>
+          <CardTitle
+            icon="rank"
+            right={topCategories.slice(0, 5).some((c) => catLevel(levelMap.get(String(c.category_id)))) && (
+              <span className="tc-legend" data-top-legend title="เทียบยอดที่ใช้กับยอดปกติของคุณถึงวันนี้">
+                {Object.entries(LEVEL_COLORS).map(([k, v]) => <span key={k} style={{ '--c': v.text }}>{v.short}</span>)}
+              </span>
+            )}
+          >
+            หมวดหมู่ที่ใช้จ่ายสูงสุด
+          </CardTitle>
           {topCategories.length === 0 ? (
             <p style={{ color: '#9ca3af', fontSize: 14 }}>ยังไม่มีข้อมูลการใช้จ่ายในเดือนนี้</p>
           ) : (
@@ -827,13 +859,18 @@ export default function Dashboard() {
               {topCategories.slice(0, 5).map((cat, idx) => {
                 const pct = summary.total_expense > 0 ? (cat.total / summary.total_expense) * 100 : 0;
                 const color = cat.color || '#4f46e5';
+                // สีตัวเลข = ระดับเทียบยอดปกติถึงวันนี้ (เฉพาะเดือนปัจจุบันที่มีประวัติ) ไม่มีข้อมูลเทียบ = สีปกติ
+                const lv = levelMap.get(String(cat.category_id));
+                const level = catLevel(lv);
+                const tip = level ? `${LEVEL_COLORS[level].label} · ใช้ไป ${ratioLabel(lv.amount / lv.expected_to_date)} ของยอดปกติถึงวันนี้ (฿${fmt(lv.expected_to_date)})` : undefined;
                 return (
                   <div key={idx} style={{ background: '#f9fafb', padding: '10px 12px', borderRadius: 8, borderLeft: `4px solid ${color}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>
                         อันดับ {idx + 1}. {cat.category_name}
                       </span>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: '#dc2626' }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: level ? LEVEL_COLORS[level].text : '#3F3A34' }} title={tip} data-top-level={level || 'none'}>
+                        {level && <span className="tc-dot" style={{ background: LEVEL_COLORS[level].text }} aria-hidden="true" />}
                         ฿{fmt(cat.total)} ({pct.toFixed(1)}%)
                       </span>
                     </div>

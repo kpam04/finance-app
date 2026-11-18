@@ -203,6 +203,10 @@ router.get('/summary', async (req, res) => {
         income_month: analysis.totals.income,
         expense_month: analysis.totals.expense,
         limits: analysis.limits,
+        // ระดับรายหมวดเทียบยอดปกติถึงวันนี้ (ใช้ระบายสีตัวเลขในการ์ดหมวดที่ใช้จ่ายสูงสุดของแดชบอร์ด)
+        cat_levels: analysis.categories
+          .filter((c) => c.expected_to_date > 0)
+          .map((c) => ({ category_id: String(c.category_id), amount: c.amount, expected_to_date: c.expected_to_date, flagged: c.flagged })),
         rules_advice: rulesAdvice(facts, goalEvals).slice(0, 2),
         rec_suggest: rec ? { tag: rec.tag, text: rec.text, count: recSug.length } : null,
         ai_advice_first: saved && saved.items[0] ? { tag: saved.items[0].tag, text: saved.items[0].text, facts_used: saved.items[0].facts_used } : null,
