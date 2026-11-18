@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Link } from 'react-router-dom';
-import PlanSummary from '../components/PlanSummary.jsx';
+import InsightTiles from '../components/InsightTiles.jsx';
 import MonthYearPicker from '../components/MonthYearPicker.jsx';
 import { catLevel, ratioLabel, LEVEL_COLORS } from '../utils/planFormat.js';
 
@@ -492,6 +492,15 @@ const spendCss = `
   @media (max-width: 620px) {
     .sp-list { grid-template-columns: 1fr; row-gap: 10px; }
   }
+  .sum-c { display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; box-sizing: border-box; padding: 20px 22px !important; }
+  .sum-l { min-width: 0; }
+  .sum-t { margin-bottom: 4px; font-size: 15px; font-weight: 500; color: #6b7280; }
+  .sum-v { font-size: 30px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+  .sum-r { flex: 1; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; padding-top: 10px; border-top: 1px dashed #E9E3D8; font-size: 13.5px; color: #6b7280; white-space: nowrap; }
+  .sum-r > span { display: flex; justify-content: space-between; gap: 12px; }
+  .sum-r > b { align-self: flex-start; }
+  .sum-r b { font-weight: 600; color: #4B4740; }
+  @media (max-width: 480px) { .sum-c { padding: 16px 18px !important; gap: 10px; } .sum-t { font-size: 14px; } .sum-v { font-size: 26px; } .sum-r { font-size: 13px; } }
   .sp-pair { display: grid; gap: 16px; margin: -4px 0 16px; }
   .sp-pair.two { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
   .sp-pair.two.open { align-items: start; }
@@ -542,7 +551,8 @@ export default function Dashboard() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [summary, setSummary] = useState(null);
-  const [insights, setInsights] = useState([]);
+  const [insightStats, setInsightStats] = useState(null); // ตัวเลขสำหรับการ์ด Insight แบบไทล์
+  const [insightText, setInsightText] = useState([]); // ข้อความเดิม (ใช้เมื่อเซิร์ฟเวอร์ยังไม่ส่งตัวเลขแยกมา)
   const [planSummary, setPlanSummary] = useState(null); // สรุปการวางแผน (เฉพาะเดือนปัจจุบัน) โหลดแยก ถ้าโหลดไม่ได้ก็ไม่กระทบแดชบอร์ด
   const [spendOpen, setSpendOpen] = useState(false); // แถบ "ใช้ได้อีก": เปิดดูยอดเหลือแยกหมวด (เปิดหน้ามาหุบไว้ก่อน)
   const [nextBill, setNextBill] = useState(null); // บิลผ่อนถัดไป (เฉพาะเดือนปัจจุบัน)
@@ -561,7 +571,8 @@ export default function Dashboard() {
           api.get('/dashboard/insights', { params }),
         ]);
         setSummary(s.data.data);
-        setInsights(i.data.data.insights);
+        setInsightStats(i.data.data.stats || null);
+        setInsightText(i.data.data.insights || []);
       } catch (err) {
         console.error('Error loading dashboard data:', err);
         // api.js โยนข้อผิดพลาดพร้อมข้อความภาษาไทย (เช่น เชื่อมต่อเซิร์ฟเวอร์ไม่ได้) ให้แสดงข้อความนั้น
@@ -647,12 +658,15 @@ export default function Dashboard() {
     prevExpense > 0 ? ((summary.total_expense - prevExpense) / prevExpense) * 100 : null;
   const topCategories = summary.expense_by_category || [];
   const levelMap = new Map(((planSummary && planSummary.cat_levels) || []).map((c) => [String(c.category_id), c]));
+  // ชื่อเดือนบนการ์ดสรุป: เดือนปัจจุบัน = "เดือนนี้" / เดือนอื่น = "เดือน ต.ค."
+  const isCurView = month === curMonth && year === curYear;
+  const monthWord = isCurView ? 'เดือนนี้' : `เดือน ${new Date(year, month - 1, 1).toLocaleDateString('th-TH', { month: 'short' })}`;
   let changeLabel = null;
   if (changePct !== null) {
     const pctText = Math.abs(changePct).toFixed(1);
     if (pctText === '0.0') changeLabel = { text: 'เท่ากับเดือนก่อน', color: '#6b7280' };
-    else if (changePct > 0) changeLabel = { text: `▲ เพิ่มขึ้น ${pctText}% จากเดือนก่อน`, color: '#dc2626' };
-    else changeLabel = { text: `▼ ลดลง ${pctText}% จากเดือนก่อน`, color: '#16a34a' };
+    else if (changePct > 0) changeLabel = { text: `▲ มากกว่าเดือนก่อน ${pctText}%`, color: '#D0661A' };
+    else changeLabel = { text: `▼ น้อยกว่าเดือนก่อน ${pctText}%`, color: '#16a34a' };
   }
 
   // ยอดยกมา / ยอดคงเหลือ (มาจาก backend รอบ 1) ถ้า backend ยังเป็นรุ่นเก่า ให้แสดงการ์ดแบบเดิม
@@ -671,46 +685,40 @@ export default function Dashboard() {
 
       {/* การ์ดสรุปยอด 3 ใบ: รายรับ (+ ยอดยกมา) / รายจ่าย / ยอดคงเหลือ */}
       <div style={grid(3)}>
-        <div style={{ ...cardStyle, borderLeft: '4px solid #16a34a' }}>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>รายรับรวมประจำเดือน</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#16a34a' }}>฿{fmt(summary.total_income)}</div>
-          {/* ตัวเลขใหญ่คือรายรับของเดือนนี้ล้วน ๆ ยอดยกมากับยอดรวมแสดงบรรทัดเดียวกัน แยกด้วยสี (ซ่อนเมื่อยอดยกมาเป็นศูนย์) */}
-          {hasCarry && opening !== 0 && (
-            <div data-carry-line style={{ display: 'flex', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 4, fontSize: 12 }}>
-              <span data-carry-opening style={{ color: opening < 0 ? '#dc2626' : '#0369a1' }}>
-                ยอดยกมา ฿{fmt(opening)}
-              </span>
-              <span data-carry-total style={{ color: '#6b7280' }}>
-                รวมเงินที่มี ฿{fmt(round2(opening + summary.total_income))}
-              </span>
-            </div>
-          )}
-        </div>
-        <div style={{ ...cardStyle, borderLeft: '4px solid #dc2626' }}>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>รายจ่ายรวมประจำเดือน</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#dc2626' }}>฿{fmt(summary.total_expense)}</div>
-          {/* เทียบกับเดือนก่อน: ใช้ลูกศรและคำแทนเครื่องหมาย (ลดลง = เขียว, เพิ่มขึ้น = แดง) */}
-          {changeLabel && (
-            <div data-expense-change style={{ fontSize: 12, fontWeight: 600, color: changeLabel.color, marginTop: 4 }}>
-              {changeLabel.text}
-            </div>
-          )}
-          {prevExpense > 0 && (
-            <div data-expense-prev style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              เดือนก่อน ฿{fmt(prevExpense)}
-            </div>
-          )}
-        </div>
-        <div style={{ ...cardStyle, borderLeft: '4px solid #4f46e5' }}>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>
-            {hasCarry ? 'ยอดคงเหลือ' : 'ยอดคงเหลือสุทธิ'}
+        <div className="sum-c" style={{ ...cardStyle, borderLeft: '4px solid #16a34a' }}>
+          <div className="sum-l">
+            <div className="sum-t">รายรับ{monthWord}</div>
+            <div className="sum-v" style={{ color: '#16a34a' }}>฿{fmt(summary.total_income)}</div>
           </div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: closing < 0 ? '#dc2626' : '#4f46e5' }}>
-            ฿{fmt(closing)}
+          {/* ตัวเลขใหญ่คือรายรับของเดือนนี้ล้วน ๆ ยอดยกมากับยอดรวมแสดงด้านขวา (ซ่อนเมื่อยอดยกมาเป็นศูนย์) */}
+          {hasCarry && opening !== 0 && (
+            <div className="sum-r" data-carry-line>
+              <span data-carry-opening>ยอดยกมา <b style={{ color: opening < 0 ? '#D0661A' : '#0369a1' }}>฿{fmt(opening)}</b></span>
+              <span data-carry-total>รวมทั้งหมด <b>฿{fmt(round2(opening + summary.total_income))}</b></span>
+            </div>
+          )}
+        </div>
+        <div className="sum-c" style={{ ...cardStyle, borderLeft: '4px solid #EE8A3C' }}>
+          <div className="sum-l">
+            <div className="sum-t">รายจ่าย{monthWord}</div>
+            <div className="sum-v" style={{ color: '#D0661A' }}>฿{fmt(summary.total_expense)}</div>
+          </div>
+          {/* เทียบกับเดือนก่อน: ลดลง = เขียว, เพิ่มขึ้น = ส้ม */}
+          {(changeLabel || prevExpense > 0) && (
+            <div className="sum-r">
+              {changeLabel && <b data-expense-change style={{ color: changeLabel.color }}>{changeLabel.text}</b>}
+              {prevExpense > 0 && <span data-expense-prev>เดือนก่อนใช้ <b>฿{fmt(prevExpense)}</b></span>}
+            </div>
+          )}
+        </div>
+        <div className="sum-c" style={{ ...cardStyle, borderLeft: '4px solid #4f46e5' }}>
+          <div className="sum-l">
+            <div className="sum-t">เงินคงเหลือ</div>
+            <div className="sum-v" style={{ color: closing < 0 ? '#D0661A' : '#4f46e5' }}>฿{fmt(closing)}</div>
           </div>
           {hasCarry && (
-            <div style={{ fontSize: 12, color: monthNet < 0 ? '#dc2626' : '#16a34a', marginTop: 4 }}>
-              สุทธิเดือนนี้ {monthNet >= 0 ? '+' : '−'}฿{fmt(Math.abs(monthNet))}
+            <div className="sum-r">
+              <span>{monthNet < 0 ? `${isCurView ? 'เดือนนี้' : 'เดือนนั้น'}เงินลดลง` : `${isCurView ? 'เดือนนี้' : 'เดือนนั้น'}เงินเพิ่มขึ้น`} <b style={{ color: monthNet < 0 ? '#D0661A' : '#16a34a' }}>{monthNet >= 0 ? '+' : '−'}฿{fmt(Math.abs(monthNet))}</b></span>
             </div>
           )}
         </div>
@@ -900,12 +908,13 @@ export default function Dashboard() {
               ดูการวิเคราะห์ทั้งหมด
             </Link>
           </div>
-          <PlanSummary summary={planSummary} />
-          <ul style={{ paddingLeft: 20, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
-            {insights.map((text, i) => (
-              <li key={i}>{text}</li>
-            ))}
-          </ul>
+          {insightStats ? (
+            <InsightTiles stats={insightStats} plan={planSummary} isCurrent={month === curMonth && year === curYear} />
+          ) : (
+            <ul style={{ paddingLeft: 20, margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 14 }}>
+              {insightText.map((text, i) => <li key={i}>{text}</li>)}
+            </ul>
+          )}
         </div>
       </div>
     </div>

@@ -145,6 +145,18 @@ router.get('/insights', async (req, res) => {
     const current = await totalsFor(userObjId, start, end);
     const previous = await totalsFor(userObjId, prevRange.start, prevRange.end);
     const insights = [];
+    // ตัวเลขแยกสำหรับการ์ด Insight แบบไทล์บนแดชบอร์ด (ข้อความใน insights ยังส่งไว้เหมือนเดิม)
+    const stats = {
+      income: round(current.income),
+      expense: round(current.expense),
+      prev_expense: previous.expense > 0 ? round(previous.expense) : null,
+      diff_pct: previous.expense > 0 ? round(((current.expense - previous.expense) / previous.expense) * 100, 1) : null,
+      diff_amount: previous.expense > 0 ? round(current.expense - previous.expense) : null,
+      saving_rate: current.income > 0 ? round(((current.income - current.expense) / current.income) * 100, 1) : null,
+      top: null,
+      budget_over: [],
+      budget_near: [],
+    };
 
     // 1) เทียบรายจ่ายกับเดือนก่อน
     if (previous.expense > 0) {
@@ -164,6 +176,7 @@ router.get('/insights', async (req, res) => {
     const cats = await expenseByCategory(userObjId, start, end);
     if (cats.length > 0 && current.expense > 0) {
       const pct = round((cats[0].total / current.expense) * 100, 1);
+      stats.top = { category_id: String(cats[0]._id), name: cats[0].category_name, color: cats[0].color, total: round(cats[0].total), pct };
       insights.push(`หมวดหมู่ "${cats[0].category_name}" มีสัดส่วนรายจ่ายสูงสุด คิดเป็น ${pct}% ของรายจ่ายทั้งเดือน`);
     }
 
@@ -190,6 +203,9 @@ router.get('/insights', async (req, res) => {
       if (!name || b.amountLimit <= 0) return;
       const spent = spentMap.get(String(b.category)) || 0;
       const usedPct = round((spent / b.amountLimit) * 100, 1);
+      const entry = { category_id: String(b.category), name, used_pct: usedPct, limit: round(b.amountLimit), spent: round(spent), over_amount: round(spent - b.amountLimit) };
+      if (usedPct >= 100) stats.budget_over.push(entry);
+      else if (usedPct >= b.alertThreshold) stats.budget_near.push(entry);
       if (usedPct >= 100) {
         insights.push(`งบประมาณหมวด \"${name}\" ใช้เกินแล้ว (${usedPct}% ของวงเงิน)`);
       } else if (usedPct >= b.alertThreshold) {
@@ -201,7 +217,9 @@ router.get('/insights', async (req, res) => {
       insights.push('ยังไม่มีข้อมูลเพียงพอสำหรับการวิเคราะห์ในเดือนนี้ ลองบันทึกรายการเพิ่มเติม');
     }
 
-    res.json({ success: true, data: { insights } });
+    stats.budget_over.sort((a, b) => b.used_pct - a.used_pct);
+    stats.budget_near.sort((a, b) => b.used_pct - a.used_pct);
+    res.json({ success: true, data: { insights, stats } });
   } catch (e) {
     console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
   }

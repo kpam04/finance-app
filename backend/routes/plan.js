@@ -206,9 +206,9 @@ router.get('/summary', async (req, res) => {
         // ระดับรายหมวดเทียบยอดปกติถึงวันนี้ (ใช้ระบายสีตัวเลขในการ์ดหมวดที่ใช้จ่ายสูงสุดของแดชบอร์ด)
         cat_levels: analysis.categories
           .filter((c) => c.expected_to_date > 0)
-          .map((c) => ({ category_id: String(c.category_id), amount: c.amount, expected_to_date: c.expected_to_date, flagged: c.flagged })),
+          .map((c) => ({ category_id: String(c.category_id), name: c.name, amount: c.amount, expected_to_date: c.expected_to_date, flagged: c.flagged })),
         rules_advice: rulesAdvice(facts, goalEvals).slice(0, 2),
-        rec_suggest: rec ? { tag: rec.tag, text: rec.text, count: recSug.length } : null,
+        rec_suggest: rec ? { tag: rec.tag, text: rec.text, count: recSug.length, note: recSug[0].note, amount: recSug[0].amount } : null,
         ai_advice_first: saved && saved.items[0] ? { tag: saved.items[0].tag, text: saved.items[0].text, facts_used: saved.items[0].facts_used } : null,
         goal: g ? { goal_id: g.goal_id, name: g.name, target_amount: g.target_amount, saved_amount: g.saved_amount, progress_pct: g.progress_pct, status: g.status, required_monthly: g.required_monthly, capacity_monthly: g.capacity_monthly, target_date: g.target_date } : null,
         goal_count: goalEvals.length,

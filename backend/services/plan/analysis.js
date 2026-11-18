@@ -8,6 +8,7 @@ const WEEKDAY_DAYS = 90; // ช่วงดูรูปแบบรายวั�
 const SMALL_AMOUNT = 100; // "รายจ่ายเล็ก ๆ" = น้อยกว่า 100 บาท
 const SMALL_DAYS = 30;
 const MIN_DAYS_PROJECTION = 7; // ต้องผ่านไปอย่างน้อย 7 วันถึงจะคาดการณ์สิ้นเดือนได้
+const INCOME_SPIKE_RATIO = 1.5; // รายรับเดือนนี้เกินค่าเฉลี่ยกี่เท่าถึงถือว่าซ้อน (ไม่ใช้เป็นรายรับอ้างอิง)
 const ANOMALY_RATIO = 1.3; // สูงกว่าที่ควรเป็น 30% ขึ้นไป
 const ANOMALY_MIN_EXCESS = 200; // และเกินค่าปกติอย่างน้อย 200 บาท (ไม่เตือนเรื่องเล็กน้อย)
 const BIG_TXN_SHARE = 0.10; // รายการเดียวตั้งแต่ 10% ของรายจ่ายเฉลี่ยต่อเดือน = ก้อนใหญ่ ไม่นับในค่าเฉลี่ยต่อวัน
@@ -286,6 +287,7 @@ function analyze({ txns = [], categories = [], todayIso = bangkokToday(), month 
   // เดือนปัจจุบัน: หมวดที่จ่ายทยอยคิดตามอัตราต่อวัน / หมวดที่จ่ายเป็นก้อน (เช่น ค่าเช่า) ไม่คูณตามวัน ใช้ยอดที่จ่ายแล้วหรือค่าเฉลี่ยต่อเดือน (ที่มากกว่า)
   //  และหมวดก้อนที่เดือนนี้ยังไม่จ่าย นับค่าเฉลี่ยต่อเดือนไว้ด้วย (กันไม่ให้ค่าเช่าต้นเดือนถูกคูณจนคาดการณ์สูงเกินจริง)
   let expenseEnd = null;
+  const parts = { fixed: 0, lumpy: 0, daily: 0, big: 0 }; // แยกส่วนของยอดคาดการณ์ (ใช้อธิบายวิธีคำนวณบนแดชบอร์ด)
   if (projectable && !isCurrent) expenseEnd = round0(cur.expense);
   else if (projectable) {
     let sum = 0;
@@ -298,19 +300,39 @@ function analyze({ txns = [], categories = [], todayIso = bangkokToday(), month 
       const fixAvg = hasBaseline ? (baseFixed.get(id) || 0) / baseN : 0;
       const varAvg = hasBaseline ? baseVar(id) / baseN : 0;
       sum += Math.max(curFix, fixAvg);
+      parts.fixed += Math.max(curFix, fixAvg);
       // รายการก้อนใหญ่ครั้งเดียวนับครั้งเดียว ไม่คูณตามจำนวนวัน
       const curBig = rows.filter((r) => r.type === 'expense' && !r.fixed && r.category === id && r.iso.slice(0, 7) === key && bigOne(r)).reduce((t, r) => t + r.amount, 0);
       sum += lumpyIds.has(id) ? Math.max(curVar, varAvg) : ((curVar - curBig) / daysElapsed) * dim + curBig;
+      if (lumpyIds.has(id)) parts.lumpy += Math.max(curVar, varAvg);
+      else { parts.daily += ((curVar - curBig) / daysElapsed) * dim; parts.big += curBig; }
     }
     expenseEnd = round0(sum);
   }
-  const incomeRef = Math.max(cur.income, baseline.avg_income_month || 0);
+  // รายรับอ้างอิง = ค่าที่มากกว่าระหว่างรายรับเดือนนี้กับค่าเฉลี่ย (เงินเดือนเข้าปลายเดือนก็ยังคาดการณ์ได้)
+  // ถ้ารายรับเดือนนี้สูงกว่าค่าเฉลี่ยเกิน 1.5 เท่า (เช่น เงินเดือนเลื่อนข้ามเดือนจนเข้า 2 ครั้ง) ใช้ค่าเฉลี่ยแทน
+  const avgIncome = baseline.avg_income_month || 0;
+  const incomeRef = avgIncome > 0 && cur.income > avgIncome * INCOME_SPIKE_RATIO ? avgIncome : Math.max(cur.income, avgIncome);
   const projection = {
     expense_end: expenseEnd,
     based_on_days: projectable ? daysElapsed : null,
     income_ref: incomeRef > 0 ? round0(incomeRef) : null,
     pct_of_income: expenseEnd !== null && incomeRef > 0 ? round1((expenseEnd / incomeRef) * 100) : null,
     over_income: expenseEnd !== null && incomeRef > 0 ? expenseEnd > incomeRef : null,
+    // รายละเอียดสำหรับอธิบายวิธีคำนวณ (เฉพาะเดือนปัจจุบันที่คาดการณ์ได้)
+    detail: projectable && isCurrent ? {
+      spent: round0(cur.expense),
+      days_elapsed: daysElapsed,
+      days_in_month: dim,
+      fixed: round0(parts.fixed),
+      lumpy: round0(parts.lumpy),
+      daily: round0(parts.daily),
+      big: round0(parts.big),
+      income_month: round0(cur.income),
+      income_avg: avgIncome > 0 ? round0(avgIncome) : null,
+      income_source: avgIncome > 0 && cur.income > avgIncome * INCOME_SPIKE_RATIO ? 'avg_spike' : cur.income >= avgIncome ? 'month' : 'avg',
+      base_months: baseN,
+    } : null,
   };
 
   // แนวโน้มรายเดือน
