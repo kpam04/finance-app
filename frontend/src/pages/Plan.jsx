@@ -273,34 +273,16 @@ const css = `
 .pl-beh.closed .pl-beh-wrap { grid-template-rows: 0fr; }
 .pl-beh-inner { min-height: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .pl-beh-wrap, .pl-chev { transition: none; } }
-.pl-beh-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 16px 28px; padding-top: 12px; }
+.pl-beh-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px 28px; padding-top: 12px; align-items: start; }
+.pl-beh-grid.one { grid-template-columns: minmax(0, 1fr); }
+[data-beh-special] .pl-special { margin-top: 0; }
 @media (max-width: 820px) { .pl-beh-grid { grid-template-columns: minmax(0, 1fr); } }
 .pl-beh-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: #4B4740; }
 .pl-beh-sub span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 400; color: #8A8177; }
-.pl-lg-bar { display: inline-block; width: 12px; height: 8px; border-radius: 2px; background: #B9C8B2; }
+.pl-lg-bar { display: inline-block; width: 12px; height: 8px; border-radius: 2px; background: #B8B0A3; }
 .pl-lg-mark { display: inline-block; width: 2px; height: 12px; margin-left: 6px; border-radius: 1px; background: #5b5348; }
 .pl-beh .pl-days { margin-top: 10px; }
-.pl-wd { margin-top: 12px; }
-.pl-wd-area { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; height: 138px; padding-top: 26px; box-sizing: border-box; border-bottom: 1px solid #E6E0D4; }
-.pl-wd-grid { position: absolute; left: 0; right: 0; border-top: 1px solid #F1EDE4; pointer-events: none; }
-.pl-wd-avg { position: absolute; left: 0; right: 0; border-top: 1.5px dashed #BDB4A6; pointer-events: none; z-index: 1; }
-.pl-wd-bar { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; padding: 0; border: none; background: none; cursor: pointer; z-index: 2; }
-.pl-wd-bar i { display: block; width: 100%; max-width: 34px; border-radius: 7px 7px 2px 2px; background: #CBD8C4; transition: background 0.2s, opacity 0.2s, transform 0.2s; transform-origin: bottom; }
-.pl-wd-bar.today i { background: #7E9677; }
-.pl-wd-bar em { position: absolute; left: -20px; right: -20px; text-align: center; white-space: nowrap; font-style: normal; font-size: 11px; font-weight: 700; color: #5E7558; }
-.pl-wd-bar:hover i, .pl-wd-bar.on i { background: #A9BDA1; }
-.pl-wd-bar.today:hover i, .pl-wd-bar.today.on i { background: #6B8364; }
-.pl-wd.has-act .pl-wd-bar:not(.on) i { opacity: 0.45; }
-.pl-wd-bar:focus-visible { outline: none; }
-.pl-wd-bar:focus-visible i { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #9AAB91; }
-.pl-wd-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 5px; font-size: 11.5px; color: #8A8177; text-align: center; }
-.pl-wd-days .today { font-weight: 700; color: #40563C; }
 /* ป้าย "สูงสุด" เหนือแท่งของวันที่ใช้มากที่สุด (แยกจากแท่งเข้ม = วันนี้) */
-.pl-wd-bar em.pl-wd-peak { left: 50%; right: auto; transform: translateX(-50%); padding: 0 7px; border-radius: 999px; background: #F6EBD9; color: #8A6A1F; font-size: 10.5px; line-height: 1.7; }
-.pl-wd-tip { position: absolute; top: -6px; z-index: 5; display: grid; gap: 1px; min-width: 132px; padding: 8px 11px; border-radius: 10px; background: #fff; border: 1px solid #E6E0D4; box-shadow: 0 6px 18px rgba(60,50,30,0.12); font-size: 12px; line-height: 1.5; color: #4B4740; transform: translateX(-50%); pointer-events: none; white-space: nowrap; }
-.pl-wd-tip.l { transform: translateX(-20%); } .pl-wd-tip.r { transform: translateX(-80%); }
-.pl-wd-tip b { font-size: 12.5px; color: #3F3A34; }
-.pl-wd-tip small { color: #9a9184; }
 .pl-special { margin-top: 12px; padding: 8px 12px; border-radius: 10px; background: #FBF6EC; border: 1px solid #EFE3CB; }
 .pl-special-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; color: #8A6A1F; }
 .pl-special-h span { cursor: help; }
@@ -312,12 +294,6 @@ const css = `
 .pl-special li .n small { color: #9a9184; }
 .pl-special li .a { font-weight: 600; white-space: nowrap; }
 .pl-special-note { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: #A39A8C; }
-.pl-wd-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font-size: 11.5px; color: #8A8177; }
-.pl-wd-legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.pl-wd-legend i { font-style: normal; }
-.pl-wd-legend .pl-lg-peak { margin: 0; }
-.pl-wd-legend .pl-lg-pk { margin: 0; }
-.pl-lg-dash { display: inline-block; width: 16px; border-top: 1.5px dashed #BDB4A6; }
 .pl-prog { position: relative; display: inline-flex; align-items: center; flex: none; width: 150px; height: 18px; border-radius: 999px; background: #EFEBE3; overflow: hidden; }
 .pl-prog i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: #C9D6C2; }
 .pl-prog em { position: relative; width: 100%; font-style: normal; font-size: 11px; font-weight: 600; color: #5E7558; text-align: center; }
@@ -349,23 +325,27 @@ const css = `
 .pl-steps .pl-act { flex: none; }
 .pl-welcome-note { margin: 14px 0 0; font-size: 11.5px; line-height: 1.6; color: #A39A8C; }
 @media (max-width: 480px) { .pl-welcome { padding: 22px 16px 18px; } .pl-steps li { flex-wrap: wrap; } .pl-steps li .t { flex-basis: calc(100% - 40px); } .pl-steps .pl-act { margin-left: 40px; } }
-.pl-lg-pk { display: inline-block; margin-right: 3px; padding: 0 6px; border-radius: 999px; background: #F6EBD9; color: #8A6A1F; font-size: 10.5px; font-weight: 700; line-height: 1.6; }
-.pl-lg-peak { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; background: #7E9677; vertical-align: -1px; }
-.pl-wd-tip .p { color: #5E7558; font-weight: 600; }
-@media (prefers-reduced-motion: reduce) { .pl-wd-bar i { transition: none; } }
-@media (max-width: 480px) { .pl-wd-area, .pl-wd-days { gap: 5px; } .pl-wd-pk { display: none; } }
 .pl-cbars { display: grid; gap: 9px; margin-top: 12px; }
 .pl-cbar { display: grid; grid-template-columns: minmax(64px, 104px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
 .pl-cbar .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3F3A34; }
 .pl-cbar .nm small { font-size: 10.5px; color: #9a9184; }
 .pl-cbar .tr { position: relative; height: 10px; border-radius: 5px; background: #F1EDE4; }
-.pl-cbar .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #B9C8B2; }
-.pl-cbar.flag .tr i { background: #E8B596; }
+.pl-cbar .tr i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; background: #CFC8BB; }
+.pl-cbar.lv-ok .tr i { background: #9DB894; }
+.pl-cbar.lv-near .tr i { background: #E6C65C; }
+.pl-cbar.lv-hit .tr i { background: #E8A06A; }
+.pl-cbar.lv-over .tr i { background: #D46A5E; }
+.pl-cbar.lv-ok .am em { color: #4F7A4A; }
+.pl-cbar.lv-near .am em { color: #8A6A12; }
+.pl-cbar.lv-hit .am em { color: #B45A2A; }
+.pl-cbar.lv-over .am em { color: #B03A2E; }
+.pl-lv-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 11.5px; color: #6b6358; }
+.pl-lv-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 3px; vertical-align: -1px; background: var(--c); }
 .pl-cbar .tr b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: #5b5348; }
 .pl-cbar .am { min-width: 108px; text-align: right; white-space: nowrap; font-weight: 600; color: #3F3A34; }
-.pl-cbar .am em { display: inline-block; min-width: 46px; margin-left: 6px; font-style: normal; font-size: 11.5px; font-weight: 500; color: #8A8177; }
-.pl-cbar.flag .am em { color: #B45A2A; font-weight: 700; }
-@media (max-width: 480px) { .pl-cbar { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 8px; } .pl-cbar .am { min-width: 0; } .pl-cbar .am em { min-width: 0; } }
+.pl-cbar .am em { display: inline-block; min-width: 52px; margin-left: 6px; font-style: normal; font-size: 11.5px; font-weight: 600; color: #8A8177; }
+.pl-cbar.flag .am em { font-weight: 700; }
+@media (max-width: 480px) { .pl-cbar { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 8px; } .pl-cbar .am { min-width: 112px; } .pl-cbar .am em { min-width: 56px; margin-left: 4px; } }
 /* ===== สิ่งที่ควรทำ ===== */
 .pl-side { display: grid; gap: 14px; }
 .pl-cap { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; background: #fff; border: 1px solid #C9D4C2; font: inherit; font-size: 12.5px; font-weight: 500; color: #5E7558; cursor: pointer; white-space: nowrap; transition: border-color 0.2s, color 0.2s, box-shadow 0.2s; }
@@ -517,6 +497,21 @@ function timingPill(earlyDays) {
   if (earlyDays <= -7) return { cls: 'late', text: `ช้ากว่ากำหนด ${spanText(earlyDays)}` };
   return { cls: 'early', text: 'ตรงกำหนด' };
 }
+// ระดับสีของแถบรายหมวด: เทียบยอดใช้จริงกับยอดปกติถึงวันนี้ (แดง = เกณฑ์เดียวกับ "ผิดปกติ" ของระบบ)
+const catLevel = (c) => {
+  if (!(c.expected_to_date > 0)) return null;
+  if (c.flagged) return 'over';
+  const r = c.amount / c.expected_to_date;
+  if (r >= 1) return 'hit';
+  if (r >= 0.8) return 'near';
+  return 'ok';
+};
+// ไม่เกินยอดปกติ -> "86%" / เกิน -> "1.7 เท่า" (เกินนิดเดียวใช้ทศนิยม 2 ตำแหน่ง เช่น 1.03 เท่า)
+const ratioLabel = (r) => {
+  const p = Math.round(r * 100);
+  if (p <= 100) return `${p}%`;
+  return `${r < 1.1 ? r.toFixed(2) : (Math.round(r * 10) / 10).toFixed(1)} เท่า`;
+};
 const durationText = (days) => (days < 1 ? 'ภายในวันเดียว' : `ใช้เวลา ${spanText(days)}`);
 
 // ป้ายตัวเลขใต้คำแนะนำ (ชื่อสั้น + ค่า) ชี้ที่ป้ายเพื่อดูคำอธิบายเต็ม
@@ -546,7 +541,6 @@ function LearningBanner({ an }) {
   const wmin = d.weekday_min_days || 10;
   const items = [
     { key: 'proj', done: days >= pmin, text: 'ค่าเฉลี่ยต่อวันและคาดการณ์สิ้นเดือน', prog: <Progress value={Math.min(days, pmin)} max={pmin} label={`${Math.min(days, pmin)}/${pmin} วัน`} /> },
-    { key: 'week', done: !!(an.weekday && an.weekday.reliable), text: 'วันไหนของสัปดาห์ใช้เงินมาก', prog: <Progress value={Math.min(d.record_days || 0, wmin)} max={wmin} label={`บันทึกแล้ว ${Math.min(d.record_days || 0, wmin)}/${wmin} วัน`} /> },
     { key: 'base', done: !!d.has_baseline, text: 'เทียบกับค่าปกติของคุณ และเตือนหมวดที่สูงผิดปกติ', prog: d.baseline_from ? <span className="pl-learn-date">เริ่ม {thaiDate(d.baseline_from)}</span> : null },
   ];
   return (
@@ -617,56 +611,6 @@ function HeroCard({ id, open, setOpen, warn, tip, children }) {
 }
 // หมวดที่ลองปรับได้: ไม่ใช่หมวดจ่ายก้อน และมีส่วนที่ไม่ใช่ค่าประจำ (ค่าประจำลดระหว่างเดือนไม่ได้)
 const simable = (c) => !c.lumpy && c.base_avg - (c.fixed_avg || 0) > 0;
-const WD_ORDER = [1, 2, 3, 4, 5, 6, 0]; // เรียงจันทร์ → อาทิตย์
-const WD_H = 112; // ความสูงสูงสุดของแท่ง (px)
-// กราฟ "ใช้จ่ายตามวันในสัปดาห์": ชี้เมาส์ / แตะ / โฟกัสด้วยคีย์บอร์ด เพื่อดูยอดของวันนั้น
-function WeekdayChart({ days, peakDay, todayDay = null }) {
-  const [act, setAct] = useState(null);
-  const list = WD_ORDER.map((i) => days.find((d) => d.day === i)).filter(Boolean);
-  const max = Math.max(1, ...list.map((d) => d.amount));
-  const total = list.reduce((t, d) => t + d.amount, 0);
-  const avgLine = total / 7;
-  const sel = act !== null ? list.find((d) => d.day === act) : null;
-  const pos = sel ? list.indexOf(sel) : -1;
-  return (
-    <div className={`pl-wd${act !== null ? ' has-act' : ''}`} data-days onMouseLeave={() => setAct(null)}>
-      <div className="pl-wd-area">
-        <span className="pl-wd-grid" style={{ bottom: `${WD_H}px` }} />
-        <span className="pl-wd-grid" style={{ bottom: `${WD_H / 2}px` }} />
-        <span className="pl-wd-avg" style={{ bottom: `${Math.round((avgLine / max) * WD_H)}px` }} />
-        {list.map((d) => (
-          <button
-            type="button"
-            key={d.day}
-            className={`pl-wd-bar${d.day === todayDay ? ' today' : ''}${act === d.day ? ' on' : ''}`}
-            aria-label={`วัน${d.name} รวม ${baht(d.amount)} จาก ${d.days} วัน เฉลี่ยวันละ ${baht(d.avg || 0)} คิดเป็น ${num1(d.share_pct)}% ของรายจ่าย`}
-            data-wd={d.day}
-            onMouseEnter={() => setAct(d.day)}
-            onFocus={() => setAct(d.day)}
-            onBlur={() => setAct(null)}
-            onClick={() => setAct((v) => (v === d.day ? null : d.day))}
-          >
-            {d.day === peakDay && act === null && <em className="pl-wd-peak" style={{ bottom: `${Math.max(3, Math.round((d.amount / max) * WD_H)) + 3}px` }}><span className="pl-wd-pk">สูงสุด </span>{Math.round(d.share_pct)}%</em>}
-            <i style={{ height: `${Math.max(3, Math.round((d.amount / max) * WD_H))}px` }} />
-          </button>
-        ))}
-        {sel && (
-          <div className={`pl-wd-tip${pos <= 1 ? ' l' : pos >= 5 ? ' r' : ''}`} style={{ left: `${((pos + 0.5) / 7) * 100}%` }} role="status" data-wd-tip>
-            <b>วัน{sel.name}</b>
-            <span>รวม {baht(sel.amount)} <small>({sel.days} วัน)</small></span>
-            <span>เฉลี่ยวันละ {baht(sel.avg || 0)}</span>
-            <span className="p">{num1(sel.share_pct)}% ของรายจ่าย</span>
-          </div>
-        )}
-      </div>
-      <div className="pl-wd-days">
-        {list.map((d) => (
-          <span key={d.day} className={d.day === todayDay ? 'today' : ''} data-wd-today={d.day === todayDay ? '' : undefined}>{DAY_SHORT[d.day]}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
 const AI_HIDE_KEY = 'finance_plan_ai_hidden';
 const SYS_HIDE_KEY = 'finance_plan_sys_hidden';
 // ปุ่มซ่อน/แสดงเล็ก ๆ ที่หัวแต่ละส่วน
@@ -1170,7 +1114,7 @@ export default function Plan() {
   const saved = data.ai_advice;
   const top = an.anomalies[0];
   const pctBase = an.daily.pct_vs_base;
-  const peakDay = an.weekday.by_day.reduce((a, d) => (d.amount > a.amount ? d : a), an.weekday.by_day[0]);
+  const hasSpecial = !!(an.special && an.special.total > 0);
   const proj = an.projection;
   // แถบรายหมวด (การ์ดพฤติกรรม): เฉพาะส่วนที่ผู้ใช้ควบคุมได้ ไม่รวมค่าประจำ และไม่แสดงหมวดจ่ายเป็นก้อน
   //  (ข้อมูลเก่าที่ยังไม่มี var_* ใช้ยอดรวมแทน)
@@ -1180,6 +1124,7 @@ export default function Plan() {
     .filter((c) => c.amount > 0)
     .sort((x, y) => y.amount - x.amount)
     .slice(0, 6);
+  const showLegend = !!an.data.has_baseline && catRows.length > 0; // คำอธิบายสีแถบรายหมวด
   const catMax = Math.max(1, ...catRows.map((c) => Math.max(c.amount, c.expected_to_date || 0)));
   const isCur = data.is_current !== false; // false = กำลังดูเดือนที่ผ่านมา (ดูอย่างเดียว)
   const instFacts = data.installments || null; // ภาระผ่อน (เฉพาะเดือนปัจจุบัน)
@@ -1369,62 +1314,53 @@ export default function Plan() {
         </div>
         <div className="pl-beh-wrap" id="pl-beh-body" aria-hidden={behHidden}>
           <div className="pl-beh-inner">
-            <div className="pl-beh-grid">
-              <div className="pl-beh-col" data-beh-days>
-                <div className="pl-beh-sub">ใช้จ่ายตามวันในสัปดาห์ <span>{isCur ? 'รวม 90 วันล่าสุด' : 'รวม 90 วันถึงสิ้นเดือน'}</span></div>
-                {an.weekday.reliable ? (
-                  <>
-                    <WeekdayChart days={an.weekday.by_day} peakDay={an.weekday.peak ? peakDay.day : null} todayDay={isCur && an.weekly ? new Date(`${an.weekly.to}T00:00:00Z`).getUTCDay() : null} />
-                    <p className="pl-wd-legend" title="แต่ละแท่ง = ยอดรวมของวันนั้นทุกสัปดาห์ในช่วง 90 วัน (เช่น ทุกวันจันทร์)">
-                      {isCur && <span><i className="pl-lg-peak" />วันนี้</span>}
-                      <span><i className="pl-lg-dash" />เฉลี่ยทุกวัน</span>
-                      <span><i className="pl-lg-pk">สูงสุด</i>วันที่ใช้มากที่สุด</span>
-                    </p>
-                  </>
-                ) : (
-                  <div className="pl-wait" data-weekday-wait>
-                    <p>บันทึกรายจ่ายครบ {an.data.weekday_min_days || 10} วัน จะเห็นว่าวันไหนของสัปดาห์คุณมักใช้เงินมาก</p>
-                    <Progress value={Math.min(an.data.record_days || 0, an.data.weekday_min_days || 10)} max={an.data.weekday_min_days || 10} label={`${Math.min(an.data.record_days || 0, an.data.weekday_min_days || 10)}/${an.data.weekday_min_days || 10} วัน`} />
-                  </div>
-                )}
-                {an.small_purchases.flagged && (
-                  <p className="pl-note" data-small>รายจ่ายน้อยกว่า {an.small_purchases.threshold} บาทมี {an.small_purchases.count} ครั้งใน {an.small_purchases.days} วัน รวม {baht(an.small_purchases.total)} ({num1(an.small_purchases.share_pct)}% ของรายจ่าย)</p>
-                )}
-              </div>
+            {/* แถบรายหมวด (ซ้าย) + รายจ่ายพิเศษ (ขวา เฉพาะเดือนที่มี) — ไม่มีรายจ่ายพิเศษ แถบรายหมวดเต็มความกว้าง */}
+            <div className={`pl-beh-grid${hasSpecial ? '' : ' one'}`}>
               <div className="pl-beh-col" data-beh-cats>
                 <div className="pl-beh-sub">{an.data.has_baseline ? 'รายหมวดเทียบระดับปกติ' : `ใช้จ่ายรายหมวด${isCur ? 'เดือนนี้' : 'เดือนนั้น'}`} {an.data.has_baseline && <span><i className="pl-lg-bar" />{isCur ? 'เดือนนี้' : 'เดือนนั้น'} <i className="pl-lg-mark" />ระดับปกติ</span>}</div>
                 {catRows.length === 0 ? <p className="pl-empty">ยังไม่มีรายจ่าย{isCur ? 'เดือนนี้' : 'ในเดือนนั้น'}</p> : (
                   <div className="pl-cbars">
                     {catRows.map((c) => (
-                      <div className={`pl-cbar${c.flagged ? ' flag' : ''}`} key={c.category_id} data-cat-row>
+                      <div className={`pl-cbar${c.flagged ? ' flag' : ''}${catLevel(c) ? ` lv-${catLevel(c)}` : ''}`} key={c.category_id} data-cat-row data-level={catLevel(c) || 'none'}>
                         <span className="nm" title={c.name}>{c.name}</span>
                         <span className="tr" title={c.expected_to_date === null ? '' : `ระดับปกติถึงวันนี้ ${baht(c.expected_to_date)}`}>
                           <i style={{ width: `${Math.min(100, (c.amount / catMax) * 100)}%` }} />
                           {c.expected_to_date !== null && c.expected_to_date !== undefined && <b style={{ left: `${Math.min(100, (c.expected_to_date / catMax) * 100)}%` }} />}
                         </span>
-                        <span className="am">{baht(c.amount)}{c.pct_vs_expected !== null && <em>{pctOrTimes(c.pct_vs_expected)}</em>}</span>
+                        <span className="am">{baht(c.amount)}{c.expected_to_date > 0 && <em>{ratioLabel(c.amount / c.expected_to_date)}</em>}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                {an.special && an.special.total > 0 && (
-                  <div className="pl-special" data-special>
-                    <div className="pl-special-h">
-                      <span title={`รายการก้อนใหญ่ที่นาน ๆ มีครั้ง${an.special.threshold ? ` (ตั้งแต่ ${baht(an.special.threshold)} ต่อรายการ)` : ''} แยกไว้ ไม่นำไปเทียบกับการใช้จ่ายปกติ`}>รายจ่ายพิเศษ</span>
-                      {an.special.items.length > 1 && <b>{baht(an.special.total)}</b>}
-                    </div>
-                    <ul>
-                      {an.special.items.map((it, i) => (
-                        <li key={`${it.date}-${i}`} data-special-item>
-                          <span className="d">{thaiDate(it.date).replace(/ \d{4}$/, '')}</span>
-                          <span className="n" title={it.note ? `${it.note} · ${it.category_name}` : it.category_name}>{it.note || it.category_name}</span>
-                          <span className="a">{baht(it.amount)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {showLegend && (
+                  <div className="pl-lv-legend" data-lv-legend>
+                    <span style={{ '--c': '#9DB894' }}>ปกติ</span>
+                    <span style={{ '--c': '#E6C65C' }}>ใกล้ถึงยอดปกติ</span>
+                    <span style={{ '--c': '#E8A06A' }}>ถึงยอดปกติ</span>
+                    <span style={{ '--c': '#D46A5E' }}>เกินยอดปกติ</span>
+                    {catRows.some((c) => !(c.expected_to_date > 0)) && <span style={{ '--c': '#CFC8BB' }}>ยังไม่มียอดปกติ</span>}
                   </div>
                 )}
               </div>
+              {hasSpecial && (
+                <div className="pl-beh-col" data-beh-special>
+                    <div className="pl-special" data-special>
+                      <div className="pl-special-h">
+                        <span title={`รายการก้อนใหญ่ที่นาน ๆ มีครั้ง${an.special.threshold ? ` (ตั้งแต่ ${baht(an.special.threshold)} ต่อรายการ)` : ''} แยกไว้ ไม่นำไปเทียบกับการใช้จ่ายปกติ`}>รายจ่ายพิเศษ</span>
+                        {an.special.items.length > 1 && <b>{baht(an.special.total)}</b>}
+                      </div>
+                      <ul>
+                        {an.special.items.map((it, i) => (
+                          <li key={`${it.date}-${i}`} data-special-item>
+                            <span className="d">{thaiDate(it.date).replace(/ \d{4}$/, '')}</span>
+                            <span className="n" title={it.note ? `${it.note} · ${it.category_name}` : it.category_name}>{it.note || it.category_name}</span>
+                            <span className="a">{baht(it.amount)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
