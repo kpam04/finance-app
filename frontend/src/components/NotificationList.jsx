@@ -19,6 +19,8 @@ const INSTALLMENT = { icon: <IconCard size={15} style={{ color: '#74896F' }} />,
 // พบรายจ่ายที่น่าจะเป็นรายการประจำ (kind = recurring) กดแล้วไปหน้ารายการเกิดซ้ำ
 // ยอดทั้งเดือนของหมวดสูงผิดปกติ (kind = spike) กดแล้วไปหน้าวางแผน
 const SPIKE = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'หมวดใช้จ่ายสูงผิดปกติ' };
+// ใช้เร็วกว่าแผน (kind = pace) ตรงกับป้ายสีส้ม "ควรลดการใช้" ในหน้างบ กดแล้วไปหน้างบของเดือนนั้น
+const PACE = { icon: <IconDot color="#EE8A3C" size={11} />, label: 'ใช้เร็วกว่าแผน' };
 const RECURRING = { icon: <IconRepeat size={15} style={{ color: '#74896F' }} />, label: 'ชวนตั้งรายการเกิดซ้ำ' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
@@ -33,7 +35,7 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {items.map((n) => {
         const unread = !n.is_read;
-        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : n.kind === 'recurring' ? RECURRING : n.kind === 'spike' ? SPIKE : LEVEL[n.level];
+        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : n.kind === 'recurring' ? RECURRING : n.kind === 'spike' ? SPIKE : n.kind === 'pace' ? PACE : LEVEL[n.level];
         // เปิดหน้างบประมาณของเดือนนั้นได้เมื่อยังมีงบอยู่ (งบถูกลบแล้ว = ไม่มีเดือน/ปี)
         const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment' || n.kind === 'recurring' || n.kind === 'spike'));
         const clickable = canOpen || unread;

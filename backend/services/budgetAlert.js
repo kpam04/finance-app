@@ -6,6 +6,8 @@ const Notification = require('../models/Notification');
 const { ensureCurrentMonth, thaiPeriod } = require('./budgetCarry');
 const { forecastFor } = require('./budgetForecast');
 
+const PACE_MIN_DAY = 5; // แจ้ง "ใช้เร็วกว่าแผน" ได้ตั้งแต่วันที่ 5 ของเดือน (ต้นเดือนรายการน้อย สัดส่วนแกว่งง่าย)
+
 const oid = (v) => new mongoose.Types.ObjectId(String(v));
 const pct1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -50,7 +52,7 @@ async function syncBudget(budget, { notify = true, now = Date.now() } = {}) {
   const level = levelFor(usedPct, budget.alertThreshold);
   const stored = budget.alertLevel || 0;
   if (level === stored) {
-    const forecasted = level === 0 && notify ? await maybeForecastAlert(budget, now) : false;
+    const forecasted = level === 0 && notify ? await earlyAlert(budget, spent, now) : false;
     return { level, changed: false, notified: forecasted, usedPct };
   }
 
@@ -69,12 +71,45 @@ async function syncBudget(budget, { notify = true, now = Date.now() } = {}) {
   }
   await Budget.updateOne({ _id: budget._id }, { $set: { alertLevel: level } });
   // ลดจากระดับสูงลงมาเป็น 0 (รีเซ็ตเงียบ) ยังต้องตรวจพยากรณ์ต่อ ถ้ายังไม่เคยเตือน
-  const forecasted = level === 0 && notify ? await maybeForecastAlert(budget, now) : false;
+  const forecasted = level === 0 && notify ? await earlyAlert(budget, spent, now) : false;
   return { level, changed: true, notified: notified || forecasted, usedPct };
 }
 
 // แจ้งเตือนเชิงพยากรณ์ "ที่ความเร็วนี้คาดว่าจะใช้ถึงวงเงิน" ครั้งเดียวต่องบต่อเดือน
 // เงื่อนไข: ยอดจริงยังไม่ถึงเกณฑ์ระดับ 1, ผ่านเงื่อนไขขั้นต่ำของการพยากรณ์ (7 วัน + 3 รายการ), คาดว่าจะเกินวงเงิน, ยังไม่เคยเตือนพยากรณ์ของงบนี้
+// เตือนล่วงหน้าก่อนถึงเกณฑ์ (ครั้งเดียวต่องบต่อเดือน รวมกันระหว่าง "ใช้เร็วกว่าแผน" กับ "คาดว่าจะใช้ถึงวงเงิน" ไม่ให้เตือนเรื่องเดียวกันซ้ำ)
+async function earlyAlert(budget, spent, now) {
+  if (await maybePaceAlert(budget, spent, now)) return true;
+  return maybeForecastAlert(budget, now);
+}
+
+// "ใช้เร็วกว่าแผน" = ป้ายสีส้ม (ควรลดการใช้) ในหน้างบ: ใช้ไปเกินสัดส่วนวันที่ผ่านไปเกิน 15 จุด (ไม่นับหมวดที่จ่ายเป็นก้อน)
+async function maybePaceAlert(budget, spent, now) {
+  if (budget.paceNotified === true || budget.forecastNotified === true) return false;
+  const cur = thaiPeriod(now);
+  if (budget.month !== cur.month || budget.year !== cur.year) return false;
+  const day = new Date(now + 7 * 3600 * 1000).getUTCDate();
+  if (day < PACE_MIN_DAY) return false;
+  // โหลดตอนเรียก (กัน require วนกับ spendable.js)
+  const { paceStatus, elapsedPct, lumpyCategories } = require('./spendable');
+  const elapsed = elapsedPct(budget.year, budget.month, now);
+  const lumpy = (await lumpyCategories(budget.user, budget.year, budget.month)).has(String(budget.category));
+  if (paceStatus({ enabled: true, spent, limit: budget.amountLimit, lumpy, elapsed }) !== 'pause') return false;
+  const cat = await Category.findById(budget.category).lean();
+  const name = cat ? cat.name : 'ไม่ทราบหมวด';
+  const f = await forecastFor(budget, { now }).catch(() => null);
+  const thMonth = new Date(Date.UTC(budget.year, budget.month - 1, 1)).toLocaleDateString('th-TH', { month: 'short', timeZone: 'UTC' });
+  const when = f && f.will_exceed && f.reach_day ? ` งบอาจหมดราว ${f.reach_day} ${thMonth}` : '';
+  await Notification.create({
+    user: budget.user,
+    budget: budget._id,
+    kind: 'pace',
+    message: `หมวด "${name}" ใช้เร็วกว่าแผน ใช้ไป ${Math.round((spent / budget.amountLimit) * 100)}% ของงบ ขณะที่เดือนผ่านไป ${Math.round(elapsed)}%${when}`,
+  });
+  await Budget.updateOne({ _id: budget._id }, { $set: { paceNotified: true, forecastNotified: true } });
+  return true;
+}
+
 async function maybeForecastAlert(budget, now) {
   if (budget.forecastNotified === true) return false;
   const f = await forecastFor(budget, { now });
@@ -88,7 +123,7 @@ async function maybeForecastAlert(budget, now) {
     kind: 'forecast',
     message: `หมวด "${name}" ที่ความเร็วนี้ คาดว่าจะใช้ถึงวงเงิน${day} (คาดการณ์สิ้นเดือน ฿${Math.round(f.projected).toLocaleString('en-US')})`,
   });
-  await Budget.updateOne({ _id: budget._id }, { $set: { forecastNotified: true } });
+  await Budget.updateOne({ _id: budget._id }, { $set: { forecastNotified: true, paceNotified: true } });
   return true;
 }
 

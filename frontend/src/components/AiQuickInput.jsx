@@ -400,7 +400,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     setMsg('');
     const st = statusRef.current;
     if (!receiptReady(st)) {
-      setMsg('ยังสแกนใบเสร็จไม่ได้ในตอนนี้ (ฟีเจอร์นี้ยังไม่เปิดให้ใช้งาน) กรุณาเพิ่มรายการด้วยการพิมพ์ พูด หรือกรอกรายการเอง');
+      setMsg('ยังเพิ่มจากรูปไม่ได้ในตอนนี้ (ฟีเจอร์นี้ยังไม่เปิดให้ใช้งาน) กรุณาเพิ่มรายการด้วยการพิมพ์ พูด หรือกรอกรายการเอง');
       return;
     }
     const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -427,7 +427,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     <form className="card" onSubmit={handleText}>
       <style>{css}</style>
       <AiTitle />
-      <p className="ai-sub" data-ai-sub>เลือกวิธีที่สะดวก: พิมพ์หรือพูดให้ AI ช่วยแยกรายการ สแกนใบเสร็จ หรือกรอกเอง ระบบจะให้ตรวจก่อนบันทึกทุกครั้ง</p>
+      <p className="ai-sub" data-ai-sub>เลือกวิธีที่สะดวก: พิมพ์หรือพูดให้ AI ช่วยแยกรายการ เพิ่มจากรูปใบเสร็จหรือสลิป หรือกรอกเอง ระบบจะให้ตรวจก่อนบันทึกทุกครั้ง</p>
       <div className="form-row ai-row">
         {/* ช่องพิมพ์: ปุ่มส่ง (ลูกศร) อยู่ในช่อง ใช้ได้เมื่อมีข้อความ หรือกด Enter ก็ได้เหมือนกัน */}
         <div className="grow ai-input">
@@ -476,7 +476,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
             onClick={onScanClick}
             title="ถ่ายหรือเลือกรูปใบเสร็จ ให้ AI อ่านยอดที่ชำระ วันที่ ร้านค้า และหมวดให้"
           >
-            {scanState === 'preparing' ? 'กำลังเตรียมรูป...' : scanState === 'reading' ? `กำลังอ่านใบเสร็จ... ${scanElapsed} วินาที` : <><IconCamera size={16} /> สแกนใบเสร็จ</>}
+            {scanState === 'preparing' ? 'กำลังเตรียมรูป...' : scanState === 'reading' ? `กำลังอ่านใบเสร็จ... ${scanElapsed} วินาที` : <><IconCamera size={16} /> เพิ่มจากรูป</>}
           </button>
           <input type="file" accept="image/*" capture="environment" ref={camRef} data-scan-camera onChange={handleFile} style={{ display: 'none' }} />
           <input type="file" accept="image/*" ref={fileRef} data-scan-file onChange={handleFile} style={{ display: 'none' }} />

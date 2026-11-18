@@ -84,7 +84,7 @@ export default function AiSettingsCard() {
         <div>
           <h3 style={{ fontSize: 16 }}>อ่านรูปใบเสร็จด้วย AI</h3>
           <p className="as-desc">
-            ปุ่ม <IconCamera size={14} /> สแกนใบเสร็จ: ถ่ายหรือเลือกรูป แล้ว AI อ่านยอดที่ชำระ วันที่ ชื่อร้าน และหมวดให้ รูปจะถูกส่งไปบริการ AI ภายนอก (ระบบเราไม่เก็บรูปและข้อความที่อ่านได้) ปิดอยู่เป็นค่าเริ่มต้น
+            ปุ่ม <IconCamera size={14} /> เพิ่มจากรูป: ถ่ายหรือเลือกรูปใบเสร็จหรือสลิป แล้ว AI อ่านยอดที่ชำระ วันที่ ชื่อร้าน และหมวดให้ รูปจะถูกส่งไปบริการ AI ภายนอก (ระบบเราไม่เก็บรูปและข้อความที่อ่านได้) ปิดอยู่เป็นค่าเริ่มต้น
           </p>
           {receiptReady(status) && Array.isArray(status.receipt_engines) && status.receipt_engines.length > 0 && (
             <p className="as-meta" data-ai-engines>ตัวอ่านใบเสร็จ: {status.receipt_engines.map((e, i) => `${e === 'gemini' ? 'Google Gemini' : 'Typhoon OCR'}${i === 0 && status.receipt_engines.length > 1 ? ' (หลัก)' : i > 0 ? ' (สำรอง)' : ''}`).join(' · ')}</p>

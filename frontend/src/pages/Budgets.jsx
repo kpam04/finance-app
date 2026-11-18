@@ -17,14 +17,23 @@ const STATUS = {
 
 // ไฟสถานะตามจังหวะการใช้ (สีอ่อน ไม่ใช้สีแดง) — สำรองไว้ใช้ STATUS เดิมถ้า backend รุ่นเก่าไม่ส่ง pace_status
 const PACE = {
-  easy: { label: 'สบาย ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
-  careful: { label: 'ระวังนิดนึง', bg: '#FBF0D5', fg: '#946A12', bar: '#E5C36B' },
-  pause: { label: 'พักก่อน', bg: '#FBE4D6', fg: '#A2522A', bar: '#E8A07A' },
-  over: { label: 'เกินงบ', bg: '#FBE4D6', fg: '#A2522A', bar: '#E8A07A' },
-  within: { label: 'อยู่ในงบ ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
-  paid: { label: 'จ่ายแล้ว ✓', bg: '#E3EEDD', fg: '#4F6B47', bar: '#9AAB91' },
-  unpaid: { label: 'ยังไม่จ่าย', bg: '#EEE7DC', fg: '#6B6258', bar: '#CFC5B6' },
+  // สีชุดเดียวกับเกณฑ์ระดับของหน้าวางแผน/แดชบอร์ด: เขียว -> เหลือง -> ส้ม -> แดงชมพู
+  easy: { label: 'ปกติ', bg: '#E6EFE2', fg: '#4F7A4A', bar: '#9DB894' },
+  careful: { label: 'เฝ้าระวัง', bg: '#F9EFCB', fg: '#8F6F00', bar: '#EBC345' },
+  pause: { label: 'ควรลดการใช้', bg: '#FBE3D2', fg: '#B5530F', bar: '#EE8A3C' },
+  over: { label: 'เกินงบ', bg: '#F8DDE4', fg: '#B8304F', bar: '#D45C78' },
+  overbig: { label: 'เกินงบมาก', bg: '#FAD7D3', fg: '#A3201A', bar: '#C8322B' }, // ใช้ไปตั้งแต่ 150% ของงบ
+  within: { label: 'ไม่เกินงบ', bg: '#E6EFE2', fg: '#4F7A4A', bar: '#9DB894' },
+  paid: { label: 'ชำระแล้ว', bg: '#E6EFE2', fg: '#4F7A4A', bar: '#9DB894' },
+  unpaid: { label: 'รอชำระ', bg: '#EEE7DC', fg: '#6B6258', bar: '#CFC5B6' },
 };
+// สัดส่วนที่ใช้ไปของงบ: ไม่เกิน 100% แสดงเป็น % / เกิน 100% แสดงเป็นเท่า (เช่น 4.2 เท่า)
+const usedText = (pct) => {
+  if (!(pct > 100)) return `${pct}% `;
+  const r = pct / 100;
+  return `${r < 1.1 ? r.toFixed(2) : (Math.round(r * 10) / 10).toFixed(1)} เท่า`;
+};
+const OVER_BIG = 1.5; // ใช้ไปตั้งแต่ 150% ของงบ = เกินงบมาก
 const shortDate = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 // กลุ่มเงินที่กันไว้: "Netflix 25 พ.ย." / "ทดสอบรายวัน ×4 · 12–15 พ.ย."
 const groupText = (g) => {
@@ -386,7 +395,9 @@ export default function Budgets() {
             const enabled = b.enabled !== false;
             const repeat = b.repeat !== false;
             const old = enabled ? STATUS[b.status] || STATUS.ok : { label: 'ปิดไว้เดือนนี้', color: '#9ca3af' };
-            const pace = enabled && b.pace_status ? PACE[b.pace_status] : null;
+            // เกินงบตั้งแต่ 150% = "เกินงบมาก" (แดงเข้ม) แยกจากเกินงบเล็กน้อย
+            const paceKey = b.pace_status === 'over' && b.amount_limit > 0 && b.spent >= b.amount_limit * OVER_BIG ? 'overbig' : b.pace_status;
+            const pace = enabled && paceKey ? PACE[paceKey] : null;
             const st = pace ? { label: pace.label, color: pace.bar } : old;
             const chip = pace ? { background: pace.bg, color: pace.fg } : { background: old.color, color: '#fff' };
             const over = b.spent - b.amount_limit;
@@ -415,7 +426,7 @@ export default function Budgets() {
                     {b.category_name}
                   </strong>
                   <span
-                    data-pace={b.pace_status || b.status}
+                    data-pace={paceKey || b.status}
                     style={{
                       fontSize: 12, padding: '2px 10px', borderRadius: 999, fontWeight: 600, ...chip,
                     }}
@@ -432,16 +443,16 @@ export default function Budgets() {
                   />
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 14 }}>
-                  <span>฿{money(b.spent)} / ฿{money(b.amount_limit)}</span>
-                  <strong style={{ color: pace ? pace.fg : st.color }}>{b.percent_used}%</strong>
+                {/* ใช้ไป / งบ (ซ้าย) และยอดเหลือหรือยอดเกิน (ขวา แทนที่ % เดิม) */}
+                <div data-budget-amounts style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 8, fontSize: 14 }}>
+                  <span style={{ color: '#4B4740' }}>฿{money(b.spent)} <span style={{ color: '#9a9184' }}>/ ฿{money(b.amount_limit)}</span></span>
+                  {enabled && (
+                    <strong data-budget-left style={{ color: pace ? pace.fg : st.color, whiteSpace: 'nowrap' }}>
+                      {over > 0 ? `เกิน ฿${money(over)}` : `เหลือ ฿${money(Math.abs(over))}`}
+                    </strong>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                  <span>
-                    {enabled
-                      ? (over > 0 ? `เกินงบ ฿${money(over)}` : `เหลือ ฿${money(-over)}`)
-                      : 'ปิดงบนี้ไว้ในเดือนนี้ (ไม่คำนวณและไม่แจ้งเตือน เดือนหน้ากลับมาเปิดเอง)'}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
                   <button
                     type="button"
                     data-detail-toggle
@@ -455,6 +466,9 @@ export default function Budgets() {
                     </svg>
                   </button>
                 </div>
+                {!enabled && (
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>ปิดงบนี้ไว้ในเดือนนี้ (ไม่คำนวณและไม่แจ้งเตือน เดือนหน้ากลับมาเปิดเอง)</div>
+                )}
 
                 {/* คาดการณ์ว่าจะเกินงบ = คำเตือน แสดงตลอด (ไม่ซ่อนในรายละเอียด) */}
                 {f && f.will_exceed && forecastLine}
@@ -468,7 +482,7 @@ export default function Budgets() {
                       <div data-pace-note style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
                         {b.lumpy
                           ? 'จ่ายเป็นก้อน (ระบบดูจากประวัติ)'
-                          : `ผ่านไป ${Math.round(b.elapsed_pct)}% ของเดือน · ใช้ไป ${b.percent_used}% ของงบ`}
+                          : `ผ่านไป ${Math.round(b.elapsed_pct)}% ของเดือน · ใช้ไป ${usedText(b.percent_used)}ของงบ`}
                       </div>
                     )}
 
@@ -489,7 +503,7 @@ export default function Budgets() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                   <button className="btn btn-sm btn-light" onClick={() => openEdit(b)}>แก้ไข</button>
                   {!isPastMonth && (
                     <button className="btn btn-sm btn-light" data-toggle-enabled onClick={() => toggleEnabled(b)}>

@@ -48,6 +48,7 @@ async function ensureCurrentMonth(userId, { now = Date.now() } = {}) {
         stopped: false,
         alertLevel: 0,
         forecastNotified: false,
+        paceNotified: false,
       });
       created.push(doc);
     } catch (e) {
