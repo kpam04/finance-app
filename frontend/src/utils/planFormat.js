@@ -67,7 +67,7 @@ export function monthOptions(current, count = 12) {
 export const LEVEL_COLORS = {
   ok: { bar: '#9DB894', text: '#4F7A4A', label: 'ปกติ', short: 'ปกติ' },
   near: { bar: '#EBC345', text: '#B08900', label: 'ใกล้ถึงยอดปกติ', short: 'ใกล้ถึง' },
-  hit: { bar: '#EE8A3C', text: '#D0661A', label: 'ถึงยอดปกติ', short: 'ถึงปกติ' },
+  hit: { bar: '#EE8A3C', text: '#D0661A', label: 'เกินยอดปกติเล็กน้อย', short: 'เกินเล็กน้อย' },
   over: { bar: '#D45C78', text: '#B8304F', label: 'เกินยอดปกติ', short: 'เกิน' },
 };
 export const catLevel = (c) => {

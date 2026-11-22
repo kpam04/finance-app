@@ -1321,7 +1321,7 @@ export default function Plan() {
                   <div className="pl-lv-legend" data-lv-legend>
                     <span style={{ '--c': '#9DB894' }}>ปกติ</span>
                     <span style={{ '--c': '#EBC345' }}>ใกล้ถึงยอดปกติ</span>
-                    <span style={{ '--c': '#EE8A3C' }}>ถึงยอดปกติ</span>
+                    <span style={{ '--c': '#EE8A3C' }}>เกินยอดปกติเล็กน้อย</span>
                     <span style={{ '--c': '#D45C78' }}>เกินยอดปกติ</span>
                     {catRows.some((c) => !(c.expected_to_date > 0)) && <span style={{ '--c': '#CFC8BB' }}>ยังไม่มียอดปกติ</span>}
                   </div>
