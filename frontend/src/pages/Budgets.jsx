@@ -486,7 +486,7 @@ export default function Budgets() {
                       </div>
                     )}
 
-                    {/* เงินที่กันไว้: รายการเกิดซ้ำในหมวดนี้ที่ยังไม่ถึงวันจ่ายในเดือนนี้ (รวมรอบของรายการเดียวกัน) */}
+                    {/* เงินที่กันไว้: รายการประจำในหมวดนี้ที่ยังไม่ถึงวันจ่ายในเดือนนี้ (รวมรอบของรายการเดียวกัน) */}
                     {enabled && b.reserved && b.reserved.total > 0 && (
                       <div data-reserved style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
                         กันไว้ ฿{money(b.reserved.total)} ({(b.reserved.groups || []).map(groupText).join(', ')})

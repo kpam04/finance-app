@@ -254,10 +254,10 @@ export default function Recurring() {
       <style>{css}</style>
 
       <div className="rc-head">
-        <h1>รายการที่เกิดซ้ำ</h1>
+        <h1>รายการประจำ</h1>
         <div className="rc-actions">
           <button className="rc-btn rc-primary" onClick={openCreate}>
-            + เพิ่มรายการที่เกิดซ้ำ
+            + เพิ่มรายการประจำ
           </button>
         </div>
       </div>
@@ -271,7 +271,7 @@ export default function Recurring() {
         </div>
       )}
 
-      {/* Popup Form สำหรับเพิ่มหรือแก้ไขรายการที่เกิดซ้ำ (สไตล์อยู่ใน index.css: rc-modal-*) */}
+      {/* Popup Form สำหรับเพิ่มหรือแก้ไขรายการประจำ (สไตล์อยู่ใน index.css: rc-modal-*) */}
       {showForm && (
         <div className="rc-modal-overlay" onClick={closeForm}>
           <div
@@ -283,7 +283,7 @@ export default function Recurring() {
           >
         <form className="rc-card rc-form" onSubmit={submit}>
           <div className="rc-modal-header">
-            <h2 id="rc-modal-title">{editingId ? 'แก้ไขรายการที่เกิดซ้ำ' : 'เพิ่มรายการที่เกิดซ้ำ'}</h2>
+            <h2 id="rc-modal-title">{editingId ? 'แก้ไขรายการประจำ' : 'เพิ่มรายการประจำ'}</h2>
             <button type="button" className="rc-modal-close" onClick={closeForm} aria-label="ปิดหน้าต่าง">
               ×
             </button>
@@ -408,7 +408,7 @@ export default function Recurring() {
         </div>
       )}
 
-      {/* ระบบชวนตั้งรายการเกิดซ้ำ: รายจ่ายที่ผู้ใช้จดเองทุกเดือน */}
+      {/* ระบบชวนตั้งรายการประจำ: รายจ่ายที่ผู้ใช้จดเองทุกเดือน */}
       {sugs.length > 0 && (
         <section className="rs-box" aria-label="รายจ่ายที่น่าจะเป็นรายการประจำ" data-rec-suggest>
           <div className="rs-h">
@@ -416,7 +416,7 @@ export default function Recurring() {
             พบรายจ่ายที่น่าจะเป็นรายการประจำ
             <span className="rs-n">{sugs.length}</span>
           </div>
-          <p className="rs-sub">คุณจดรายการเหล่านี้เองทุกเดือน ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้อัตโนมัติและกันเงินไว้ในงบ</p>
+          <p className="rs-sub">คุณจดรายการเหล่านี้เองทุกเดือน ตั้งเป็นรายการประจำไว้ ระบบจะบันทึกให้อัตโนมัติและกันเงินไว้ในงบ</p>
           {sugs.map((s) => (
             <div className="rs-row" key={s.key} data-rec-suggest-item>
               <div className="rs-nm">
@@ -428,7 +428,7 @@ export default function Recurring() {
                 <small>ทุกวันที่ {s.day}</small>
               </div>
               <div className="rs-acts">
-                <button type="button" className="rs-a main" data-rec-suggest-set onClick={() => openFromSuggestion(s)}>ตั้งเป็นรายการเกิดซ้ำ</button>
+                <button type="button" className="rs-a main" data-rec-suggest-set onClick={() => openFromSuggestion(s)}>ตั้งเป็นรายการประจำ</button>
                 <button type="button" className="rs-a ghost" data-rec-suggest-no onClick={() => dismissSuggestion(s)}>ไม่ใช่</button>
               </div>
             </div>
@@ -440,7 +440,7 @@ export default function Recurring() {
         {loading ? (
           <p className="rc-empty">กำลังโหลด...</p>
         ) : rules.length === 0 ? (
-          <p className="rc-empty">ยังไม่มีรายการที่เกิดซ้ำ กด "+ เพิ่มรายการที่เกิดซ้ำ" เพื่อเริ่มต้น</p>
+          <p className="rc-empty">ยังไม่มีรายการประจำ กด "+ เพิ่มรายการประจำ" เพื่อเริ่มต้น</p>
         ) : (
           <div className="rc-scroll">
             <table className="rc-table">
@@ -513,7 +513,7 @@ const css = `
 .rs-a.ghost { border-color: #DDD6C8; background: #fff; color: #5F5A52; }
 .rs-a.ghost:hover { background: #F3EFE6; border-color: #C9C0AF; color: #3F3A34; }
 @media (max-width: 560px) { .rs-acts { width: 100%; justify-content: flex-end; } }
-/* ===== หน้ารายการที่เกิดซ้ำ ===== */
+/* ===== หน้ารายการประจำ ===== */
 .rc-page {
   max-width: 1000px;
   margin: 0 auto;
@@ -904,7 +904,7 @@ const css = `
     padding: 10px;
   }
 
-  /* ชื่อหน้ากับปุ่ม "+ เพิ่มรายการที่เกิดซ้ำ" อยู่บรรทัดเดียวกัน (ชื่อซ้าย ปุ่มขวา) */
+  /* ชื่อหน้ากับปุ่ม "+ เพิ่มรายการประจำ" อยู่บรรทัดเดียวกัน (ชื่อซ้าย ปุ่มขวา) */
   .rc-head {
     flex-wrap: nowrap;
     align-items: center;

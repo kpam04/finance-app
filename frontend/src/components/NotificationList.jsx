@@ -16,14 +16,14 @@ const LEVEL = {
 const FORECAST = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'คาดการณ์ว่าจะเกินงบ' };
 // บิลผ่อนใกล้ครบกำหนด / ครบกำหนดวันนี้ (kind = installment) กดแล้วไปแท็บรายการผ่อน
 const INSTALLMENT = { icon: <IconCard size={15} style={{ color: '#74896F' }} />, label: 'บิลผ่อน' };
-// พบรายจ่ายที่น่าจะเป็นรายการประจำ (kind = recurring) กดแล้วไปหน้ารายการเกิดซ้ำ
+// พบรายจ่ายที่น่าจะเป็นรายการประจำ (kind = recurring) กดแล้วไปหน้ารายการประจำ
 // ยอดทั้งเดือนของหมวดสูงผิดปกติ (kind = spike) กดแล้วไปหน้าวางแผน
 const SPIKE = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'หมวดใช้จ่ายสูงผิดปกติ' };
 // ใช้เร็วกว่าแผน (kind = pace) ตรงกับป้ายสีส้ม "ควรลดการใช้" ในหน้างบ กดแล้วไปหน้างบของเดือนนั้น
 const PACE = { icon: <IconDot color="#EE8A3C" size={11} />, label: 'ใช้เร็วกว่าแผน' };
 // เรื่องบัญชี เช่น ผลคำขอเปลี่ยนชื่อผู้ใช้ (kind = account) กดแล้วไปหน้าโปรไฟล์
 const ACCOUNT = { icon: <IconUser size={15} style={{ color: '#74896F' }} />, label: 'บัญชีผู้ใช้' };
-const RECURRING = { icon: <IconRepeat size={15} style={{ color: '#74896F' }} />, label: 'ชวนตั้งรายการเกิดซ้ำ' };
+const RECURRING = { icon: <IconRepeat size={15} style={{ color: '#74896F' }} />, label: 'ชวนตั้งรายการประจำ' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
 //  - onRead(id): ทำเครื่องหมายอ่านแล้ว (ใช้เมื่อไม่ส่ง onSelect)
@@ -42,7 +42,7 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
         const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment' || n.kind === 'recurring' || n.kind === 'spike' || n.kind === 'account'));
         const clickable = canOpen || unread;
         const title = canOpen
-          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : n.kind === 'recurring' ? 'คลิกเพื่อไปหน้ารายการเกิดซ้ำ' : n.kind === 'spike' ? 'คลิกเพื่อดูการวิเคราะห์' : n.kind === 'account' ? 'คลิกเพื่อไปหน้าโปรไฟล์' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
+          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : n.kind === 'recurring' ? 'คลิกเพื่อไปหน้ารายการประจำ' : n.kind === 'spike' ? 'คลิกเพื่อดูการวิเคราะห์' : n.kind === 'account' ? 'คลิกเพื่อไปหน้าโปรไฟล์' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
           : unread
             ? 'คลิกเพื่อทำเครื่องหมายว่าอ่านแล้ว'
             : '';

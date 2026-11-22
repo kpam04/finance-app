@@ -206,7 +206,7 @@ export default function Profile() {
           <div className="pf-stats" data-pf-stats>
             <Stat title="รายการทั้งหมด" icon={<IconList />} n={stats.total_transactions} />
             <Stat title="งบประมาณ" icon={<IconPie />} n={stats.total_budgets} />
-            <Stat title="รายการซ้ำ" icon={<IconRepeat />} n={stats.total_recurring} />
+            <Stat title="รายการประจำ" icon={<IconRepeat />} n={stats.total_recurring} />
           </div>
         )}
 
@@ -225,7 +225,7 @@ export default function Profile() {
       <div className="card" style={{ borderColor: '#fecaca' }}>
         <h3 style={{ marginTop: 0, color: '#b91c1c' }}>ลบบัญชี</h3>
         <p style={{ marginTop: 0 }}>
-          การลบบัญชีจะลบ <strong>ข้อมูลทั้งหมดของคุณถาวร</strong> ได้แก่ รายการรายรับ-รายจ่าย งบประมาณ รายการที่เกิดซ้ำ
+          การลบบัญชีจะลบ <strong>ข้อมูลทั้งหมดของคุณถาวร</strong> ได้แก่ รายการรายรับ-รายจ่าย งบประมาณ รายการประจำ
           การแจ้งเตือน หมวดหมู่ที่คุณสร้างเอง และข้อมูลโปรไฟล์ ไม่สามารถกู้คืนได้
         </p>
         {isStaff ? (

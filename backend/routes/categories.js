@@ -156,7 +156,7 @@ const thaiNow = () => {
   return { month: t.getUTCMonth() + 1, year: t.getUTCFullYear() };
 };
 
-// ลบ: ยังมีงบ/รายการซ้ำที่ใช้อยู่ = ไม่ให้ลบ / เคยมีข้อมูลใช้ = ซ่อน / ไม่เคยใช้ = ลบจริง
+// ลบ: ยังมีงบ/รายการประจำที่ใช้อยู่ = ไม่ให้ลบ / เคยมีข้อมูลใช้ = ซ่อน / ไม่เคยใช้ = ลบจริง
 router.delete('/:id', async (req, res) => {
   try {
     const cat = await findOwn(req, res);
@@ -170,7 +170,7 @@ router.delete('/:id', async (req, res) => {
     if (budgetActive || recurringActive) {
       const parts = [];
       if (budgetActive) parts.push('งบประมาณ');
-      if (recurringActive) parts.push(`รายการซ้ำที่เปิดอยู่ ${recurringActive} รายการ`);
+      if (recurringActive) parts.push(`รายการประจำที่เปิดอยู่ ${recurringActive} รายการ`);
       return fail(res, 409, `ลบหมวดนี้ไม่ได้ เพราะยังมี${parts.join('และ')}ใช้หมวดนี้อยู่ ปิดหรือลบก่อน`, {
         code: 'IN_USE',
         blocking: { budgets: budgetActive ? 1 : 0, recurring: recurringActive },

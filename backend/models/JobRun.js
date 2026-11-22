@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// ประวัติรอบงานที่ระบบรันเอง (เช่น สร้างรายการจากกฎรายการซ้ำ) เก็บ 10 รอบล่าสุดต่องาน ไม่มีข้อมูลการเงินของผู้ใช้
+// ประวัติรอบงานที่ระบบรันเอง (เช่น สร้างรายการจากกฎรายการประจำ) เก็บ 10 รอบล่าสุดต่องาน ไม่มีข้อมูลการเงินของผู้ใช้
 const schema = new mongoose.Schema({
   job:        { type: String, required: true },                           // เช่น 'recurring'
   trigger:    { type: String, enum: ['startup', 'daily'], required: true },

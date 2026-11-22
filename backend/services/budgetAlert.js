@@ -127,7 +127,7 @@ async function maybeForecastAlert(budget, now) {
   return true;
 }
 
-// เรียกหลังเพิ่ม/แก้/ลบรายจ่าย (และตอนระบบสร้างรายการซ้ำ) ความล้มเหลวของการแจ้งเตือนต้องไม่ทำให้การบันทึกรายการล้มเหลว
+// เรียกหลังเพิ่ม/แก้/ลบรายจ่าย (และตอนระบบสร้างรายการประจำ) ความล้มเหลวของการแจ้งเตือนต้องไม่ทำให้การบันทึกรายการล้มเหลว
 async function checkBudgetAlert(userId, categoryId, date, { now = Date.now() } = {}) {
   try {
     const d = new Date(date);

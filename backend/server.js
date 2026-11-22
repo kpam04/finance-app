@@ -28,7 +28,7 @@ const { createApp } = require('./app');
 const app = createApp();
 const PORT = process.env.PORT || 3000;
 
-// ประมวลผลรายการที่เกิดซ้ำ แล้วบันทึกผลรอบ (ให้หน้า admin ดูได้ว่างานรันจริงไหม)
+// ประมวลผลรายการประจำ แล้วบันทึกผลรอบ (ให้หน้า admin ดูได้ว่างานรันจริงไหม)
 async function processRecurring(trigger) {
   const startedAt = new Date();
   try {

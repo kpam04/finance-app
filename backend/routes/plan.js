@@ -156,7 +156,7 @@ router.get('/overview', async (req, res) => {
   try {
     const { analysis, goalEvals, achievements, facts, inst, currentMonth } = await loadPlan(req.userId, req.query.month);
     const [saved, ctx] = await Promise.all([PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean(), adviceCtx(req.userId, analysis, goalEvals)]);
-    // รายจ่ายที่จดเองทุกเดือนแต่ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ (เฉพาะเดือนปัจจุบัน) → คำแนะนำ 1 ข้อ + แจ้งกระดิ่งครั้งเดียวต่อรายการ
+    // รายจ่ายที่จดเองทุกเดือนแต่ยังไม่ได้ตั้งเป็นรายการประจำ (เฉพาะเดือนปัจจุบัน) → คำแนะนำ 1 ข้อ + แจ้งกระดิ่งครั้งเดียวต่อรายการ
     const recSug = analysis.is_current ? await suggestionsFor(req.userId, todayTH().toISOString().slice(0, 10)).catch(() => []) : [];
     if (recSug.length) notifySuggestions(req.userId, recSug).catch((e) => console.error('[plan/rec-suggest]', e.message));
     res.json({
@@ -175,15 +175,15 @@ router.get('/overview', async (req, res) => {
   }
 });
 
-// คำแนะนำ "ตั้งเป็นรายการเกิดซ้ำ" (ไม่ส่งให้ AI: ชื่อรายการเป็นข้อความที่ผู้ใช้จดเอง)
+// คำแนะนำ "ตั้งเป็นรายการประจำ" (ไม่ส่งให้ AI: ชื่อรายการเป็นข้อความที่ผู้ใช้จดเอง)
 function recSuggestAdvice(list) {
   if (!list.length) return [];
   const s = list[0];
   const amt = `${(Math.round(s.amount * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })} บาท`;
   const text = list.length === 1
-    ? `“${s.note}” ${amt} ดูเหมือนเป็นรายจ่ายที่คุณจดเองทุกเดือน ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`
-    : `พบรายจ่ายที่คุณจดเองทุกเดือน ${list.length} รายการ เช่น “${s.note}” ${amt} ตั้งเป็นรายการเกิดซ้ำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`;
-  return [{ tag: 'tip', group: 'save', source: 'rules', text, facts_used: [{ id: 'rec_suggest', label: 'รายจ่ายประจำที่ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ', short: 'ยังไม่ได้ตั้ง', value: list.length, unit: 'รายการ', ai: false }] }];
+    ? `“${s.note}” ${amt} ดูเหมือนเป็นรายจ่ายที่คุณจดเองทุกเดือน ตั้งเป็นรายการประจำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`
+    : `พบรายจ่ายที่คุณจดเองทุกเดือน ${list.length} รายการ เช่น “${s.note}” ${amt} ตั้งเป็นรายการประจำไว้ ระบบจะบันทึกให้และกันเงินไว้ในงบให้อัตโนมัติ`;
+  return [{ tag: 'tip', group: 'save', source: 'rules', text, facts_used: [{ id: 'rec_suggest', label: 'รายจ่ายประจำที่ยังไม่ได้ตั้งเป็นรายการประจำ', short: 'ยังไม่ได้ตั้ง', value: list.length, unit: 'รายการ', ai: false }] }];
 }
 
 // สรุปย่อสำหรับการ์ดบนแดชบอร์ด (เฉพาะเดือนปัจจุบัน ไม่เรียก AI)
@@ -192,7 +192,7 @@ router.get('/summary', async (req, res) => {
     const { analysis, goalEvals, achievements, facts } = await loadPlan(req.userId);
     const saved = await PlanAdvice.findOne({ user: req.userId, month: analysis.month }).lean();
     const g = goalEvals[0] || null;
-    // ชวนตั้งรายการเกิดซ้ำ (แสดงเป็น 1 ข้อในการ์ด Insight ของแดชบอร์ด เฉพาะตอนมีรายการให้ชวน)
+    // ชวนตั้งรายการประจำ (แสดงเป็น 1 ข้อในการ์ด Insight ของแดชบอร์ด เฉพาะตอนมีรายการให้ชวน)
     const recSug = await suggestionsFor(req.userId, todayTH().toISOString().slice(0, 10)).catch(() => []);
     const rec = recSuggestAdvice(recSug)[0];
     res.json({

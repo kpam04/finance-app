@@ -47,12 +47,12 @@ async function categoryOk(categoryId, userId, type) {
 
 router.param('id', (req, res, next, id) => {
   if (!mongoose.isValidObjectId(id)) {
-    return res.status(400).json({ success: false, message: 'รหัสรายการที่เกิดซ้ำไม่ถูกต้อง' });
+    return res.status(400).json({ success: false, message: 'รหัสรายการประจำไม่ถูกต้อง' });
   }
   next();
 });
 
-// รายจ่ายที่น่าจะเป็นรายการประจำ (จดเองทุกเดือน ยังไม่ได้ตั้งเป็นรายการเกิดซ้ำ)
+// รายจ่ายที่น่าจะเป็นรายการประจำ (จดเองทุกเดือน ยังไม่ได้ตั้งเป็นรายการประจำ)
 router.get('/suggestions', async (req, res) => {
   try {
     const data = await suggestionsFor(req.userId, ymd(todayTH()));
@@ -75,7 +75,7 @@ router.post('/suggestions/dismiss', async (req, res) => {
   }
 });
 
-// ดูรายการที่เกิดซ้ำทั้งหมด
+// ดูรายการประจำทั้งหมด
 router.get('/', async (req, res) => {
   try {
     const rows = await Recurring.find({ user: req.userId })
@@ -132,7 +132,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'สร้างรายการที่เกิดซ้ำสำเร็จ',
+      message: 'สร้างรายการประจำสำเร็จ',
       data: { recurring_id: rule._id, created_now: run.created },
     });
   } catch (e) {
@@ -158,7 +158,7 @@ router.post('/run-due', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const r = await Recurring.findOne({ _id: req.params.id, user: req.userId });
-    if (!r) return res.status(404).json({ success: false, message: 'ไม่พบรายการที่เกิดซ้ำ' });
+    if (!r) return res.status(404).json({ success: false, message: 'ไม่พบรายการประจำ' });
 
     const b = req.body;
     let changed = false;
@@ -231,7 +231,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const rule = await Recurring.findOneAndDelete({ _id: req.params.id, user: req.userId }).lean();
     if (!rule) {
-      return res.status(404).json({ success: false, message: 'ไม่พบรายการที่เกิดซ้ำ' });
+      return res.status(404).json({ success: false, message: 'ไม่พบรายการประจำ' });
     }
     await Transaction.updateMany({ user: req.userId, recurring: req.params.id }, { recurring: null });
     // รายการที่กฎนี้สร้างไว้กลายเป็นรายการธรรมดา → ระบบจะเห็นเป็นรายจ่ายรายเดือนแล้วชวนตั้งใหม่ทันที

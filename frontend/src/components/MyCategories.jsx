@@ -5,7 +5,7 @@ import { TYPE_LABEL } from '../utils/categoryColors.js';
 
 // การ์ด "หมวดหมู่ของฉัน" (อยู่ในหน้าโปรไฟล์)
 //  ปุ่ม "+ เพิ่มหมวดหมู่" ปุ่มเดียว เปิดป๊อปอัปสร้าง (เลือกรายจ่าย/รายรับในป๊อปอัป) / แก้ไข = ป๊อปอัปหน้าตาเดียวกัน / ลบ = ถามยืนยันก่อนเสมอ
-//  ลบ: ไม่เคยใช้ = ลบถาวร / เคยมีรายการ = ซ่อน (ประวัติเดิมยังอยู่) / ยังมีงบหรือรายการซ้ำที่ใช้อยู่ = ไม่ให้ลบ (หลังบ้านตัดสินและบอกเหตุผล)
+//  ลบ: ไม่เคยใช้ = ลบถาวร / เคยมีรายการ = ซ่อน (ประวัติเดิมยังอยู่) / ยังมีงบหรือรายการประจำที่ใช้อยู่ = ไม่ให้ลบ (หลังบ้านตัดสินและบอกเหตุผล)
 const css = `
 .mc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
 .mc-head h3 { margin: 0 0 2px; }
@@ -125,7 +125,7 @@ export default function MyCategories() {
     }
     return n === 0
       ? 'หมวดนี้ยังไม่เคยถูกใช้ จะลบถาวร (กู้คืนไม่ได้)'
-      : `หมวดนี้ถูกใช้แล้ว (รายการ ${c.usage.transactions || 0} · งบ ${c.usage.budgets || 0} · รายการซ้ำ ${c.usage.recurring || 0}) จะถูกซ่อนแทนการลบ: ไม่แสดงในตัวเลือก แต่ประวัติเดิมยังแสดงชื่อหมวดนี้ และกด “แสดงอีกครั้ง” ได้`;
+      : `หมวดนี้ถูกใช้แล้ว (รายการ ${c.usage.transactions || 0} · งบ ${c.usage.budgets || 0} · รายการประจำ ${c.usage.recurring || 0}) จะถูกซ่อนแทนการลบ: ไม่แสดงในตัวเลือก แต่ประวัติเดิมยังแสดงชื่อหมวดนี้ และกด “แสดงอีกครั้ง” ได้`;
   };
 
   return (
@@ -174,7 +174,7 @@ export default function MyCategories() {
                         {c.hidden && <span className="mc-badge">ซ่อนอยู่</span>}
                       </div>
                       <div className="mc-meta">
-                        {used === 0 ? 'ยังไม่เคยถูกใช้' : `ใช้แล้ว: รายการ ${c.usage.transactions || 0} · งบ ${c.usage.budgets || 0} · รายการซ้ำ ${c.usage.recurring || 0}`}
+                        {used === 0 ? 'ยังไม่เคยถูกใช้' : `ใช้แล้ว: รายการ ${c.usage.transactions || 0} · งบ ${c.usage.budgets || 0} · รายการประจำ ${c.usage.recurring || 0}`}
                       </div>
                     </div>
                     <div className="mc-actions">
