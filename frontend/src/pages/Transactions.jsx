@@ -753,7 +753,14 @@ export default function Transactions() {
                   </td>
 
                   <td data-label="จัดการ" className="actions">
-                    {isSaving(t) && !t.editable ? (
+                    {isSaving(t) && !t.editable && t.deletable ? (
+                      <span className="tx-actions">
+                        <button className="btn btn-sm btn-danger tx-act" aria-label="ลบ" title="ลบ (ยกเลิกการย้ายเงินกลับ)" onClick={() => remove(t)}>
+                          <span className="tx-ico"><IconTrash /></span>
+                          <span className="tx-txt">ลบ</span>
+                        </button>
+                      </span>
+                    ) : isSaving(t) && !t.editable ? (
                       <span className="tx-locked" title={t.goal_state === 'done' ? 'เป้าหมายนี้สำเร็จแล้ว ดูได้อย่างเดียว' : 'เป้าหมายถูกลบแล้ว ดูได้อย่างเดียว'} data-tx-locked><IconLockSm />ดูอย่างเดียว</span>
                     ) : (
                     /* ครอบปุ่มด้วย span (ไม่ใช้ display:flex ที่ตัว td) เส้นขอบแถวจึงต่อเนื่องไม่เหลื่อม */

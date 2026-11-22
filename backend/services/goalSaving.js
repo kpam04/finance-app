@@ -85,8 +85,12 @@ async function editableGoal(userId, t) {
   return goal;
 }
 
+// รายการ "คืนเงินที่เหลือจากเป้าที่สำเร็จแล้ว" = ถอนที่มี goal_used (นับเป็นยอดที่ใช้ของเป้า ไม่ลดยอดออมสำเร็จ)
+const isReturn = (t) => t.type === 'withdraw' && Number(t.goal_used) > 0;
+
 // แก้จำนวนเงิน/วันที่ (หมวด เป้า และเหตุผลแก้ไม่ได้)
 async function editSaving(userId, t, { amount, date }) {
+  if (isReturn(t)) throw new SavingError('รายการย้ายเงินที่เหลือกลับแก้ไขไม่ได้ ถ้าทำผิดให้ลบแล้วทำใหม่');
   const goal = await editableGoal(userId, t);
   let delta = 0;
   if (amount !== undefined && amount !== t.amount) {
@@ -103,6 +107,13 @@ async function editSaving(userId, t, { amount, date }) {
 
 // ลบรายการออม/ถอน (กรอกผิด): ยอดในเป้าปรับกลับ เงินคงเหลือกลับคืนเอง (คำนวณจากรายการ)
 async function deleteSaving(userId, t) {
+  // ยกเลิกการคืนเงินที่เหลือ: เงินกลับเข้าเป้าที่สำเร็จแล้ว (ยอดออมสำเร็จไม่เปลี่ยน)
+  if (isReturn(t)) {
+    const g = t.goal ? await Goal.findOne({ _id: t.goal, user: userId }).lean() : null;
+    if (!g) throw new SavingError('เป้าหมายของรายการนี้ถูกลบแล้ว ลบไม่ได้');
+    await Transaction.deleteOne({ _id: t._id, user: userId });
+    return { goal: g, justCompleted: false };
+  }
   const goal = await editableGoal(userId, t);
   const delta = -effect(t.type, t.amount);
   if (round2(Number(goal.saved_amount) + delta) < 0) throw new SavingError('ลบไม่ได้ เพราะยอดในเป้าจะติดลบ (มีการถอนออกไปแล้ว)');
@@ -136,7 +147,7 @@ async function deleteGoal(userId, goalId) {
 // เงินคงเหลือ: รายจ่ายนับเต็มจำนวน แต่ส่วนที่ดึงจากเป้า (goal_used) บวกกลับ เพราะหักไปแล้วตอนออม
 async function usedByGoal(userId, goalIds, excludeTxId) {
   if (!goalIds.length) return new Map();
-  const q = { user: userId, type: 'expense', goal: { $in: goalIds } };
+  const q = { user: userId, type: { $in: ['expense', 'withdraw'] }, goal: { $in: goalIds } }; // withdraw ที่มี goal_used = คืนเงินที่เหลือ
   const rows = await Transaction.find(q).select('_id goal goal_used').lean();
   const m = new Map();
   for (const r of rows) {
@@ -168,4 +179,16 @@ async function goalFund(userId, goalId, amount, excludeTxId) {
   return { goal: goal._id, goal_name: goal.name, goal_used: round2(Math.min(amount, remaining)) };
 }
 
-module.exports = { usedByGoal, usableGoals, goalFund, SavingError, SAVING_TYPES, REASON_MAX, addSaving, withdraw, editSaving, deleteSaving, deleteGoal, netSaved, cleanReason, todayTH };
+// คืนเงินที่เหลือของเป้าที่สำเร็จแล้วเข้าเงินคงเหลือ (ทั้งหมดที่เหลือ)
+async function returnRemaining(userId, goalId) {
+  const goal = await Goal.findOne({ _id: goalId, user: userId }).lean();
+  if (!goal) throw new SavingError('ไม่พบเป้าหมาย', 404);
+  if (!isDone(goal)) throw new SavingError('คืนเงินที่เหลือได้เฉพาะเป้าที่สำเร็จแล้ว');
+  const used = (await usedByGoal(userId, [goal._id])).get(String(goal._id)) || 0;
+  const remaining = Math.max(0, round2(Number(goal.saved_amount) - used));
+  if (remaining <= 0) throw new SavingError('ไม่มีเงินเหลือในเป้านี้');
+  const t = await Transaction.create({ user: userId, type: 'withdraw', amount: remaining, goal_used: remaining, date: todayTH(), goal: goal._id, goal_name: goal.name, reason: 'ย้ายเงินที่เหลือกลับไปใช้' });
+  return { transaction: t, returned: remaining };
+}
+
+module.exports = { returnRemaining, isReturn, usedByGoal, usableGoals, goalFund, SavingError, SAVING_TYPES, REASON_MAX, addSaving, withdraw, editSaving, deleteSaving, deleteGoal, netSaved, cleanReason, todayTH };

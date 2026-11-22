@@ -53,7 +53,9 @@ const toDto = (t, goals) => {
     goal_name: (g && g.name) || t.goal_name || '',
     goal_state: goalState,
     reason: t.reason || '',
-    editable: goalState === 'active',
+    // คืนเงินที่เหลือ (ถอนจากเป้าที่สำเร็จแล้ว): แก้ไม่ได้ แต่ลบ (ยกเลิก) ได้
+    editable: goalState === 'active' && !goalSaving.isReturn(t),
+    deletable: goalState === 'active' || (goalSaving.isReturn(t) && goalState !== 'deleted'),
   };
 };
 

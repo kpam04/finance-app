@@ -453,6 +453,19 @@ router.post('/goals/:id/deposits', async (req, res) => {
   }
 });
 
+// คืนเงินที่เหลือของเป้าที่สำเร็จแล้วเข้าเงินคงเหลือ
+router.post('/goals/:id/return', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบเป้าหมาย');
+    const r = await goalSaving.returnRemaining(req.userId, req.params.id);
+    res.status(201).json({ success: true, message: `ย้ายเงินที่เหลือ ${r.returned.toLocaleString('en-US')} บาท กลับเข้าเงินคงเหลือแล้ว`, data: { returned: r.returned } });
+  } catch (e) {
+    if (e instanceof goalSaving.SavingError) return fail(res, e.status, e.message);
+    console.error('[plan/goals/return]', e.message);
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
 router.post('/goals/:id/withdraw', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบเป้าหมาย');

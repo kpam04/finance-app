@@ -23,6 +23,14 @@ function readSavedTab() {
   try { const t = localStorage.getItem(TAB_KEY); return isTab(t) ? t : null; } catch { return null; }
 }
 
+// การ์ดเป้าที่สำเร็จแล้ว: วันที่แบบย่อ "8 พ.ค. 69" / ช่วง "8 พ.ค. – 8 พ.ย. 69" (ปีเดียวกันแสดงปีครั้งเดียว)
+const achDate = (iso, year = true) => new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString('th-TH', year ? { day: 'numeric', month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' });
+const achRange = (a, b) => (String(a).slice(0, 4) === String(b).slice(0, 4) ? `${achDate(a, false)} – ${achDate(b)}` : `${achDate(a)} – ${achDate(b)}`);
+const svgS = { width: 12, height: 12, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true };
+const IconClockSm = () => (<svg {...svgS}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>);
+const IconCalSm = () => (<svg {...svgS}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>);
+const IconCheckSm = () => (<svg {...svgS} width={14} height={14}><path d="M20 6 9 17l-5-5" /></svg>);
+
 // ไอคอนถอนออก (กระเป๋าเงิน + ลูกศรออก)
 const IconWithdraw = ({ size = 15 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3" /><path d="M3 6v12a2 2 0 0 0 2 2h9" /><path d="M16 17h6" /><path d="m19 14 3 3-3 3" /></svg>
@@ -208,12 +216,23 @@ const css = `
 .pl-add:disabled { color: #b0a99c; border-color: #E6E0D4; cursor: not-allowed; }
 .pl-add-n { font-weight: 500; font-size: 12px; color: #8A8177; }
 .pl-goal-tools { display: inline-flex; gap: 2px; }
-.pl-ach-use { margin-top: 10px; padding-top: 9px; border-top: 1px dashed #EADFC4; font-size: 13px; color: #6b6358; }
-.pl-ach-use > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; }
+.pl-ach-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; font-size: 12.5px; color: #8A8177; }
+.pl-ach-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.pl-ach-meta svg { flex: 0 0 auto; }
+.pl-ach-use { margin-top: 14px; padding-top: 12px; border-top: 1px solid #F1E8D2; font-size: 13px; color: #6b6358; }
+.pl-ach-ul { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.pl-ach-ul b { font-size: 16px; color: #3E7E7A !important; font-variant-numeric: tabular-nums; }
+.pl-ach-us { margin-top: 6px; font-size: 12px; color: #8A8177; }
+.pl-ach-used { display: flex; align-items: center; gap: 6px; font-weight: 600; color: #6F8FA0; }
 .pl-ach-use b { color: #3F3A34; font-weight: 600; }
 .pl-ach-use small { flex-basis: 100%; font-size: 12px; color: #9a9184; }
-.pl-ach-ubar { height: 5px; margin-top: 6px; border-radius: 5px; background: #EFE9DF; overflow: hidden; }
-.pl-ach-ubar i { display: block; height: 100%; background: #6F8FA0; }
+.pl-ach-left { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.pl-ach-left b { color: #3E7E7A !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pl-ach-left .of { color: #9a9184; }
+.pl-ach-return { display: inline-flex; flex: 0 0 auto; white-space: nowrap; align-items: center; gap: 4px; padding: 3px 9px; border: 1px solid #CFE0DD; border-radius: 999px; background: #F7FBFA; color: #3E7E7A; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pl-ach-return:hover { background: #EDF6F4; }
+.pl-ach-ubar { height: 4px; margin-top: 8px; border-radius: 4px; background: #F1ECE2; overflow: hidden; }
+.pl-ach-ubar i { display: block; height: 100%; border-radius: 4px; background: #D9B65C; }
 .pl-goal-tools button { display: inline-flex; padding: 3px 5px; border: none; border-radius: 6px; background: none; color: #9a9185; cursor: pointer; }
 .pl-goal-tools button:hover { color: #4b5563; background: #F3EFE6; }
 .pl-bar { height: 8px; margin: 8px 0 6px; border-radius: 4px; background: #EEE9DD; overflow: hidden; }
@@ -775,6 +794,16 @@ export default function Plan() {
   }, [loadInst]);
   const [celebrate, setCelebrate] = useState(null); // เป้าที่เพิ่งออมครบ (แสดงหน้าต่างแสดงความยินดี)
   const [achMenu, setAchMenu] = useState(null); // เมนู ⋯ ของการ์ดสำเร็จแล้วที่เปิดอยู่
+  const [confirmReturn, setConfirmReturn] = useState(null); // เป้าที่กำลังถามยืนยัน "คืนเงินที่เหลือ"
+  const returnRemaining = async (id) => {
+    try {
+      await api.returnGoalRemaining(id);
+      setConfirmReturn(null);
+      await load();
+    } catch (e) {
+      setError(e.message || 'คืนเงินไม่สำเร็จ');
+    }
+  };
   useEffect(() => {
     if (!achMenu) return undefined;
     const close = (e) => { if (!e.target.closest('[data-ach-menu-wrap]')) setAchMenu(null); };
@@ -1569,23 +1598,43 @@ export default function Plan() {
                           <span className="pl-ach-done"><span className="pl-ach-trophy" aria-hidden="true"><IconTrophy size={15} /></span><b>{baht(a.target_amount)}</b></span>
                           <span className={`pl-ach-pill ${pill.cls}`} data-ach-timing>{pill.text}</span>
                         </div>
-                        <div className="pl-bar pl-ach-bar" aria-hidden="true"><i style={{ width: '100%' }} /></div>
-                        <dl className="pl-goal-facts pl-ach-facts">
-                          <div><dt>ระยะเวลา</dt><dd>{a.duration_days < 1 ? 'ภายในวันเดียว' : spanText(a.duration_days)}</dd></div>
-                          <div><dt>ช่วงที่ออม</dt><dd>{a.started_at ? `${thaiDate(a.started_at)} – ${thaiDate(a.completed_at)}` : thaiDate(a.completed_at)}</dd></div>
-                          {a.target_date && <div><dt>กำหนดเดิม</dt><dd>{thaiDate(a.target_date)}</dd></div>}
-                        </dl>
+                        {/* รายละเอียดย่อ: ระยะเวลา ช่วงที่ออม กำหนดเดิม */}
+                        <div className="pl-ach-meta" data-ach-meta>
+                          <span><IconClockSm />{a.duration_days < 1 ? 'ภายในวันเดียว' : `ใช้เวลา ${spanText(a.duration_days)}`}</span>
+                          {a.started_at && <span><IconCalSm />{achRange(a.started_at, a.completed_at)}</span>}
+                          {a.target_date && <span>กำหนดเดิม {achDate(a.target_date)}</span>}
+                        </div>
                         {/* การใช้เงินของเป้า: จ่ายผ่านช่อง "จ่ายจากเงินออม" ตอนกรอกรายจ่าย */}
                         {typeof a.used_amount === 'number' && (
                           <div className="pl-ach-use" data-ach-use>
-                            {a.used_amount <= 0 ? (
-                              <span>พร้อมใช้ <b>{baht(a.remaining_amount)}</b><small>เลือก “จ่ายจากเงินออม” ตอนกรอกรายจ่าย</small></span>
-                            ) : (
+                            {a.used_amount <= 0 && a.remaining_amount > 0 ? (
                               <>
-                                <span>{a.remaining_amount > 0 ? `ใช้ไปแล้ว ${baht(a.used_amount)}` : 'ใช้ครบแล้ว'}{a.remaining_amount > 0 && <b>เหลือ {baht(a.remaining_amount)}</b>}</span>
-                                <div className="pl-ach-ubar"><i style={{ width: `${Math.min(100, (a.used_amount / (a.used_amount + a.remaining_amount)) * 100)}%` }} /></div>
+                                <div className="pl-ach-ul"><span>พร้อมใช้</span><b>{baht(a.remaining_amount)}</b></div>
+                                <div className="pl-ach-us">เลือก “จ่ายจากเงินออม” ตอนกรอกรายจ่าย</div>
                               </>
+                            ) : a.remaining_amount > 0 ? (
+                              <>
+                                <div className="pl-ach-left">
+                                  <span>เหลือ <b>{baht(a.remaining_amount)}</b> <span className="of">/ {baht(a.used_amount + a.remaining_amount)}</span></span>
+                                  {confirmReturn !== a.goal_id && (
+                                    <button type="button" className="pl-ach-return" data-ach-return title="ย้ายเงินที่เหลือกลับเข้าเงินคงเหลือ" onClick={() => setConfirmReturn(a.goal_id)}>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3" /><path d="M3 6v12a2 2 0 0 0 2 2h9" /><path d="M16 17h6" /><path d="m19 14 3 3-3 3" /></svg>
+                                      ย้ายกลับ
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="pl-ach-ubar" title={`ใช้ไปแล้ว ${baht(a.used_amount)}`}><i style={{ width: `${Math.min(100, (a.used_amount / (a.used_amount + a.remaining_amount)) * 100)}%` }} /></div>
+                              </>
+                            ) : (
+                              <div className="pl-ach-used"><IconCheckSm />ใช้ครบแล้ว {baht(a.used_amount)}</div>
                             )}
+                          </div>
+                        )}
+                        {confirmReturn === a.goal_id && (
+                          <div className="pl-confirm" data-ach-return-confirm>
+                            <span>ย้าย {baht(a.remaining_amount)} กลับเข้าเงินคงเหลือ?<small style={{ display: 'block', color: '#8A8177' }}>ไม่นับเป็นรายรับ ยกเลิกได้ด้วยการลบรายการในหน้ารายการ</small></span>
+                            <button type="button" className="btn btn-sm" data-ach-return-yes onClick={() => returnRemaining(a.goal_id)}>ย้ายกลับ</button>
+                            <button type="button" className="btn btn-sm btn-light" onClick={() => setConfirmReturn(null)}>ยกเลิก</button>
                           </div>
                         )}
                         {confirmDel === a.goal_id && (
