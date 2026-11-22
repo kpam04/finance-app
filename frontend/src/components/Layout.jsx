@@ -73,11 +73,11 @@ export default function Layout() {
 
               <div className="profile-dropdown-header">
 
-                <Avatar src={user && user.avatar} name={name} size={30} />
+                <Avatar src={user && user.avatar} name={name} size={32} />
 
                 <div className="profile-dropdown-info">
                   <strong>{name}</strong>
-                  <span>บัญชีผู้ใช้งาน</span>
+                  <span>{user && user.username ? `@${user.username}` : 'บัญชีผู้ใช้งาน'}</span>
                 </div>
 
               </div>

@@ -282,8 +282,11 @@ img {
 
   z-index: 1100;
 
-  width: 240px;
-  padding: 10px;
+  /* กว้างตามเนื้อหา: แคบสุด 200px กว้างสุด 260px (ชื่อยาวจะตัดเป็น ...) */
+  width: max-content;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 8px;
 
   background: #ffffff;
 
@@ -298,8 +301,9 @@ img {
   display: flex;
   align-items: center;
 
-  gap: 10px;
-  padding: 10px 8px;
+  /* รูปกว้าง 32px ตรงกับช่องไอคอนของเมนูด้านล่าง ชื่อจึงเริ่มแนวเดียวกับข้อความเมนู */
+  gap: 12px;
+  padding: 8px 10px;
 }
 
 .profile-dropdown-info {
@@ -325,7 +329,7 @@ img {
 
 .profile-dropdown-divider {
   height: 1px;
-  margin: 6px 0;
+  margin: 4px 2px;
 
   background: var(--border);
 }
@@ -335,10 +339,10 @@ img {
   display: flex;
   align-items: center;
 
-  gap: 10px;
+  gap: 12px;
 
   width: 100%;
-  padding: 11px 10px;
+  padding: 10px;
 
   border: none;
   border-radius: 8px;
@@ -352,6 +356,13 @@ img {
   text-decoration: none;
 
   cursor: pointer;
+}
+
+/* ช่องไอคอนกว้างเท่ารูปโปรไฟล์ (32px) ให้อยู่แนวเดียวกัน */
+.profile-dropdown-item > span:first-child {
+  display: inline-flex;
+  justify-content: center;
+  flex: 0 0 32px;
 }
 
 .profile-dropdown-item:hover {
@@ -928,7 +939,7 @@ label {
     top: calc(100% + 8px);
     right: 0;
 
-    width: 230px;
+    width: max-content;
   }
 
   /* ---------- Main Content ---------- */
