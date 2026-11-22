@@ -10,6 +10,7 @@ import InfoTitle from '../components/InfoTitle.jsx';
 import ExportCsvModal from '../components/ExportCsvModal.jsx';
 import SavingEditModal from '../components/SavingEditModal.jsx';
 import GoalFundPicker, { IconGoalSm } from '../components/GoalFundPicker.jsx';
+import SoftSelect from '../components/SoftSelect.jsx';
 import UnusualHint, { useUnusual, resetTypical } from '../components/UnusualHint.jsx';
 import { IconList, IconFilter, IconDownload } from '../components/PlanIcons.jsx';
 
@@ -857,20 +858,18 @@ export default function Transactions() {
                 <div>
                   <label>ประเภท</label>
 
-                  <select
+                  {/* หน้าตาเดียวกับช่องหมวดหมู่ */}
+                  <SoftSelect
+                    options={[{ value: 'expense', label: 'รายจ่าย', dot: '#C98278' }, { value: 'income', label: 'รายรับ', dot: '#6F987B' }]}
                     value={form.type}
-                    onChange={(e) => {
-                      e.target.setCustomValidity('');
-                      changeType(e.target.value);
-                    }}
-                    onInvalid={(e) => e.target.setCustomValidity('โปรดระบุประเภท')}
+                    onChange={changeType}
+                    placeholder="-- เลือกประเภท --"
+                    invalidMessage="โปรดระบุประเภท"
+                    ariaLabel="ประเภท"
                     disabled={!!editingId}
                     required
-                  >
-                    <option value="">โปรดเลือกประเภทรายการ</option>
-                    <option value="expense">รายจ่าย</option>
-                    <option value="income">รายรับ</option>
-                  </select>
+                    data-tx-form-type
+                  />
 
                   {editingId && (
                     <small className="muted" data-type-locked>

@@ -1,3 +1,5 @@
+import SoftSelect from './SoftSelect.jsx';
+
 // "จ่ายจากเงินออม" (ไม่บังคับ) ในฟอร์มรายจ่าย: เลือกเป้าที่สำเร็จแล้วและยังมีเงินเหลือ
 // ระบบดึงเงินจากเป้าได้ไม่เกินยอดที่เหลือ ส่วนเกินหักจากเงินคงเหลือตามปกติ / ส่วนที่ดึงจากเป้าไม่นับในงบและไม่ถูกเตือนยอดสูงผิดปกติ
 // goals: [{ goal_id, name, remaining }] (ตอนแก้รายการ remaining รวมยอดเดิมของรายการนั้นแล้ว)
@@ -5,7 +7,6 @@ const css = `
 .gf-box { margin: 4px 0 12px; padding: 12px; border: 1px dashed #CFE0DD; border-radius: 12px; background: #F7FBFA; }
 .gf-box > label { display: flex !important; align-items: center; flex-direction: row !important; justify-content: flex-start; gap: 6px; margin: 0 0 6px !important; text-align: left; font-size: 13px; font-weight: 600; color: #3E7E7A; }
 .gf-box > label svg { flex: 0 0 auto; }
-.gf-box select { width: 100%; box-sizing: border-box; border-color: #CFE0DD; }
 .gf-pv { margin: 8px 0 0; font-size: 13px; line-height: 1.7; color: #6b6358; }
 .gf-pv b { color: #3E7E7A; }
 .gf-pv .w { color: #B08900; }
@@ -41,10 +42,14 @@ export default function GoalFundPicker({ goals = [], value = '', onChange, amoun
     <div className="gf-box" data-goal-fund>
       <style>{css}</style>
       <label htmlFor="gf-select"><IconGoalSm />จ่ายจากเงินออม (ไม่บังคับ)</label>
-      <select id="gf-select" value={value} onChange={(e) => onChange(e.target.value)} data-goal-fund-select>
-        <option value="">ไม่ใช้เงินออม</option>
-        {goals.map((g) => <option key={g.goal_id} value={g.goal_id}>{g.name} (เหลือ {baht(g.remaining)})</option>)}
-      </select>
+      <SoftSelect
+        options={[{ value: '', label: 'ไม่ใช้เงินออม' }, ...goals.map((g) => ({ value: g.goal_id, label: g.name, icon: <IconGoalSm />, sub: `เหลือ ${baht(g.remaining)}` }))]}
+        value={value}
+        onChange={onChange}
+        ariaLabel="จ่ายจากเงินออม"
+        id="gf-select"
+        data-goal-fund-select
+      />
       {sel && amt > 0 && (
         <p className="gf-pv" data-goal-fund-preview>
           ใช้เงินออม <b>{baht(use)}</b>{over > 0 ? ' (ที่เหลือทั้งหมด)' : ` · เหลือในเป้า ${baht(sel.remaining - use)}`}
