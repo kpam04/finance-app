@@ -38,8 +38,10 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('auth:logout', onLogout);
   }, []);
 
-  const login = async (email, password) => {
-    const res = await api.login({ email, password });
+  // identifier = ชื่อผู้ใช้ หรืออีเมล (มี @)
+  // mode = 'username' | 'email' (ไม่ส่ง = หลังบ้านดูจาก @)
+  const login = async (identifier, password, mode) => {
+    const res = await api.login({ identifier, password, mode });
     setToken(res.data.token);
     setLoading(true);
     await loadProfile();
@@ -49,7 +51,7 @@ export function AuthProvider({ children }) {
   const register = async (payload) => {
     await api.register(payload);
     // สมัครเสร็จแล้ว login ต่อให้เลย
-    await login(payload.email, payload.password);
+    await login(payload.email, payload.password, 'email');
   };
 
   const logout = () => {

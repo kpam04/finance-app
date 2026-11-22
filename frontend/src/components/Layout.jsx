@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import Avatar from './Avatar.jsx';
 import { IconWallet, IconUser, IconLogout, IconChevronDown } from './PlanIcons.jsx';
+import PolicyGate from './PolicyGate.jsx';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -22,6 +23,8 @@ export default function Layout() {
 
   return (
     <div className="app">
+      {/* นโยบายเปลี่ยนเวอร์ชัน: ต้องกดยอมรับก่อนใช้งานต่อ (ผู้ใช้เดิม) */}
+      {user && user.policy_ok === false && <PolicyGate onLogout={handleLogout} />}
 
       {/* ================= HEADER ================= */}
       <header className="topbar">

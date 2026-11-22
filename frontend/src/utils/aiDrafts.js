@@ -38,6 +38,7 @@ export const FALLBACK_REASON = {
   AI_BAD_OUTPUT: 'AI ตอบกลับในรูปแบบที่ใช้ไม่ได้',
   AI_UNAVAILABLE: 'ระบบ AI ใช้ไม่ได้ชั่วคราว',
   AI_EMPTY: 'AI ไม่พบรายการในข้อความนี้',
+  POLICY_REQUIRED: 'ยังไม่ได้ยอมรับนโยบายเวอร์ชันล่าสุด',
   AI_CONSENT_REQUIRED: 'ยังไม่ได้เปิดใช้ AI',
   AI_IMAGE_CONSENT_REQUIRED: 'ยังไม่ได้ยินยอมให้ส่งรูปใบเสร็จ',
   AI_NO_TOTAL: 'อ่านยอดเงินจากรูปนี้ไม่ได้',

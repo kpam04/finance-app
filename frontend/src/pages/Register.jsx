@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import PrivacyModal from '../components/PrivacyModal.jsx';
+import useUsernameCheck from '../utils/useUsernameCheck.js';
 import {
   checkName,
   checkEmail,
   checkSignupEmail,
   checkPassword,
+  checkUsername,
   suggestEmailFix,
   passwordLength,
   ALLOWED_EMAIL_DOMAINS,
@@ -27,6 +29,8 @@ function validate(form) {
   if (fn.error) e.first_name = fn.error;
   const ln = checkName(form.last_name, 'นามสกุล');
   if (ln.error) e.last_name = ln.error;
+  const un = checkUsername(form.username);
+  if (un.error) e.username = un.error;
   const em = checkSignupEmail(form.email);
   if (em.error) e.email = em.error;
   const pw = checkPassword(form.password);
@@ -43,6 +47,7 @@ export default function Register() {
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
+    username: '',
     email: '',
     password: '',
     confirm_password: '',
@@ -58,6 +63,8 @@ export default function Register() {
   if (user) return <Navigate to="/dashboard" replace />;
 
   const errors = validate(form);
+  const uCheck = useUsernameCheck(form.username);
+  if (!errors.username && uCheck.state === 'taken') errors.username = uCheck.message;
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
   const shown = (k) => (touched[k] || submitted ? errors[k] : undefined);
@@ -77,6 +84,7 @@ export default function Register() {
       await register({
         first_name: checkName(form.first_name, 'ชื่อ').value,
         last_name: checkName(form.last_name, 'นามสกุล').value,
+        username: checkUsername(form.username).value,
         email: checkSignupEmail(form.email).value,
         password: form.password,
         confirm_password: form.confirm_password,
@@ -120,6 +128,29 @@ export default function Register() {
             {shown('last_name') && <small style={errStyle} data-error="last_name">{errors.last_name}</small>}
           </label>
         </div>
+
+        <label>
+          ชื่อผู้ใช้ (ใช้เข้าสู่ระบบ)
+          <input
+            value={form.username}
+            onChange={set('username')}
+            onBlur={blur('username')}
+            maxLength={20}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            data-username
+          />
+          {shown('username') ? (
+            <small style={errStyle} data-error="username">{errors.username}</small>
+          ) : uCheck.state === 'ok' ? (
+            <small style={okStyle} data-username-ok>{uCheck.message}</small>
+          ) : uCheck.state === 'taken' || (uCheck.state === 'invalid' && form.username.length >= 3) ? (
+            <small style={errStyle} data-error="username">{uCheck.message}</small>
+          ) : (
+            <small style={hintStyle}>a-z, 0-9, จุด และขีดล่าง ยาว 3-20 ตัว ขึ้นต้นด้วยตัวอักษร</small>
+          )}
+        </label>
 
         <label>
           อีเมล

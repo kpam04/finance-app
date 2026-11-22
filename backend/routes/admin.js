@@ -5,9 +5,10 @@ const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const JobRun = require('../models/JobRun');
 const Notification = require('../models/Notification');
+const UsernameRequest = require('../models/UsernameRequest');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/requireRole');
-const { recordAudit } = require('../services/audit');
+const { recordAudit, maskEmail } = require('../services/audit');
 const { deleteUserData } = require('../services/accountDeletion');
 const v = require('../utils/userValidation');
 
@@ -43,13 +44,14 @@ const userRow = (u) => ({
   last_name: u.lastName || '',
   full_name: u.fullName || [u.firstName, u.lastName].filter(Boolean).join(' '),
   email: u.email,
+  username: u.username || null,
   created_at: u.createdAt,
   last_active_at: u.lastActiveAt || null,
   status: u.status || 'active',
   role: u.role || 'user',
   suspended_reason: u.suspendedReason || '',
 });
-const USER_FIELDS = 'firstName lastName fullName email createdAt lastActiveAt status role suspendedReason';
+const USER_FIELDS = 'firstName lastName fullName email username createdAt lastActiveAt status role suspendedReason';
 
 async function loadTarget(req, res) {
   if (!mongoose.isValidObjectId(req.params.id)) {
@@ -124,7 +126,7 @@ router.get('/users', wrap(async (req, res) => {
   const search = v.cleanText(req.query.search || '').slice(0, 100);
   if (search) {
     const rx = escapeRegex(search);
-    q.$or = [{ fullName: { $regex: rx, $options: 'i' } }, { email: { $regex: rx, $options: 'i' } }];
+    q.$or = [{ fullName: { $regex: rx, $options: 'i' } }, { email: { $regex: rx, $options: 'i' } }, { username: { $regex: rx, $options: 'i' } }];
   }
   if (['active', 'suspended'].includes(req.query.status)) q.status = req.query.status;
   if (['user', 'admin', 'owner'].includes(req.query.role)) q.role = req.query.role;
@@ -246,6 +248,78 @@ router.delete('/admins/:id', ownerOnly, wrap(async (req, res) => {
 }));
 
 // ---------- บันทึกการกระทำ / สถานะงาน ----------
+// ---------- คำขอเปลี่ยนชื่อผู้ใช้ ----------
+// แอดมินเห็นเฉพาะชื่อผู้ใช้เดิม/ใหม่ เหตุผล และอีเมลแบบปิดบางส่วน (ไม่มีข้อมูลการเงิน)
+router.get('/username-requests', wrap(async (req, res) => {
+  const status = ['pending', 'approved', 'rejected', 'cancelled'].includes(req.query.status) ? req.query.status : 'pending';
+  const page = pageOf(req.query);
+  const q = { status };
+  const [total, rows] = await Promise.all([
+    UsernameRequest.countDocuments(q),
+    UsernameRequest.find(q).sort({ createdAt: status === 'pending' ? 1 : -1 }).skip((page - 1) * PAGE_SIZE).limit(PAGE_SIZE).populate('user', 'email firstName lastName').lean(),
+  ]);
+  res.json({
+    success: true,
+    data: rows.map((r) => ({
+      request_id: r._id,
+      user_id: r.user ? r.user._id : null,
+      user_name: r.user ? [r.user.firstName, r.user.lastName].filter(Boolean).join(' ') : '(ลบบัญชีแล้ว)',
+      user_email: r.user ? maskEmail(r.user.email) : '',
+      from_username: r.fromUsername,
+      to_username: r.toUsername,
+      reason: r.reason,
+      status: r.status,
+      decision_note: r.decisionNote || '',
+      created_at: r.createdAt,
+      decided_at: r.decidedAt || null,
+    })),
+    pagination: { page, limit: PAGE_SIZE, total },
+  });
+}));
+
+async function loadPendingRequest(req, res) {
+  if (!mongoose.isValidObjectId(req.params.id)) { fail(res, 400, 'รหัสคำขอไม่ถูกต้อง'); return null; }
+  const r = await UsernameRequest.findById(req.params.id);
+  if (!r) { fail(res, 404, 'ไม่พบคำขอ'); return null; }
+  if (r.status !== 'pending') { fail(res, 409, 'คำขอนี้ถูกพิจารณาหรือยกเลิกไปแล้ว'); return null; }
+  return r;
+}
+
+// อนุมัติ = เปลี่ยนชื่อผู้ใช้ให้ทันที (ตรวจซ้ำอีกครั้งว่าชื่อยังว่าง)
+router.post('/username-requests/:id/approve', wrap(async (req, res) => {
+  const r = await loadPendingRequest(req, res);
+  if (!r) return;
+  const target = await User.findById(r.user).lean();
+  if (!target) return fail(res, 404, 'ไม่พบบัญชีผู้ใช้');
+  if (await User.exists({ username: r.toUsername, _id: { $ne: target._id } })) {
+    return fail(res, 409, `ชื่อ "${r.toUsername}" ถูกใช้งานไปแล้ว กรุณาปฏิเสธคำขอนี้และแจ้งให้ผู้ใช้เลือกชื่อใหม่`);
+  }
+  await recordAudit({ actor: req.authUser, action: 'username_approve', target, reason: `${r.fromUsername} -> ${r.toUsername}` });
+  try {
+    await User.updateOne({ _id: target._id }, { $set: { username: r.toUsername } });
+  } catch (e) {
+    if (e.code === 11000) return fail(res, 409, `ชื่อ "${r.toUsername}" ถูกใช้งานไปแล้ว`);
+    throw e;
+  }
+  await UsernameRequest.updateOne({ _id: r._id }, { $set: { status: 'approved', decidedBy: req.authUser._id, decidedAt: new Date() } });
+  await Notification.create({ user: target._id, kind: 'account', message: `คำขอเปลี่ยนชื่อผู้ใช้ได้รับอนุมัติแล้ว ชื่อผู้ใช้ใหม่ของคุณคือ "${r.toUsername}" ใช้ชื่อนี้เข้าสู่ระบบครั้งต่อไป` });
+  res.json({ success: true, message: 'อนุมัติและเปลี่ยนชื่อผู้ใช้เรียบร้อยแล้ว' });
+}));
+
+router.post('/username-requests/:id/reject', wrap(async (req, res) => {
+  const note = cleanReason(req.body.reason, false);
+  if (note.error) return fail(res, 400, note.error);
+  const r = await loadPendingRequest(req, res);
+  if (!r) return;
+  const target = await User.findById(r.user).lean();
+  await recordAudit({ actor: req.authUser, action: 'username_reject', target, reason: note.value || `${r.fromUsername} -> ${r.toUsername}` });
+  await UsernameRequest.updateOne({ _id: r._id }, { $set: { status: 'rejected', decidedBy: req.authUser._id, decidedAt: new Date(), decisionNote: note.value } });
+  if (target) {
+    await Notification.create({ user: target._id, kind: 'account', message: `คำขอเปลี่ยนชื่อผู้ใช้เป็น "${r.toUsername}" ไม่ได้รับอนุมัติ${note.value ? ` (${note.value})` : ''} ยื่นใหม่ได้หลัง ${UsernameRequest.REAPPLY_DAYS} วัน` });
+  }
+  res.json({ success: true, message: 'ปฏิเสธคำขอเรียบร้อยแล้ว' });
+}));
+
 router.get('/audit', wrap(async (req, res) => {
   const page = pageOf(req.query);
   const [total, rows] = await Promise.all([

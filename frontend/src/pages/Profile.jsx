@@ -4,7 +4,6 @@ import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import PrivacyModal from '../components/PrivacyModal.jsx';
 import MyCategories from '../components/MyCategories.jsx';
-import AiSettingsCard from '../components/AiSettingsCard.jsx';
 import ProfileEditModal from '../components/ProfileEditModal.jsx';
 import ChangePasswordModal from '../components/ChangePasswordModal.jsx';
 import Avatar from '../components/Avatar.jsx';
@@ -140,6 +139,7 @@ export default function Profile() {
                 </span>
               )}
             </div>
+            {user.username && <div className="pf-email" data-pf-username>@{user.username}</div>}
             <div className="pf-email">{user.email}</div>
             <div className="pf-since">สมาชิกตั้งแต่ {fmtDate(user.created_at)}</div>
           </div>
@@ -178,7 +178,6 @@ export default function Profile() {
 
       {/* หมวดหมู่ของฉัน: เพิ่ม/แก้ไข/ลบ/แสดงอีกครั้ง */}
       <MyCategories />
-      <AiSettingsCard />
 
       <div className="card" style={{ borderColor: '#fecaca' }}>
         <h3 style={{ marginTop: 0, color: '#b91c1c' }}>ลบบัญชี</h3>

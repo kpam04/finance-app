@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const ACTIONS = [
   'suspend', 'unsuspend', 'force_logout', 'delete_user',
   'promote_admin', 'demote_admin', 'owner_created',
+  'username_approve', 'username_reject',
 ];
 
 const schema = new mongoose.Schema({

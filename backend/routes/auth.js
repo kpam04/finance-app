@@ -10,6 +10,7 @@ const v = require('../utils/userValidation');
 const loginLimiter = require('../services/loginLimiter');
 const { suspendedPayload } = require('../services/accountStatus');
 const { deleteUserData } = require('../services/accountDeletion');
+const UsernameRequest = require('../models/UsernameRequest');
 
 const router = express.Router();
 // Express 5 ไม่ใส่ {} ให้ req.body เมื่อไม่มีข้อมูลส่งมา กันโค้ดด้านล่างพังเมื่อเรียกโดยไม่มี body
@@ -19,7 +20,7 @@ router.use((req, res, next) => {
 });
 
 // เวอร์ชันของประกาศความเป็นส่วนตัว (เปลี่ยนเมื่อแก้เนื้อหานโยบาย) 1.1 = เพิ่มข้อความเรื่องผู้ดูแลระบบ
-const POLICY_VERSION = '1.5'; // 1.5 = ให้ AI วิเคราะห์ตัวเลขสรุปการเงินและเป้าหมายการออม (ผู้ใช้ยินยอมแยก ส่งเฉพาะตัวเลขสรุป) / 1.4 = ระบุตัวอ่านใบเสร็จสำรอง Google Gemini / 1.3 = ส่งรูปใบเสร็จไปอ่านด้วยบริการ AI ภายนอก (ผู้ใช้ยินยอมแยก) / 1.2 = AI ภายนอก (ข้อความ) และรูปโปรไฟล์
+const { POLICY_VERSION, policyAccepted } = require('../utils/policy');
 
 // อายุ token เป็นชั่วโมง ปรับได้ใน .env (ผู้ใช้ทั่วไป 7 วัน, admin/เจ้าของ 4 ชั่วโมง)
 const hoursFor = (role) => {
@@ -48,6 +49,7 @@ function publicUser(u) {
     nickname: u.nickname || '',
     display_name: u.nickname || firstName,
     email: u.email,
+    username: u.username || null,
     currency: u.currency,
     phone: u.phone || '',
     birth_date: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
@@ -56,6 +58,8 @@ function publicUser(u) {
     avatar: u.avatar || null, // รูปโปรไฟล์ (data URL) หรือ null ถ้ายังไม่มี ผู้ดูแลระบบไม่ได้รับฟิลด์นี้ (หน้าผู้ดูแลเลือกเฉพาะฟิลด์พื้นฐาน)
     policy_accepted_at: u.policyAcceptedAt || null,
     policy_version: u.policyVersion || '',
+    policy_current: POLICY_VERSION,
+    policy_ok: policyAccepted(u), // false = ต้องกดยอมรับนโยบายเวอร์ชันใหม่ก่อนใช้งานต่อ
     role: u.role || 'user',
     status: u.status || 'active',
     created_at: u.createdAt,
@@ -86,6 +90,8 @@ router.post('/register', async (req, res) => {
     if (last.error) return fail(res, 400, last.error);
     const email = v.checkSignupEmail(req.body.email);
     if (email.error) return fail(res, 400, email.error);
+    const uname = v.checkUsername(req.body.username);
+    if (uname.error) return fail(res, 400, uname.error);
     const pw = v.checkPassword(req.body.password);
     if (pw.error) return fail(res, 400, pw.error);
     if (req.body.confirm_password !== undefined && req.body.confirm_password !== req.body.password) {
@@ -96,6 +102,9 @@ router.post('/register', async (req, res) => {
     if (await User.findOne({ email: email.value })) {
       return fail(res, 409, 'อีเมลนี้ถูกใช้งานแล้ว');
     }
+    if (await User.findOne({ username: uname.value })) {
+      return fail(res, 409, 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+    }
 
     // ไม่รับ role/status จาก body เด็ดขาด ผู้ใช้ใหม่เป็น user เสมอ (ค่าเริ่มต้นใน schema)
     const passwordHash = await bcrypt.hash(pw.value, 10);
@@ -103,6 +112,7 @@ router.post('/register', async (req, res) => {
       firstName: first.value,
       lastName: last.value,
       email: email.value,
+      username: uname.value,
       passwordHash,
       policyAcceptedAt: new Date(),
       policyVersion: POLICY_VERSION,
@@ -115,20 +125,40 @@ router.post('/register', async (req, res) => {
       data: { token: makeToken(user), user: publicUser(user) },
     });
   } catch (e) {
-    if (e.code === 11000) return fail(res, 409, 'อีเมลนี้ถูกใช้งานแล้ว');
+    if (e.code === 11000) return fail(res, 409, e.keyPattern && e.keyPattern.username ? 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' : 'อีเมลนี้ถูกใช้งานแล้ว');
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ: ' + e.message);
+  }
+});
+
+// ---------- ตรวจว่าชื่อผู้ใช้ว่างไหม (ใช้ขณะพิมพ์ในหน้าสมัคร/โปรไฟล์) ----------
+router.get('/username-available', async (req, res) => {
+  try {
+    const r = v.checkUsername(req.query.u);
+    if (r.error) return res.json({ success: true, data: { available: false, error: r.error } });
+    const taken = await User.exists({ username: r.value });
+    res.json({ success: true, data: { available: !taken, username: r.value, error: taken ? 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว' : null } });
+  } catch (e) {
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });
 
 // ---------- เข้าสู่ระบบ ----------
 router.post('/login', async (req, res) => {
   try {
-    const email = v.cleanText(req.body.email).toLowerCase();
+    // เข้าได้ 2 แบบ (แท็บในหน้าเข้าสู่ระบบ): mode = 'username' | 'email'
+    //  ไม่ส่ง mode (หน้าเว็บเก่า/หลังสมัคร) = ดูจาก @ เอง / ข้อผิดพลาดบอกช่องที่ผิด (field) ให้หน้าเว็บแสดงใต้ช่องนั้น
+    const id = v.cleanText(req.body.identifier !== undefined ? req.body.identifier : req.body.username !== undefined ? req.body.username : req.body.email).toLowerCase();
     const password = typeof req.body.password === 'string' ? req.body.password : '';
-    if (!email || !password) return fail(res, 400, 'กรุณากรอกอีเมลและรหัสผ่าน');
+    const mode = req.body.mode === 'email' || req.body.mode === 'username' ? req.body.mode : id.includes('@') ? 'email' : 'username';
+    const label = mode === 'email' ? 'อีเมล' : 'ชื่อผู้ใช้';
+    const fieldErr = (status, code, field, message, extra = {}) => res.status(status).json({ success: false, code, field, message, ...extra });
+    if (!id) return fieldErr(400, 'REQUIRED', 'identifier', `กรุณากรอก${label}`);
+    if (!password) return fieldErr(400, 'REQUIRED', 'password', 'กรุณากรอกรหัสผ่าน');
+    const fmt = mode === 'email' ? v.checkEmail(id) : v.checkUsername(id);
+    if (fmt.error) return fieldErr(400, 'INVALID_FORMAT', 'identifier', mode === 'email' ? 'รูปแบบอีเมลไม่ถูกต้อง' : fmt.error);
 
-    // จำกัดล็อกอินผิดซ้ำ (อีเมล + IP เดียวกัน)
-    const key = `${email}|${req.ip}`;
+    // จำกัดล็อกอินผิดซ้ำ (ชื่อผู้ใช้/อีเมล + IP เดียวกัน) นับทั้งกรณีไม่พบบัญชีและรหัสผ่านผิด
+    const key = `${mode}:${fmt.value}|${req.ip}`;
     const state = loginLimiter.check(key);
     const blockedReply = (sec) => {
       const minutes = Math.max(1, Math.ceil(sec / 60));
@@ -142,11 +172,18 @@ router.post('/login', async (req, res) => {
     };
     if (state.blocked) return blockedReply(state.retryAfterSec);
 
-    const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    const user = await User.findOne(mode === 'email' ? { email: fmt.value } : { username: fmt.value });
+    if (!user) {
       const f = loginLimiter.fail(key);
       if (f.blocked) return blockedReply(f.retryAfterSec);
-      return fail(res, 401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      return fieldErr(401, 'ACCOUNT_NOT_FOUND', 'identifier', mode === 'email' ? 'ไม่พบบัญชีที่ใช้อีเมลนี้' : 'ไม่พบบัญชีที่ใช้ชื่อผู้ใช้นี้', { remaining: f.remaining });
+    }
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
+      const f = loginLimiter.fail(key);
+      if (f.blocked) return blockedReply(f.retryAfterSec);
+      // บอกจำนวนครั้งที่เหลือเมื่อเหลือไม่เกิน 2 ครั้ง (ก่อนถูกล็อก 15 นาที)
+      const left = f.remaining <= 2 ? ` (ลองได้อีก ${f.remaining} ครั้ง)` : '';
+      return fieldErr(401, 'WRONG_PASSWORD', 'password', `รหัสผ่านไม่ถูกต้อง${left}`, { remaining: f.remaining });
     }
     loginLimiter.reset(key);
 
@@ -225,6 +262,18 @@ router.put('/profile', auth, async (req, res) => {
       }
     }
 
+    // ชื่อผู้ใช้: ตั้งเองได้ครั้งแรกครั้งเดียว (ผู้ใช้เดิมที่ยังไม่มี) ตั้งแล้วล็อก เปลี่ยนต้องยื่นคำขอให้แอดมินอนุมัติ
+    if ('username' in b && b.username !== null && String(b.username).trim()) {
+      const r = v.checkUsername(b.username);
+      if (r.error) return fail(res, 400, r.error);
+      if (user.username) {
+        if (r.value !== user.username) return fail(res, 403, 'ชื่อผู้ใช้เปลี่ยนเองไม่ได้ กรุณายื่นคำขอเปลี่ยนชื่อผู้ใช้');
+      } else {
+        if (await User.exists({ username: r.value, _id: { $ne: user._id } })) return fail(res, 409, 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+        user.username = r.value;
+      }
+    }
+
     // รูปโปรไฟล์ (ส่ง avatar เป็น data URL เพื่อเปลี่ยน ส่ง null หรือ '' เพื่อลบ ไม่ส่งมา = ไม่เปลี่ยน)
     if ('avatar' in b) {
       const r = v.checkAvatar(b.avatar);
@@ -248,12 +297,99 @@ router.put('/profile', auth, async (req, res) => {
       passwordChanged = true;
     }
 
-    await user.save();
+    try {
+      await user.save();
+    } catch (e) {
+      if (e.code === 11000) return fail(res, 409, 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+      throw e;
+    }
     const body = { success: true, message: 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว', data: publicUser(user) };
     if (passwordChanged) body.token = makeToken(user);
     res.json(body);
   } catch (e) {
     fail(res, 500, e.message);
+  }
+});
+
+// ---------- ยอมรับนโยบายเวอร์ชันใหม่ (ผู้ใช้เดิมที่ยอมรับเวอร์ชันเก่าไว้) ----------
+router.post('/accept-policy', auth, async (req, res) => {
+  try {
+    if (req.body.version !== POLICY_VERSION) return fail(res, 400, 'กรุณาอ่านนโยบายเวอร์ชันล่าสุดแล้วกดยอมรับอีกครั้ง');
+    await User.updateOne({ _id: req.userId }, { $set: { policyAcceptedAt: new Date(), policyVersion: POLICY_VERSION } });
+    const user = await User.findById(req.userId);
+    res.json({ success: true, message: 'ยอมรับนโยบายแล้ว', data: publicUser(user) });
+  } catch (e) {
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
+// ---------- คำขอเปลี่ยนชื่อผู้ใช้ (แอดมินอนุมัติ) ----------
+const DAY_MS = 24 * 3600 * 1000;
+const requestOut = (r) => r && ({
+  request_id: r._id,
+  from_username: r.fromUsername,
+  to_username: r.toUsername,
+  reason: r.reason,
+  status: r.status,
+  decision_note: r.decisionNote || '',
+  created_at: r.createdAt,
+  decided_at: r.decidedAt || null,
+});
+// สถานะสำหรับหน้าโปรไฟล์: คำขอล่าสุด + ยื่นใหม่ได้เมื่อไหร่
+async function requestState(userId) {
+  const last = await UsernameRequest.findOne({ user: userId }).sort({ createdAt: -1 }).lean();
+  let canRequestAt = null;
+  if (last && last.status === 'rejected' && last.decidedAt) {
+    const t = new Date(new Date(last.decidedAt).getTime() + UsernameRequest.REAPPLY_DAYS * DAY_MS);
+    if (t > new Date()) canRequestAt = t;
+  }
+  return { request: requestOut(last), can_request: !(last && last.status === 'pending') && !canRequestAt, can_request_at: canRequestAt };
+}
+
+router.get('/username-request', auth, async (req, res) => {
+  try {
+    res.json({ success: true, data: await requestState(req.userId) });
+  } catch (e) {
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
+router.post('/username-request', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('username').lean();
+    if (!user) return fail(res, 404, 'ไม่พบข้อมูลผู้ใช้');
+    if (!user.username) return fail(res, 400, 'ยังไม่ได้ตั้งชื่อผู้ใช้ ตั้งเองได้ในหน้าแก้ไขโปรไฟล์');
+    const st = await requestState(req.userId);
+    if (st.request && st.request.status === 'pending') return fail(res, 409, 'มีคำขอที่รอแอดมินพิจารณาอยู่แล้ว');
+    if (st.can_request_at) return fail(res, 429, `คำขอก่อนหน้าถูกปฏิเสธ ยื่นใหม่ได้ตั้งแต่ ${new Date(st.can_request_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' })}`);
+    const r = v.checkUsername(req.body.username);
+    if (r.error) return fail(res, 400, r.error);
+    if (r.value === user.username) return fail(res, 400, 'ชื่อใหม่ต้องไม่ซ้ำกับชื่อผู้ใช้ปัจจุบัน');
+    if (await User.exists({ username: r.value })) return fail(res, 409, 'ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+    const reason = v.cleanText(req.body.reason);
+    const n = Array.from(reason).length;
+    if (n < 10) return fail(res, 400, 'กรุณาระบุเหตุผลอย่างน้อย 10 ตัวอักษร');
+    if (n > 300) return fail(res, 400, 'เหตุผลต้องไม่เกิน 300 ตัวอักษร');
+    try {
+      await UsernameRequest.create({ user: req.userId, fromUsername: user.username, toUsername: r.value, reason });
+    } catch (e) {
+      if (e.code === 11000) return fail(res, 409, 'มีคำขอที่รอแอดมินพิจารณาอยู่แล้ว');
+      throw e;
+    }
+    res.status(201).json({ success: true, message: 'ส่งคำขอแล้ว รอแอดมินพิจารณา', data: await requestState(req.userId) });
+  } catch (e) {
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
+// ยกเลิกคำขอที่ยังรอพิจารณา
+router.delete('/username-request', auth, async (req, res) => {
+  try {
+    const r = await UsernameRequest.findOneAndUpdate({ user: req.userId, status: 'pending' }, { $set: { status: 'cancelled', decidedAt: new Date() } });
+    if (!r) return fail(res, 404, 'ไม่มีคำขอที่รอพิจารณา');
+    res.json({ success: true, message: 'ยกเลิกคำขอแล้ว', data: await requestState(req.userId) });
+  } catch (e) {
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });
 

@@ -106,6 +106,9 @@ export default function NotificationBell() {
     } else if (n.kind === 'spike') {
       setOpen(false);
       navigate('/plan?tab=overview');
+    } else if (n.kind === 'account') {
+      setOpen(false);
+      navigate('/profile');
     } else if (n.period_month && n.period_year) {
       setOpen(false);
       navigate(`/budgets?month=${n.period_month}&year=${n.period_year}`);

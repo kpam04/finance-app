@@ -81,6 +81,18 @@ function checkSignupEmail(value) {
   return r;
 }
 
+// ชื่อผู้ใช้: a-z 0-9 . _ ยาว 3-20 ตัว ขึ้นต้นด้วยตัวอักษร ไม่สนตัวพิมพ์ใหญ่/เล็ก (เก็บเป็นตัวเล็ก)
+const RESERVED_USERNAMES = ['admin', 'administrator', 'owner', 'root', 'support', 'system', 'staff', 'moderator', 'finance', 'financeapp', 'help', 'api', 'null', 'undefined'];
+function checkUsername(value) {
+  const v = cleanText(value).toLowerCase();
+  if (!v) return { error: 'กรุณากรอกชื่อผู้ใช้' };
+  if (v.length < 3 || v.length > 20) return { error: 'ชื่อผู้ใช้ต้องยาว 3-20 ตัวอักษร' };
+  if (!/^[a-z]/.test(v)) return { error: 'ชื่อผู้ใช้ต้องขึ้นต้นด้วยตัวอักษร a-z' };
+  if (!/^[a-z][a-z0-9._]*$/.test(v)) return { error: 'ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 จุด (.) และขีดล่าง (_)' };
+  if (RESERVED_USERNAMES.includes(v.replace(/[._]/g, ''))) return { error: 'ชื่อผู้ใช้นี้สงวนไว้ กรุณาเลือกชื่ออื่น' };
+  return { value: v };
+}
+
 // bcrypt ใช้ได้แค่ 72 ไบต์แรก (ตัวอักษรไทย 1 ตัว = 3 ไบต์) จึงจำกัดตามไบต์
 function checkPassword(value, label = 'รหัสผ่าน') {
   const v = typeof value === 'string' ? value : '';
@@ -157,6 +169,6 @@ function checkAvatar(value) {
 }
 
 module.exports = {
-  cleanText, splitFullName, checkName, checkNickname, checkEmail, checkSignupEmail, ALLOWED_EMAIL_DOMAINS, checkPassword,
+  cleanText, splitFullName, checkName, checkNickname, checkEmail, checkSignupEmail, ALLOWED_EMAIL_DOMAINS, checkPassword, checkUsername,
   checkPhone, checkBirthDate, checkOccupation, checkIncome, checkCurrency, checkAvatar, AVATAR_MAX_BYTES,
 };

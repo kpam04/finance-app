@@ -3,7 +3,6 @@ import { parseNaturalLanguage } from '../utils/aiParser.js';
 import { api } from '../api.js';
 import { prepareReceiptImage } from '../utils/receiptImage.js';
 import { receiptToDraft, receiptReady, itemsToDrafts, fallbackReasonFor } from '../utils/aiDrafts.js';
-import AiConsentModal from './AiConsentModal.jsx';
 import { normalizeThaiNumbers } from '../utils/thaiNumbers.js';
 import { createSpeechSession, isSpeechSupported, SPEECH_MESSAGES } from '../utils/speechInput.js';
 import PrivacyModal from './PrivacyModal.jsx';
@@ -24,22 +23,8 @@ const saveFlag = () => {
     /* ไม่มี localStorage ก็แจ้งใหม่ทุกครั้ง */
   }
 };
-// ผู้ใช้กด "ไม่ยินยอม" ให้ส่งข้อความไป AI แล้ว: ใช้กฎไปเลย ไม่ถามซ้ำ (เปลี่ยนใจได้ที่การ์ดตั้งค่า AI หน้าโปรไฟล์) จำไว้ในเบราว์เซอร์นี้
-const AI_DECLINED_KEY = 'finance_ai_text_declined';
-const readDeclined = () => {
-  try {
-    return localStorage.getItem(AI_DECLINED_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
-const saveDeclined = () => {
-  try {
-    localStorage.setItem(AI_DECLINED_KEY, '1');
-  } catch {
-    /* ไม่มี localStorage: ครั้งหน้าจะถามใหม่ */
-  }
-};
+// โควตาเหลือน้อยกว่านี้ จึงบอกจำนวนที่เหลือใต้ปุ่ม (ปกติไม่แสดง จะได้ไม่รก)
+const QUOTA_WARN = 5;
 
 // รอ AI แยกข้อความได้นานสุดเท่านี้ ถ้าเกินใช้ผลจากกฎแทน
 const AI_WAIT_MS = 10000;
@@ -54,6 +39,9 @@ const linkBtn = {
 //  คอมพิวเตอร์: [ ช่องพิมพ์ ➤ ] [🎤 พูด] [📷 สแกน] แถวเดียวกัน
 //  มือถือ (ไม่เกิน 640px): แถวบน = ช่องพิมพ์ / แถวล่าง = ปุ่มพูดและปุ่มสแกนเท่ากัน (กฎกลางของ .form-row เรียงเป็นคอลัมน์อยู่แล้ว)
 const css = `
+.ai-spent { opacity: 0.55; }
+.ai-quota { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12.5px; color: #8F6F00; }
+.ai-quota .ai-quota-reset { color: #9a9184; }
 .aq-rec { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #E2A27E; vertical-align: 0.05em; animation: aq-pulse 1.2s ease-in-out infinite; }
 @keyframes aq-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .aq-rec { animation: none; } }
@@ -174,14 +162,12 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
   const [scanState, setScanState] = useState('idle'); // idle | preparing | reading (สแกนใบเสร็จ: เตรียมรูป -> AI อ่าน)
   const [scanElapsed, setScanElapsed] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false); // มือถือ: เมนูเลือก "ถ่ายรูป" หรือ "เลือกรูปจากเครื่อง"
-  const [consentFile, setConsentFile] = useState(null); // รูปที่รอผู้ใช้ตัดสินใจเรื่องความยินยอมให้ส่งรูป (ถามครั้งแรก)
   const scanning = scanState !== 'idle';
   const [listening, setListening] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [showPolicy, setShowPolicy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false); // AI กำลังแยกข้อความ (ยังไม่เปิดการ์ด)
   const [aiElapsed, setAiElapsed] = useState(0);
-  const [consentReq, setConsentReq] = useState(null); // ข้อความที่รอผู้ใช้ตัดสินใจเรื่องความยินยอมใช้ AI (ถามครั้งแรก)
   const aiCtrlRef = useRef(null);
   const fileRef = useRef(null);
   const camRef = useRef(null);
@@ -252,6 +238,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     const started = Date.now();
     try {
       const res = await api.aiParseText({ text: req.parseText, source: req.source }, ctrl.signal);
+      bumpUsed('used_today');
       if (!alive.current || job.why) return;
       const data = res.data || {};
       const items = data.items || [];
@@ -271,13 +258,23 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
       if (!alive.current) return;
       if (job.why === 'timeout') return openRules(req, `AI ตอบช้าเกิน ${AI_WAIT_MS / 1000} วินาที`);
       if (job.why === 'cancel') return openRules(req, 'ยกเลิกการรอ AI');
-      if (err && err.code === 'AI_CONSENT_REQUIRED' && onAiStatusChange) onAiStatusChange({ ...(statusRef.current || {}), enabled: false });
       openRules(req, fallbackReasonFor(err));
     } finally {
       clearTimeout(timer);
       if (aiCtrlRef.current === job) aiCtrlRef.current = null;
       if (alive.current) setAiBusy(false);
     }
+  };
+
+  // นับโควตาที่ใช้ไปในหน้า (เซิร์ฟเวอร์นับจริง) เพื่อให้ตัวเลข "เหลืออีก" ตรงโดยไม่ต้องโหลดสถานะใหม่
+  //  full = true: เซิร์ฟเวอร์บอกว่าครบแล้ว ตั้งเป็นเต็มเลย
+  const bumpUsed = (field, full = false) => {
+    const st = statusRef.current;
+    if (!st || !onAiStatusChange) return;
+    const limitKey = field === 'used_today' ? 'daily_limit' : 'receipt_daily_limit';
+    const next = { ...st, [field]: full ? st[limitKey] : (st[field] || 0) + 1 };
+    statusRef.current = next;
+    onAiStatusChange(next);
   };
 
   const cancelAi = () => {
@@ -287,7 +284,8 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     job.ctrl.abort();
   };
 
-  // เลือกทาง: เปิด AI แล้ว -> AI ก่อน / ยังไม่เคยตอบเรื่องความยินยอม -> ถาม / ไม่ยินยอมหรือระบบ AI ไม่พร้อม -> กฎ
+  // เลือกทาง: ระบบ AI พร้อม + ยอมรับนโยบายแล้ว -> AI ก่อน / ครบโควตาหรือระบบ AI ไม่พร้อม -> กฎ
+  //  (เดิม: ยังไม่เคยตอบเรื่องความยินยอม -> ถาม / ไม่ยินยอมหรือระบบ AI ไม่พร้อม -> กฎ
   const processInput = (req) => {
     setMsg('');
     if (catsRef.current.length === 0) {
@@ -300,9 +298,9 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     }
     const st = statusRef.current;
     if (!st || !st.configured) return openRules(req); // ระบบ AI ยังไม่ตั้งค่า (หรือโหลดสถานะไม่ได้) ใช้กฎตามเดิม
-    if (st.enabled) return runAi(req);
-    if (readDeclined()) return openRules(req);
-    setConsentReq(req); // ครั้งแรก: ถามความยินยอมก่อนส่งข้อความไปบริการ AI ภายนอก
+    // ยอมรับนโยบาย (รวมการใช้ AI) ตอนสมัครแล้ว: ใช้ AI ได้ทันที / โควตาวันนี้หมด = ใช้กฎ
+    if (st.enabled && !(st.daily_limit > 0 && st.used_today >= st.daily_limit)) return runAi(req);
+    return openRules(req, st.enabled ? `ใช้ AI ครบ ${st.daily_limit} ครั้งของวันนี้แล้ว ระบบใช้การแยกแบบกฎแทน (ใช้ AI ได้อีกครั้งหลังเที่ยงคืน)` : undefined);
   };
 
   const handleText = (e) => {
@@ -357,7 +355,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
   };
 
   // สแกนใบเสร็จ: ย่อรูปในเครื่อง -> ส่งให้หลังบ้านอ่าน (Typhoon OCR + LLM) -> หน้ายืนยันเดิม (มีรูปย่อ/รายการสินค้าให้เทียบ)
-  // ครั้งแรกต้องยินยอมให้ส่งรูปไปบริการภายนอกก่อน ระบบเราไม่เก็บรูปและข้อความที่อ่านได้
+  // การส่งรูปไปบริการภายนอกอยู่ในนโยบายที่ยอมรับตอนสมัครแล้ว ระบบเราไม่เก็บรูปและข้อความที่อ่านได้
   const scanError = (e) => `${e && e.message ? e.message : 'อ่านใบเสร็จไม่สำเร็จ'} (กรอกรายการเองได้ตามปกติ)`;
 
   const runScan = async (file) => {
@@ -378,11 +376,12 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
     const started = Date.now();
     try {
       const res = await api.aiParseReceipt({ image: prepared.dataUrl }, ctrl.signal);
+      bumpUsed('receipts_used_today');
       if (ctrl.signal.aborted || !alive.current) return;
       draftCb.current(receiptToDraft(res.data, { thumb: prepared.thumb, clientMs: Date.now() - started }));
     } catch (err) {
       if (ctrl.signal.aborted || !alive.current || (err && err.name === 'AbortError')) return;
-      if (err && err.code === 'AI_IMAGE_CONSENT_REQUIRED' && onAiStatusChange) onAiStatusChange({ ...(statusRef.current || {}), image_enabled: false });
+      if (err && err.code === 'AI_QUOTA') bumpUsed('receipts_used_today', true);
       setMsg(scanError(err));
     } finally {
       if (abortRef.current === ctrl) abortRef.current = null;
@@ -403,6 +402,10 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
       setMsg('ยังเพิ่มจากรูปไม่ได้ในตอนนี้ (ฟีเจอร์นี้ยังไม่เปิดให้ใช้งาน) กรุณาเพิ่มรายการด้วยการพิมพ์ พูด หรือกรอกรายการเอง');
       return;
     }
+    if (receiptLeft === 0) {
+      setMsg(`เพิ่มจากรูปครบ ${st.receipt_daily_limit} ใบของวันนี้แล้ว กรอกรายการเองหรือพิมพ์แทนได้ตามปกติ (ใช้ได้อีกครั้งหลังเที่ยงคืน)`);
+      return;
+    }
     const coarse = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     if (coarse) setMenuOpen((o) => !o); // มือถือ: เลือกถ่ายรูป/เลือกรูปจากเครื่อง
     else if (fileRef.current) fileRef.current.click(); // คอมพิวเตอร์: เลือกไฟล์รูปทันที
@@ -418,10 +421,13 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
       setMsg('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
       return;
     }
-    const st = statusRef.current;
-    if (st && !st.image_enabled) setConsentFile(file); // ยังไม่เคยยินยอมเรื่องรูป: ถามก่อน
-    else runScan(file);
+    runScan(file);
   };
+
+  // โควตาที่เหลือวันนี้ (null = ไม่รู้/ไม่จำกัด)
+  const leftOf = (used, limit) => (aiStatus && aiStatus.configured && limit > 0 ? Math.max(0, limit - (used || 0)) : null);
+  const receiptLeft = leftOf(aiStatus && aiStatus.receipts_used_today, aiStatus && aiStatus.receipt_daily_limit);
+  const textLeft = leftOf(aiStatus && aiStatus.used_today, aiStatus && aiStatus.daily_limit);
 
   return (
     <form className="card" onSubmit={handleText}>
@@ -470,7 +476,7 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
           </button>
           <button
             type="button"
-            className="btn btn-light"
+            className={`btn btn-light${receiptLeft === 0 ? ' ai-spent' : ''}`}
             data-scan
             disabled={scanning || listening || aiBusy}
             onClick={onScanClick}
@@ -488,6 +494,18 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
           )}
         </div>
       </div>
+
+      {((receiptLeft !== null && receiptLeft < QUOTA_WARN) || (textLeft !== null && textLeft < QUOTA_WARN)) && (
+        <div className="ai-quota" data-ai-quota>
+          {textLeft !== null && textLeft < QUOTA_WARN && (
+            <span data-quota-text>{textLeft === 0 ? 'AI ช่วยแยกข้อความครบโควตาวันนี้แล้ว ระบบใช้การแยกแบบกฎแทน' : `วันนี้ AI ช่วยแยกข้อความได้อีก ${textLeft} ครั้ง`}</span>
+          )}
+          {receiptLeft !== null && receiptLeft < QUOTA_WARN && (
+            <span data-quota-receipt>{receiptLeft === 0 ? 'เพิ่มจากรูปครบโควตาวันนี้แล้ว' : `วันนี้เพิ่มจากรูปได้อีก ${receiptLeft} ใบ`}</span>
+          )}
+          <span className="ai-quota-reset">นับใหม่หลังเที่ยงคืน</span>
+        </div>
+      )}
 
       {menuOpen && (
         <div data-scan-menu style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
@@ -536,38 +554,6 @@ export default function AiQuickInput({ categories, onDraftGenerated, speechEngin
       </div>
 
       {showPolicy && <PrivacyModal onClose={() => setShowPolicy(false)} />}
-      {consentReq && (
-        <AiConsentModal
-          version={(aiStatus && aiStatus.consent_version) || '1.0'}
-          onAccepted={(data) => {
-            const req = consentReq;
-            setConsentReq(null);
-            if (onAiStatusChange) onAiStatusChange(data);
-            statusRef.current = data;
-            runAi(req);
-          }}
-          onDeclined={() => {
-            const req = consentReq;
-            setConsentReq(null);
-            saveDeclined();
-            openRules(req);
-          }}
-        />
-      )}
-      {consentFile && (
-        <AiConsentModal
-          scope="image"
-          engines={(aiStatus && aiStatus.receipt_engines) || []}
-          version={(aiStatus && aiStatus.image_consent_version) || '1.0'}
-          onAccepted={(data) => {
-            const f = consentFile;
-            setConsentFile(null);
-            if (onAiStatusChange) onAiStatusChange(data);
-            runScan(f);
-          }}
-          onDeclined={() => setConsentFile(null)}
-        />
-      )}
     </form>
   );
 }

@@ -23,6 +23,7 @@ const { todayTH } = require('../services/recurringRunner');
 const { installmentFacts } = require('../services/plan/instFacts');
 const { dataSignature, goalsSignature, isStale } = require('../services/plan/signature');
 const { generateAdvice, polishText } = require('../services/plan/aiAdvice');
+const { policyAccepted } = require('../utils/policy');
 const { PLAN_CONSENT_VERSION, MAX_GOALS, MAX_GOAL_NAME, MAX_GOAL_YEARS } = require('../services/plan/constants');
 const { bangkokToday, monthKeyOf, parseMonthKey, addMonths, addYearsIso, validIso } = require('../services/plan/dateUtil');
 const { parseAmount, MAX_AMOUNT } = require('../utils/inputRules');
@@ -140,10 +141,10 @@ const savedOut = (doc, stale = false, ctx = null, facts = []) => {
 };
 
 async function aiState(userId) {
-  const u = await User.findById(userId).select('aiPlanEnabled aiPlanConsentVersion').lean();
+  const u = await User.findById(userId).select('policyVersion').lean();
   return {
     configured: aiConfig().configured,
-    plan_enabled: !!(u && u.aiPlanEnabled && u.aiPlanConsentVersion === PLAN_CONSENT_VERSION),
+    plan_enabled: policyAccepted(u),
     plan_consent_version: PLAN_CONSENT_VERSION,
     plans_used_today: await usedToday(userId, new Date(), 'plans'),
     plan_daily_limit: planDailyLimit(),
@@ -227,14 +228,14 @@ router.post('/advice', perMinute, async (req, res) => {
   try {
     const cfg = aiConfig();
     if (!cfg.configured) return fail(res, 503, 'ระบบ AI ยังไม่พร้อมใช้งาน', 'AI_UNAVAILABLE');
-    const user = await User.findById(req.userId).select('aiPlanEnabled aiPlanConsentVersion').lean();
-    if (!user || !user.aiPlanEnabled || user.aiPlanConsentVersion !== PLAN_CONSENT_VERSION) {
-      return fail(res, 403, 'ต้องยินยอมให้ส่งตัวเลขสรุปการเงินไปให้ AI ภายนอกวิเคราะห์ก่อน', 'AI_PLAN_CONSENT_REQUIRED');
+    const user = await User.findById(req.userId).select('policyVersion').lean();
+    if (!policyAccepted(user)) {
+      return fail(res, 403, 'กรุณายอมรับนโยบายความเป็นส่วนตัวเวอร์ชันล่าสุดก่อนใช้ AI', 'POLICY_REQUIRED');
     }
     const { analysis, goalEvals, facts } = await loadPlan(req.userId);
     if (!analysis.data.has_data) return fail(res, 422, 'ยังไม่มีข้อมูลเพียงพอให้วิเคราะห์ ลองบันทึกรายการก่อน', 'PLAN_NO_DATA');
     const quota = await checkAndBump(req.userId, new Date(), { field: 'plans', limit: planDailyLimit() });
-    if (!quota.ok) return fail(res, 429, `ขอคำแนะนำจาก AI ครบ ${quota.limit} ครั้งของวันนี้แล้ว (ยังดูคำแนะนำจากระบบได้)`, 'AI_QUOTA');
+    if (!quota.ok) return fail(res, 429, `ขอคำแนะนำจาก AI ครบ ${quota.limit} ครั้งของวันนี้แล้ว ยังดูคำแนะนำจากระบบได้ (ขอใหม่ได้หลังเที่ยงคืน)`, 'AI_QUOTA');
     if (!globalAllow()) return fail(res, 503, 'ระบบ AI ถูกใช้งานหนาแน่น ลองใหม่อีกสักครู่', 'AI_BUSY');
 
     let result;

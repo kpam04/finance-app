@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { CONTACT_EMAIL } from '../config.js';
 
-export const POLICY_VERSION = '1.5';
+export const POLICY_VERSION = '2.0'; // ต้องตรงกับ backend/utils/policy.js
 
 const overlay = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1100,
@@ -14,20 +14,28 @@ const box = {
 
 // การ์ดประกาศความเป็นส่วนตัว (หน้าต่างลอย)
 // onClose: ปิดการ์ด | onAccept (ไม่บังคับ): ถ้าส่งมาจะมีปุ่ม "ยอมรับ" (ใช้ในหน้าสมัคร)
-export default function PrivacyModal({ onClose, onAccept }) {
+// required: นโยบายเปลี่ยนเวอร์ชัน ต้องกดยอมรับก่อนใช้งานต่อ (ปิดไม่ได้ ปุ่มรองเป็น "ออกจากระบบ" = onClose)
+export default function PrivacyModal({ onClose, onAccept, required = false, busy = false, error = '' }) {
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !required) onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, required]);
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={{ ...overlay, ...(required ? { zIndex: 1300 } : {}) }} onClick={required ? undefined : onClose} data-privacy-modal={required ? 'required' : 'view'}>
       <div style={box} role="dialog" aria-modal="true" aria-label="ประกาศความเป็นส่วนตัว" onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ marginTop: 0 }}>ประกาศความเป็นส่วนตัว</h3>
-        <p style={{ color: '#6b7280', marginTop: 0, fontSize: 13 }}>เวอร์ชัน {POLICY_VERSION}</p>
+        <h3 style={{ margin: '0 0 14px', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '2px 10px' }}>
+          ประกาศความเป็นส่วนตัว
+          <span style={{ fontSize: 13, fontWeight: 400, color: '#9a9184' }} data-policy-version>เวอร์ชัน {POLICY_VERSION}</span>
+        </h3>
+        {required && (
+          <div className="alert" style={{ marginBottom: 14 }} data-policy-updated>
+            ประกาศความเป็นส่วนตัวมีการเปลี่ยนแปลง (รวมการใช้ AI ไว้ในบริการแล้ว ไม่ต้องเปิดปิดแยกอีก) กรุณาอ่านและกดยอมรับเพื่อใช้งานต่อ
+          </div>
+        )}
 
         <ol style={{ lineHeight: 1.8, paddingLeft: 20, marginTop: 0 }}>
           <li>
@@ -55,14 +63,18 @@ export default function PrivacyModal({ onClose, onAccept }) {
             (เช่น Google สำหรับ Chrome)
           </li>
           <li>
-            <strong>ผู้ช่วย AI (เมื่อคุณเปิดใช้เอง ปิดอยู่เป็นค่าเริ่มต้น):</strong> เมื่อคุณกดปุ่ม "ให้ AI ช่วยตรวจ" ในหน้ายืนยันรายการ ข้อความที่คุณพิมพ์หรือพูดจะถูกส่งไปบริการ AI ภายนอก
+            <strong>การใช้ AI ในระบบ (ส่วนหนึ่งของบริการ):</strong> ระบบนี้ใช้บริการ AI ภายนอก 3 แบบตามรายละเอียดในข้อนี้และ 2 ข้อถัดไป
+            การยอมรับประกาศนี้ถือเป็นการยินยอมให้ส่งข้อมูลตามที่ระบุไปยังบริการเหล่านั้น ไม่มีการถามซ้ำในแต่ละครั้ง
+            ระบบส่งเฉพาะเมื่อคุณกดใช้ฟีเจอร์นั้นเอง และมีโควตาต่อวัน (นับใหม่หลังเที่ยงคืน) ถ้าไม่ต้องการใช้ AI ในครั้งใด ให้กรอกรายการเองได้ตามปกติ
+            <br />
+            <strong>แยกข้อความเป็นรายการ:</strong> เมื่อคุณพิมพ์หรือพูดรายการ ข้อความจะถูกส่งไปบริการ AI ภายนอก
             (เช่น Typhoon ของ SCB 10X) เพื่อแยกเป็นรายการเทียบกับผลของระบบ ระบบปิดเลขยาว (เลขบัตร เลขบัญชี เบอร์โทร) และอีเมลในข้อความก่อนส่ง
             และไม่ส่งชื่อ อีเมล หรือรหัสผู้ใช้ของคุณ เมื่อผู้ให้บริการเป็นแผนฟรี เขาอาจเก็บข้อมูลการใช้งานเพื่อปรับปรุงโมเดล
-            คุณปิดการใช้ AI ได้ทุกเมื่อที่หน้าโปรไฟล์ และเมื่อปิด ระบบจะแยกข้อความด้วยกฎในระบบเราเอง ไม่ส่งข้อมูลออกไป
-            ฟีเจอร์อื่นที่ใช้ AI ในอนาคตจะแจ้งและขอความยินยอมก่อนใช้
+            ถ้าบริการ AI ไม่พร้อมหรือครบโควตา ระบบจะแยกข้อความด้วยกฎในระบบเราเอง ไม่ส่งข้อมูลออกไป
+            ฟีเจอร์ใหม่ที่ใช้ AI ในอนาคตจะแจ้งผ่านการปรับเวอร์ชันประกาศนี้ และให้คุณกดยอมรับใหม่ก่อนใช้
           </li>
           <li>
-            <strong>รูปใบเสร็จ (เมื่อคุณยินยอมเปิดแยกต่างหาก ปิดอยู่เป็นค่าเริ่มต้น):</strong> เมื่อคุณถ่ายหรือเลือกรูปใบเสร็จให้ AI อ่าน
+            <strong>เพิ่มจากรูป (ใบเสร็จหรือสลิป):</strong> เมื่อคุณถ่ายหรือเลือกรูปให้ AI อ่าน
             รูป (ที่ระบบย่อขนาดและลบข้อมูลตำแหน่งที่ติดมากับรูปแล้ว) จะถูกส่งไปบริการอ่านภาพ (OCR) ภายนอก (Typhoon ของ SCB 10X)
             และข้อความที่อ่านได้ (หลังปิดเลขยาว เบอร์โทร อีเมล) จะถูกส่งต่อให้โมเดลภาษาเพื่อสรุปยอด วันที่ และร้านค้า
             ถ้า Typhoon ไม่ตอบหรืออ่านไม่สำเร็จ และผู้ดูแลระบบเปิดใช้ตัวอ่านสำรอง ระบบจะส่งรูปเดียวกันไปให้ Google Gemini (ผู้ให้บริการอีกราย) อ่านและสรุปแทน
@@ -70,7 +82,7 @@ export default function PrivacyModal({ onClose, onAccept }) {
             ใบเสร็จอาจมีข้อมูลส่วนตัว (ชื่อ เลขสมาชิก เลขบัตร เบอร์โทร) ควรครอบตัดออกก่อนส่ง และเมื่อผู้ให้บริการเป็นแผนฟรี เขา (รวมถึง Google) อาจเก็บข้อมูลหรือนำเนื้อหาไปปรับปรุงโมเดล/ผลิตภัณฑ์ของเขา
           </li>
           <li>
-            <strong>การวิเคราะห์แผนการเงินด้วย AI (เมื่อคุณยินยอมเปิดแยกต่างหาก ปิดอยู่เป็นค่าเริ่มต้น):</strong> เมื่อคุณกดขอคำแนะนำจาก AI ในหน้า “วางแผน”
+            <strong>การวิเคราะห์แผนการเงินด้วย AI:</strong> เมื่อคุณกดขอคำแนะนำจาก AI ในหน้า “วางแผน”
             ระบบส่ง <em>ตัวเลขสรุป</em> (เช่น ยอดรวมต่อเดือน ค่าเฉลี่ย ยอดและชื่อหมวดที่สูงผิดปกติ ชื่อเป้าหมายการออมพร้อมยอดและวันที่) ไปยังบริการ AI ภายนอก (Typhoon ของ SCB 10X)
             โดยไม่ส่งรายการรายตัว บันทึกช่วยจำ ชื่อ อีเมล หรือรหัสผู้ใช้ และผ่านตัวปิดเลขยาว/อีเมล/เบอร์โทรอัตโนมัติ ระบบตรวจตัวเลขในคำแนะนำทุกตัวก่อนแสดง
             ระบบเก็บคำแนะนำล่าสุดของแต่ละเดือนไว้เพื่อไม่ต้องเรียกซ้ำ คุณลบได้เอง และเมื่อผู้ให้บริการเป็นแผนฟรี เขาอาจเก็บข้อมูลหรือนำเนื้อหาไปปรับปรุงโมเดล
@@ -88,12 +100,13 @@ export default function PrivacyModal({ onClose, onAccept }) {
         </ol>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-light" onClick={onClose}>
-            ปิด
+          {error && <span style={{ marginRight: 'auto', alignSelf: 'center', fontSize: 13, color: '#B8304F' }}>{error}</span>}
+          <button type="button" className="btn btn-light" onClick={onClose} disabled={busy}>
+            {required ? 'ออกจากระบบ' : 'ปิด'}
           </button>
           {onAccept && (
-            <button type="button" className="btn" onClick={onAccept}>
-              ยอมรับ
+            <button type="button" className="btn" onClick={onAccept} disabled={busy} data-policy-accept>
+              {busy ? 'กำลังบันทึก...' : 'ยอมรับ'}
             </button>
           )}
         </div>

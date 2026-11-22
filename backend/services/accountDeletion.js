@@ -10,6 +10,7 @@ const Goal = require('../models/Goal');
 const PlanAdvice = require('../models/PlanAdvice');
 const RecurringDismiss = require('../models/RecurringDismiss');
 const Installment = require('../models/Installment');
+const UsernameRequest = require('../models/UsernameRequest');
 
 // ลบข้อมูลทั้งหมดของผู้ใช้ แล้วลบบัญชีเป็นขั้นสุดท้าย (ถ้าขัดข้องกลางทาง สั่งซ้ำได้)
 // ใช้ร่วมกันระหว่าง "ผู้ใช้ลบบัญชีตัวเอง" และ "admin ลบบัญชี" ส่วนที่เพิ่มในอนาคต (เช่น เรื่องร้องเรียน) ให้เพิ่มที่นี่ที่เดียว
@@ -25,6 +26,7 @@ async function deleteUserData(userId) {
   await PlanAdvice.deleteMany({ user: userId });
   await RecurringDismiss.deleteMany({ user: userId });
   await Installment.deleteMany({ user: userId });
+  await UsernameRequest.deleteMany({ user: userId });
   await User.deleteOne({ _id: userId });
 }
 

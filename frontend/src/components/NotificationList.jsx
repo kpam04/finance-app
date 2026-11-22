@@ -1,4 +1,4 @@
-import { IconDot, IconTrendUp, IconCard, IconRepeat } from './PlanIcons.jsx';
+import { IconDot, IconTrendUp, IconCard, IconRepeat, IconUser } from './PlanIcons.jsx';
 const fmtTime = (s) => {
   const d = new Date(s);
   return Number.isNaN(d.getTime())
@@ -21,6 +21,8 @@ const INSTALLMENT = { icon: <IconCard size={15} style={{ color: '#74896F' }} />,
 const SPIKE = { icon: <IconTrendUp size={15} style={{ color: '#B98A2E' }} />, label: 'หมวดใช้จ่ายสูงผิดปกติ' };
 // ใช้เร็วกว่าแผน (kind = pace) ตรงกับป้ายสีส้ม "ควรลดการใช้" ในหน้างบ กดแล้วไปหน้างบของเดือนนั้น
 const PACE = { icon: <IconDot color="#EE8A3C" size={11} />, label: 'ใช้เร็วกว่าแผน' };
+// เรื่องบัญชี เช่น ผลคำขอเปลี่ยนชื่อผู้ใช้ (kind = account) กดแล้วไปหน้าโปรไฟล์
+const ACCOUNT = { icon: <IconUser size={15} style={{ color: '#74896F' }} />, label: 'บัญชีผู้ใช้' };
 const RECURRING = { icon: <IconRepeat size={15} style={{ color: '#74896F' }} />, label: 'ชวนตั้งรายการเกิดซ้ำ' };
 
 // รายการแจ้งเตือน (ใช้ในกระดิ่ง)
@@ -35,12 +37,12 @@ export default function NotificationList({ items, onRead, onSelect, emptyText = 
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {items.map((n) => {
         const unread = !n.is_read;
-        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : n.kind === 'recurring' ? RECURRING : n.kind === 'spike' ? SPIKE : n.kind === 'pace' ? PACE : LEVEL[n.level];
+        const lv = n.kind === 'forecast' ? FORECAST : n.kind === 'installment' ? INSTALLMENT : n.kind === 'recurring' ? RECURRING : n.kind === 'spike' ? SPIKE : n.kind === 'pace' ? PACE : n.kind === 'account' ? ACCOUNT : LEVEL[n.level];
         // เปิดหน้างบประมาณของเดือนนั้นได้เมื่อยังมีงบอยู่ (งบถูกลบแล้ว = ไม่มีเดือน/ปี)
-        const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment' || n.kind === 'recurring' || n.kind === 'spike'));
+        const canOpen = !!(onSelect && ((n.period_month && n.period_year) || n.kind === 'installment' || n.kind === 'recurring' || n.kind === 'spike' || n.kind === 'account'));
         const clickable = canOpen || unread;
         const title = canOpen
-          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : n.kind === 'recurring' ? 'คลิกเพื่อไปหน้ารายการเกิดซ้ำ' : n.kind === 'spike' ? 'คลิกเพื่อดูการวิเคราะห์' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
+          ? (n.kind === 'installment' ? 'คลิกเพื่อดูรายการผ่อน' : n.kind === 'recurring' ? 'คลิกเพื่อไปหน้ารายการเกิดซ้ำ' : n.kind === 'spike' ? 'คลิกเพื่อดูการวิเคราะห์' : n.kind === 'account' ? 'คลิกเพื่อไปหน้าโปรไฟล์' : 'คลิกเพื่อดูงบประมาณของเดือนนั้น')
           : unread
             ? 'คลิกเพื่อทำเครื่องหมายว่าอ่านแล้ว'
             : '';

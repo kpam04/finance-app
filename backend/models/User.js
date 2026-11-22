@@ -6,6 +6,8 @@ const schema = new mongoose.Schema({
   fullName:      { type: String, default: '', trim: true }, // สร้างอัตโนมัติจาก ชื่อ + นามสกุล (ใช้เพื่อความเข้ากันได้กับโค้ดเดิม)
   nickname:      { type: String, default: '', trim: true },
   email:         { type: String, required: true, unique: true, lowercase: true, trim: true },
+  // ชื่อผู้ใช้สำหรับเข้าสู่ระบบ (ไม่บังคับสำหรับผู้ใช้เดิม) ไม่มีค่าเริ่มต้น เพื่อให้ index แบบ sparse ข้ามบัญชีที่ยังไม่ตั้ง
+  username:      { type: String, unique: true, sparse: true, lowercase: true, trim: true },
   passwordHash:  { type: String, required: true },
   currency:      { type: String, default: 'THB' },
   phone:         { type: String, default: '' },

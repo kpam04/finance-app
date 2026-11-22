@@ -99,6 +99,11 @@ export const api = {
   // auth
   register: (data) => request('/auth/register', { method: 'POST', body: data }),
   login: (data) => request('/auth/login', { method: 'POST', body: data }),
+  usernameAvailable: (u) => request('/auth/username-available', { params: { u } }),
+  acceptPolicy: (version) => request('/auth/accept-policy', { method: 'POST', body: { version } }),
+  getUsernameRequest: () => request('/auth/username-request'),
+  createUsernameRequest: (data) => request('/auth/username-request', { method: 'POST', body: data }),
+  cancelUsernameRequest: () => request('/auth/username-request', { method: 'DELETE' }),
   profile: () => request('/auth/profile'),
 
   updateProfile: (data) => request('/auth/profile', { method: 'PUT', body: data }),

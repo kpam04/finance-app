@@ -11,6 +11,7 @@ const { parseReceiptWithEngines } = require('../services/ai/parseReceipt');
 const { geminiConfig } = require('../services/ai/geminiClient');
 const { checkReceiptImage } = require('../services/ai/imageCheck');
 const { PLAN_CONSENT_VERSION } = require('../services/plan/constants');
+const { policyAccepted } = require('../utils/policy');
 const { checkAndBump, dailyLimit, receiptDailyLimit, planDailyLimit, usedToday, globalAllow, ocrGlobalAllow, geminiGlobalAllow } = require('../services/ai/quota');
 
 const router = express.Router();
@@ -52,26 +53,28 @@ function receiptEngines() {
 
 async function statusFor(userId) {
   const cfg = aiConfig();
-  const u = await User.findById(userId).select('aiEnabled aiConsentAt aiConsentVersion aiImageEnabled aiImageConsentAt aiImageConsentVersion aiPlanEnabled aiPlanConsentAt aiPlanConsentVersion').lean();
+  // ไม่มีสวิตช์รายคนแล้ว: ใช้ได้ทั้ง 3 แบบเมื่อยอมรับนโยบายเวอร์ชันปัจจุบัน (ฟิลด์ ai*Enabled เดิมไม่ได้ใช้แล้ว)
+  const u = await User.findById(userId).select('policyVersion policyAcceptedAt').lean();
+  const ok = policyAccepted(u);
   return {
     configured: cfg.configured, // ฝั่งเซิร์ฟเวอร์มีคีย์ AI หรือไม่ (ไม่เปิดเผยคีย์หรือที่อยู่)
-    enabled: !!(u && u.aiEnabled),
+    enabled: ok,
     consent_version: AI_CONSENT_VERSION,
-    consent_at: (u && u.aiConsentAt) || null,
+    consent_at: (u && u.policyAcceptedAt) || null,
     provider: cfg.provider,
     model: cfg.model,
     daily_limit: dailyLimit(),
     used_today: await usedToday(userId),
     // อ่านรูปใบเสร็จ (ส่งรูปไปบริการภายนอก) แยกความยินยอมและโควต้า
-    image_enabled: !!(u && u.aiImageEnabled && u.aiImageConsentVersion === AI_IMAGE_CONSENT_VERSION),
+    image_enabled: ok,
     receipt_engines: receiptEngines(), // ชื่อตัวอ่านที่ใช้ได้ตามลำดับ (บอกผู้ใช้ในหน้าต่างยินยอมว่ารูปอาจไปที่ไหนบ้าง)
     image_consent_version: AI_IMAGE_CONSENT_VERSION,
-    image_consent_at: (u && u.aiImageConsentAt) || null,
+    image_consent_at: (u && u.policyAcceptedAt) || null,
     ocr_model: cfg.ocrModel,
     receipt_daily_limit: receiptDailyLimit(),
     receipts_used_today: await usedToday(userId, new Date(), 'receipts'),
     // ให้ AI วิเคราะห์ตัวเลขสรุปการเงิน (หน้า "วางแผน") แยกความยินยอมและโควต้า
-    plan_enabled: !!(u && u.aiPlanEnabled && u.aiPlanConsentVersion === PLAN_CONSENT_VERSION),
+    plan_enabled: ok,
     plan_consent_version: PLAN_CONSENT_VERSION,
     plan_daily_limit: planDailyLimit(),
     plans_used_today: await usedToday(userId, new Date(), 'plans'),
@@ -120,11 +123,11 @@ router.post('/parse-text', perMinute, async (req, res) => {
     if (Array.from(text).length > MAX_TEXT) return fail(res, 400, `ข้อความต้องไม่เกิน ${MAX_TEXT} ตัวอักษร`);
 
     if (!cfg.configured) return fail(res, 503, 'ระบบ AI ยังไม่พร้อมใช้งาน', 'AI_UNAVAILABLE');
-    const user = await User.findById(req.userId).select('aiEnabled').lean();
-    if (!user || !user.aiEnabled) return fail(res, 403, 'ต้องเปิดใช้ AI ก่อน (ข้อความจะถูกส่งไปบริการ AI ภายนอก)', 'AI_CONSENT_REQUIRED');
+    const user = await User.findById(req.userId).select('policyVersion').lean();
+    if (!policyAccepted(user)) return fail(res, 403, 'กรุณายอมรับนโยบายความเป็นส่วนตัวเวอร์ชันล่าสุดก่อนใช้ AI', 'POLICY_REQUIRED');
 
     const quota = await checkAndBump(req.userId);
-    if (!quota.ok) return fail(res, 429, `ใช้ AI ครบ ${quota.limit} ครั้งของวันนี้แล้ว (ระบบจะใช้การแยกแบบกฎแทน)`, 'AI_QUOTA');
+    if (!quota.ok) return fail(res, 429, `ใช้ AI ครบ ${quota.limit} ครั้งของวันนี้แล้ว ระบบจะใช้การแยกแบบกฎแทน (ใช้ AI ได้อีกครั้งหลังเที่ยงคืน)`, 'AI_QUOTA');
     if (!globalAllow()) return fail(res, 503, 'ระบบ AI ถูกใช้งานหนาแน่น ลองใหม่อีกสักครู่', 'AI_BUSY');
 
     const cats = await Category.find({ $or: [{ user: null }, { user: req.userId }] }).lean();
@@ -171,11 +174,11 @@ router.post('/parse-receipt', receiptPerMinute, async (req, res) => {
 
     const engines = receiptEngines();
     if (!engines.length) return fail(res, 503, 'ระบบ AI ยังไม่พร้อมใช้งาน', 'AI_UNAVAILABLE');
-    const user = await User.findById(req.userId).select('aiImageEnabled aiImageConsentVersion').lean();
-    if (!user || !user.aiImageEnabled || user.aiImageConsentVersion !== AI_IMAGE_CONSENT_VERSION) return fail(res, 403, 'ต้องยินยอมให้ส่งรูปใบเสร็จไปบริการ AI ภายนอกก่อน', 'AI_IMAGE_CONSENT_REQUIRED');
+    const user = await User.findById(req.userId).select('policyVersion').lean();
+    if (!policyAccepted(user)) return fail(res, 403, 'กรุณายอมรับนโยบายความเป็นส่วนตัวเวอร์ชันล่าสุดก่อนใช้ AI', 'POLICY_REQUIRED');
 
     const quota = await checkAndBump(req.userId, new Date(), { field: 'receipts', limit: receiptDailyLimit() });
-    if (!quota.ok) return fail(res, 429, `อ่านใบเสร็จครบ ${quota.limit} ใบของวันนี้แล้ว (กรอกรายการเองหรือรอพรุ่งนี้)`, 'AI_QUOTA');
+    if (!quota.ok) return fail(res, 429, `เพิ่มจากรูปครบ ${quota.limit} ใบของวันนี้แล้ว กรอกรายการเองได้ตามปกติ (ใช้ได้อีกครั้งหลังเที่ยงคืน)`, 'AI_QUOTA');
     // ตัวไหนเต็มเพดานต่อนาทีของตัวเอง ข้ามไปใช้ตัวที่เหลือ (ถ้าไม่เหลือเลย = หนาแน่น)
     const usable = engines.filter((e) => (e === 'gemini' ? geminiGlobalAllow() : ocrGlobalAllow()));
     if (!usable.length) return fail(res, 503, 'ระบบอ่านใบเสร็จถูกใช้งานหนาแน่น ลองใหม่อีกสักครู่', 'AI_BUSY');

@@ -4,7 +4,6 @@ import { api } from '../api.js';
 import InfoTitle from '../components/InfoTitle.jsx';
 import GoalModal from '../components/GoalModal.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
-import AiConsentModal from '../components/AiConsentModal.jsx';
 import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
 import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, IconWarning, IconPiggy, IconSprout, IconTrophy, IconParty, IconCheckCircle, AdviceIcon } from '../components/PlanIcons.jsx';
 import { baht, num1, thaiDate, thaiMonth, thaiMonthYearShort, chipParts, monthOptions, timesOf, pctOrTimes, catLevel, ratioLabel } from '../utils/planFormat.js';
@@ -720,7 +719,6 @@ export default function Plan() {
   const [aiElapsed, setAiElapsed] = useState(0);
   const [aiMsg, setAiMsg] = useState('');
   const [aiDropped, setAiDropped] = useState(0);
-  const [showConsent, setShowConsent] = useState(false);
   const [goalModal, setGoalModal] = useState(null); // null | { goal, reopen } (goal = null เพิ่มใหม่ / reopen = ย้ายเป้าที่สำเร็จแล้วกลับ)
   const [confirmDel, setConfirmDel] = useState(null);
   const [goalView, setGoalView] = useState('active'); // แท็บเป้าหมายออม: 'active' กำลังออม / 'done' สำเร็จแล้ว
@@ -839,7 +837,6 @@ export default function Plan() {
       setData((d) => ({ ...d, ai_advice: { items: res.data.items, generated_at: res.data.generated_at, model: res.data.model, stale: false }, ai: { ...d.ai, plans_used_today: d.ai.plans_used_today + 1 } }));
     } catch (e) {
       if (ctrl.signal.aborted || !alive.current || (e && e.name === 'AbortError')) return;
-      if (e.code === 'AI_PLAN_CONSENT_REQUIRED') setData((d) => ({ ...d, ai: { ...d.ai, plan_enabled: false } }));
       setAiMsg(e.message || 'ขอคำแนะนำจาก AI ไม่สำเร็จ');
     } finally {
       if (abortRef.current === ctrl) abortRef.current = null;
@@ -860,16 +857,13 @@ export default function Plan() {
     setAiDropped(0);
     setConfirmDel(null);
     setGoalModal(null);
-    setShowConsent(false);
     setBudgetAsk(null);
     setActMsg('');
     setSimOpen(false);
     load();
   };
-  const askAi = () => {
-    if (!data.ai.plan_enabled) setShowConsent(true);
-    else runAdvice();
-  };
+  // ยอมรับนโยบาย (รวมการใช้ AI) ตอนสมัครแล้ว: กดแล้วส่งให้ AI วิเคราะห์ทันที ไม่ต้องยืนยันซ้ำ
+  const askAi = () => runAdvice();
 
   const rate = async (index, value) => {
     const cur = data.ai_advice.items[index].rating || 0;
@@ -1412,7 +1406,7 @@ export default function Plan() {
                   {(saved || (isCur && ai.configured)) && (
                     <p className="pl-note pl-ai-usage" data-ai-usage>
                       {saved && <span className="pl-mob-only">เขียนเมื่อ {new Date(saved.generated_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}{isCur && ai.configured ? ' · ' : ''}</span>}
-                      {isCur && ai.configured && `วันนี้ขอไปแล้ว ${ai.plans_used_today}/${ai.plan_daily_limit} ครั้ง`}
+                      {isCur && ai.configured && `วันนี้ขอไปแล้ว ${ai.plans_used_today}/${ai.plan_daily_limit} ครั้ง${ai.plans_used_today >= ai.plan_daily_limit ? ' · ขอใหม่ได้หลังเที่ยงคืน' : ''}`}
                     </p>
                   )}
                 </div>
@@ -1444,7 +1438,7 @@ export default function Plan() {
           {!saved && !aiBusy && isCur && ai.configured && (
             <div className="pl-aicta" data-ai-cta>
               <span className="pl-aicta-ic"><IconSpark size={16} /></span>
-              <span className="pl-aicta-tx">อยากได้มุมมองเพิ่ม ให้ AI ช่วยอ่านตัวเลขสรุปแล้วเขียนคำแนะนำ<small>วันนี้ขอได้อีก {Math.max(0, ai.plan_daily_limit - ai.plans_used_today)} ครั้ง</small></span>
+              <span className="pl-aicta-tx">อยากได้มุมมองเพิ่ม ให้ AI ช่วยอ่านตัวเลขสรุปแล้วเขียนคำแนะนำ<small>{ai.plans_used_today >= ai.plan_daily_limit ? 'วันนี้ขอครบแล้ว ขอใหม่ได้หลังเที่ยงคืน' : `วันนี้ขอได้อีก ${Math.max(0, ai.plan_daily_limit - ai.plans_used_today)} ครั้ง`}</small></span>
               <button type="button" className="pl-act main" data-ai-ask onClick={askAi} disabled={ai.plans_used_today >= ai.plan_daily_limit}>ให้ AI วิเคราะห์</button>
             </div>
           )}
@@ -1678,14 +1672,6 @@ export default function Plan() {
             </div>
           </div>
         </div>
-      )}
-      {showConsent && (
-        <AiConsentModal
-          scope="plan"
-          version={ai.plan_consent_version}
-          onAccepted={() => { setShowConsent(false); setData((d) => ({ ...d, ai: { ...d.ai, plan_enabled: true } })); runAdvice(); }}
-          onDeclined={() => setShowConsent(false)}
-        />
       )}
     </div>
   );
