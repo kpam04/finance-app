@@ -4,6 +4,7 @@ import { categorySelectCss, orderForPicker } from './CategorySelect.jsx';
 // ช่องเลือกหมวดหมู่สำหรับ "ตัวกรอง" (หน้าตาเดียวกับช่องเลือกหมวดตอนเพิ่มรายการ แต่ไม่มีแถบสร้างหมวดใหม่)
 //  - type = 'expense' | 'income': แสดงเฉพาะหมวดของประเภทนั้น / type = '' (ทั้งหมด): แสดงสองกลุ่มมีหัวข้อ "รายจ่าย" "รายรับ"
 //  - แถวแรกคือ "ทุกหมวดหมู่" (ล้างตัวเลือก) หมวดที่ถูกซ่อนยังเลือกได้ท้ายกลุ่มพร้อมป้าย "(ซ่อนอยู่)" เพราะรายการเก่าอาจใช้หมวดนั้น
+//  - special (ไม่บังคับ): ตัวเลือกพิเศษบนสุดใต้หัวข้อ "พิเศษ" แสดงเฉพาะตอน type = '' (ทั้งหมด) เช่น "การออม" [{ value, name, icon }]
 //  - ใช้คีย์บอร์ดได้ (ลูกศร Home End Enter Esc) กดนอกกล่องหรือแตะที่อื่นเพื่อปิด ถ้าด้านล่างไม่พอจะเปิดขึ้นด้านบน
 const TYPE_LABEL = { expense: 'รายจ่าย', income: 'รายรับ' };
 const ALL_LABEL = 'ทุกหมวดหมู่';
@@ -14,9 +15,11 @@ const extraCss = `
 .cf-wrap .cs-button { min-height: 42px; font-size: 14px; }
 .cs-group { padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: #8A8177; }
 .cs-list > .cs-group:first-child { padding-top: 4px; }
+.cf-icon { display: inline-flex; flex: 0 0 auto; width: 10px; justify-content: center; color: #6F9E99; }
+.cf-icon svg { width: 13px; height: 13px; }
 `;
 
-export default function CategoryFilterSelect({ categories = [], type = '', value = '', onChange, ariaLabel = 'กรองตามหมวดหมู่' }) {
+export default function CategoryFilterSelect({ categories = [], type = '', value = '', onChange, ariaLabel = 'กรองตามหมวดหมู่', special = [] }) {
   const [open, setOpen] = useState(false);
   const [up, setUp] = useState(false);
   const [maxH, setMaxH] = useState(MAX_PANEL);
@@ -27,6 +30,10 @@ export default function CategoryFilterSelect({ categories = [], type = '', value
   // แถวทั้งหมดของรายการ: ตัวเลือก "ทุกหมวดหมู่" + (หัวข้อกลุ่ม) + หมวดต่าง ๆ (หมวดที่ซ่อนอยู่ท้ายกลุ่ม)
   const rows = useMemo(() => {
     const out = [{ kind: 'option', value: '', name: ALL_LABEL, all: true }];
+    if (!type && special.length) {
+      out.push({ kind: 'group', name: 'พิเศษ', key: 'g-special' });
+      for (const s of special) out.push({ kind: 'option', value: s.value, name: s.name, icon: s.icon, special: true });
+    }
     const groups = type ? [type] : ['expense', 'income'];
     for (const g of groups) {
       const list = categories.filter((c) => c.type === g);
@@ -37,7 +44,7 @@ export default function CategoryFilterSelect({ categories = [], type = '', value
       for (const c of [...visible, ...hidden]) out.push({ kind: 'option', value: String(c.category_id), name: c.name, color: c.color, hidden: !!c.hidden });
     }
     return out;
-  }, [categories, type]);
+  }, [categories, type, special]);
 
   const optionIdx = useMemo(() => rows.map((r, i) => (r.kind === 'option' ? i : -1)).filter((i) => i >= 0), [rows]);
   const current = String(value || '');
@@ -133,7 +140,7 @@ export default function CategoryFilterSelect({ categories = [], type = '', value
         onKeyDown={onKeyDown}
       >
         <span className={`cs-value${selected.all ? ' placeholder' : ''}`}>
-          {!selected.all && <span className="cs-dot" style={{ background: selected.color || '#9ca3af' }} />}
+          {!selected.all && (selected.icon ? <span className="cf-icon">{selected.icon}</span> : <span className="cs-dot" style={{ background: selected.color || '#9ca3af' }} />)}
           {label}
         </span>
         <span className="cs-chevron" aria-hidden="true">▾</span>
@@ -159,7 +166,7 @@ export default function CategoryFilterSelect({ categories = [], type = '', value
                   onMouseEnter={() => setActive(i)}
                   onClick={() => choose(i)}
                 >
-                  {r.all ? <span className="cs-dot" style={{ background: 'transparent' }} /> : <span className="cs-dot" style={{ background: r.color || '#9ca3af' }} />}
+                  {r.all ? <span className="cs-dot" style={{ background: 'transparent' }} /> : r.icon ? <span className="cf-icon">{r.icon}</span> : <span className="cs-dot" style={{ background: r.color || '#9ca3af' }} />}
                   <span className="cs-name">{r.name}{r.hidden && <span className="cs-muted"> (ซ่อนอยู่)</span>}</span>
                   {isSel && <span className="cs-check" aria-hidden="true">✓</span>}
                 </div>

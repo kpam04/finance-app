@@ -62,7 +62,9 @@ const IconTrash = () => (
   </svg>
 );
 
-const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ่าย'], ['income', 'รายรับ'], ['saving', 'การออม']];
+const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ่าย'], ['income', 'รายรับ']];
+// "การออม" เลือกได้จากช่องหมวดหมู่ (หัวข้อพิเศษบนสุด เฉพาะตอนประเภท = ทั้งหมด) → ตัวกรอง type = 'saving'
+const SAVING_OPT = '__saving';
 const TYPE_LABEL = { income: 'รายรับ', expense: 'รายจ่าย', saving: 'การออม' };
 
 // รายการออม/ถอน (สร้างจากหน้าเป้าหมายเท่านั้น): ออมเข้าเป้า = เงินคงเหลือลด / ถอนจากเป้า = เงินคงเหลือเพิ่ม ไม่ใช่รายรับ-รายจ่าย
@@ -70,6 +72,7 @@ const isSaving = (t) => t.type === 'saving' || t.type === 'withdraw';
 const IconGoal = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" fill="currentColor" /></svg>
 );
+const SPECIAL_CATS = [{ value: SAVING_OPT, name: 'การออม', icon: <IconGoal /> }];
 const IconLockSm = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
 );
@@ -83,7 +86,7 @@ const txCss = `
 .tx-list-head h3 { margin: 0; font-size: 17px; }
 .tx-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #4b5563; }
 .tx-clear { padding: 0; border: none; background: none; font: inherit; font-size: 13px; font-weight: 400; color: var(--primary-dark, #74896F); text-decoration: underline; cursor: pointer; }
-.tx-filter-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; margin-bottom: 14px; }
+.tx-filter-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; margin-bottom: 6px; }
 .tx-seg { display: flex; border: 1px solid var(--border, #E9E1D6); border-radius: 10px; overflow: hidden; background: #fff; }
 .tx-seg button { flex: 1; min-height: 42px; padding: 8px 6px; border: none; background: #fff; color: #6b7280; font: inherit; font-size: 14px; cursor: pointer; }
 .tx-seg button + button { border-left: 1px solid var(--border, #E9E1D6); }
@@ -105,11 +108,22 @@ const txCss = `
 .transactions-table td.num.saving { color: #3E7E7A; font-weight: 600; }
 .transactions-table td.num.withdraw { color: #4F6E80; font-weight: 600; }
 .tx-locked { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: #9a9184; }
-.tx-sav-sum { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -4px 0 12px; padding: 8px 12px; border-radius: 10px; background: #F1F6F5; font-size: 13.5px; color: #4b5563; }
+.tx-sav-sum { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 4px; padding: 8px 12px; border-radius: 10px; background: #F1F6F5; font-size: 13.5px; color: #4b5563; }
 .tx-sav-sum b { color: #3F3A34; }
 .tx-sav-sum .in b { color: #3E7E7A; }
 .tx-sav-sum .out b { color: #4F6E80; }
 @media (max-width: 760px) { .tx-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tx-field.tx-wide { grid-column: 1 / -1; } }
+/* จอกว้าง: ทั้งหน้ากว้างสุด 1040px อยู่กลางจอ (การ์ดเพิ่มรายการกับการ์ดรายการขอบตรงกัน) และช่องกรองกว้างพอดีข้อมูล ชิดซ้าย */
+.transactions-page { max-width: 1040px; margin-left: auto; margin-right: auto; }
+@media (min-width: 900px) {
+  .tx-filter-grid { display: flex; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: 10px 14px; }
+  /* ประเภทยืดเต็มพื้นที่ที่เหลือ / ช่องวันที่กว้างเท่ากล่องปฏิทินที่เด้งขึ้นมา */
+  /* จอเล็กลง: ทุกช่องหดตามสัดส่วน (ไม่ตกบรรทัด) แต่ไม่ต่ำกว่า min-width */
+  .tx-filter-grid > .tx-field:nth-child(1) { flex: 1 1 260px; min-width: 230px; }
+  .tx-filter-grid > .tx-field:nth-child(2) { flex: 0 1 230px; min-width: 170px; }
+  .tx-filter-grid > .tx-field:nth-child(3), .tx-filter-grid > .tx-field:nth-child(4) { flex: 0 1 215px; min-width: 150px; }
+  .tx-filter-grid .tx-seg button { flex: 1 1 0; padding: 8px 12px; white-space: nowrap; }
+}
 .tx-act .tx-ico { display: none; }
 @media (max-width: 640px) {
   .ai-actions .btn { font-size: 13px; padding-left: 6px; padding-right: 6px; }
@@ -437,13 +451,16 @@ export default function Transactions() {
   };
   const setCategory = (id) => {
     setPage(1);
-    setFilter((f) => ({ ...f, category_id: id }));
+    if (id === SAVING_OPT) setFilter((f) => ({ ...f, type: 'saving', category_id: '' }));
+    else setFilter((f) => ({ ...f, category_id: id, type: f.type === 'saving' ? '' : f.type }));
   };
+  // การออมอยู่ใต้ "ทั้งหมด": ปุ่มประเภทแสดง "ทั้งหมด" ตอนกรองการออม
+  const segType = filter.type === 'saving' ? '' : filter.type;
   const typeKey = (e) => {
     const keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
     if (!(e.key in keys)) return;
     e.preventDefault();
-    const i = TYPE_OPTIONS.findIndex(([v]) => v === filter.type);
+    const i = Math.max(0, TYPE_OPTIONS.findIndex(([v]) => v === filter.type));
     setType(TYPE_OPTIONS[(i + keys[e.key] + TYPE_OPTIONS.length) % TYPE_OPTIONS.length][0]);
   };
 
@@ -540,9 +557,9 @@ export default function Transactions() {
                   key={v || 'all'}
                   type="button"
                   role="radio"
-                  aria-checked={filter.type === v}
-                  tabIndex={filter.type === v ? 0 : -1}
-                  className={filter.type === v ? 'on' : ''}
+                  aria-checked={segType === v}
+                  tabIndex={segType === v ? 0 : -1}
+                  className={segType === v ? 'on' : ''}
                   data-tx-type-opt={v || 'all'}
                   onClick={() => setType(v)}
                 >
@@ -554,17 +571,14 @@ export default function Transactions() {
 
           <div className="tx-field tx-wide">
             <span data-tx-cat-label>หมวดหมู่{filter.type === 'income' || filter.type === 'expense' ? ` (เฉพาะ${TYPE_LABEL[filter.type]})` : ''}</span>
-            {filter.type === 'saving' ? (
-              <select disabled aria-label="กรองตามหมวดหมู่" data-tx-cat-saving><option>การออม (ทุกเป้าหมาย)</option></select>
-            ) : (
             <CategoryFilterSelect
               categories={cats}
-              type={filter.type}
-              value={filter.category_id}
+              type={segType}
+              value={filter.type === 'saving' ? SAVING_OPT : filter.category_id}
               onChange={setCategory}
               ariaLabel="กรองตามหมวดหมู่"
+              special={SPECIAL_CATS}
             />
-            )}
           </div>
 
           <label className="tx-field">
