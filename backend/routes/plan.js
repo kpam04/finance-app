@@ -6,7 +6,7 @@ const User = require('../models/User');
 const Category = require('../models/Category');
 const Transaction = require('../models/Transaction');
 const Goal = require('../models/Goal');
-const GoalDeposit = require('../models/GoalDeposit');
+const goalSaving = require('../services/goalSaving');
 const Budget = require('../models/Budget');
 const Installment = require('../models/Installment');
 const Recurring = require('../models/Recurring');
@@ -399,90 +399,53 @@ router.put('/goals/:id', async (req, res) => {
   }
 });
 
+// ลบเป้า: กำลังออม (เลิกเป้า) = ยอดที่ออมผ่านรายการถอนกลับเข้าเงินคงเหลือ / สำเร็จแล้ว = รายการออมเดิมอยู่ครบ เงินไม่กลับมา
 router.delete('/goals/:id', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบเป้าหมาย');
-    const r = await Goal.deleteOne({ _id: req.params.id, user: req.userId });
-    if (!r.deletedCount) return fail(res, 404, 'ไม่พบเป้าหมาย');
-    await GoalDeposit.deleteMany({ goal: req.params.id, user: req.userId });
-    res.json({ success: true, message: 'ลบเป้าหมายแล้ว' });
+    const r = await goalSaving.deleteGoal(req.userId, req.params.id);
+    res.json({ success: true, message: r.returned > 0 ? 'เลิกเป้าหมายแล้ว เงินที่ออมไว้กลับไปที่เงินคงเหลือ' : 'ลบเป้าหมายแล้ว', data: { returned: r.returned } });
   } catch (e) {
+    if (e instanceof goalSaving.SavingError) return fail(res, e.status, e.message);
     console.error('[plan/goals/delete]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });
 
-// ---------- ออมเพิ่ม (ประวัติการออมของเป้าหมาย) ----------
-const DEPOSIT_LIST = 30;
-const depositOut = (d) => ({ deposit_id: String(d._id), amount: d.amount, created_at: d.createdAt });
-async function ownGoal(req, res) {
-  if (!mongoose.isValidObjectId(req.params.id)) { fail(res, 404, 'ไม่พบเป้าหมาย'); return null; }
-  const goal = await Goal.findOne({ _id: req.params.id, user: req.userId }).lean();
-  if (!goal) { fail(res, 404, 'ไม่พบเป้าหมาย'); return null; }
-  return goal;
+// ---------- ออมเพิ่ม / ถอนออก (เก็บเป็นรายการชนิด saving / withdraw แสดงในหน้ารายการ) ----------
+async function savingResponse(req, res, status, result, okMessage) {
+  const { goal, justCompleted } = result;
+  if (justCompleted && goal) {
+    return res.status(status).json({ success: true, message: 'ออมครบตามเป้าหมายแล้ว', data: { goal: null, just_completed: true, achievement: achievementOut(goal) } });
+  }
+  const { goalEvals } = await loadPlan(req.userId);
+  res.status(status).json({ success: true, message: okMessage, data: { goal: goal ? goalEvals.find((g) => g.goal_id === String(goal._id)) || null : null } });
 }
 
-router.get('/goals/:id/deposits', async (req, res) => {
-  try {
-    const goal = await ownGoal(req, res);
-    if (!goal) return;
-    const [items, count] = await Promise.all([
-      GoalDeposit.find({ goal: goal._id, user: req.userId }).sort({ createdAt: -1 }).limit(DEPOSIT_LIST).lean(),
-      GoalDeposit.countDocuments({ goal: goal._id, user: req.userId }),
-    ]);
-    const sum = items.length === count ? items.reduce((t, d) => t + d.amount, 0) : null;
-    res.json({ success: true, data: { saved_amount: goal.saved_amount, deposits: items.map(depositOut), count, deposits_total: sum } });
-  } catch (e) {
-    console.error('[plan/goals/deposits]', e.message);
-    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
-  }
-});
-
-// ออมเพิ่ม: ยอดปัจจุบัน + จำนวนนี้ ถึงเป้าแล้วปิดเป็น "สำเร็จแล้ว" อัตโนมัติ
 router.post('/goals/:id/deposits', async (req, res) => {
   try {
-    const goal = await ownGoal(req, res);
-    if (!goal) return;
-    if (isDone(goal)) return fail(res, 400, 'เป้าหมายนี้สำเร็จแล้ว');
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบเป้าหมาย');
     const amt = parseAmount(req.body && req.body.amount, 'ยอดออมเพิ่ม');
     if (amt.error) return fail(res, 400, amt.error);
-    const nextSaved = Math.round((Number(goal.saved_amount) + amt.value) * 100) / 100;
-    if (nextSaved > MAX_AMOUNT) return fail(res, 400, `ยอดที่ออมแล้วรวมต้องไม่เกิน ${MAX_AMOUNT.toLocaleString('en-US')} บาท`);
-    const dep = await GoalDeposit.create({ user: req.userId, goal: goal._id, amount: amt.value, date: todayTH() });
-    const justCompleted = nextSaved >= Number(goal.target_amount);
-    // ใช้ $inc กันยอดหายเมื่อกดบันทึกพร้อมกันหลายครั้ง
-    await Goal.updateOne({ _id: goal._id }, { $inc: { saved_amount: amt.value }, ...(justCompleted ? { $set: { completed_at: new Date() } } : {}) });
-    if (justCompleted) {
-      const fresh = await Goal.findById(goal._id).lean();
-      return res.status(201).json({ success: true, message: 'ออมครบตามเป้าหมายแล้ว', data: { goal: null, deposit: depositOut(dep), just_completed: true, achievement: achievementOut(fresh) } });
-    }
-    const { goalEvals } = await loadPlan(req.userId);
-    res.status(201).json({ success: true, message: 'บันทึกยอดออมเพิ่มแล้ว', data: { goal: goalEvals.find((g) => g.goal_id === String(goal._id)) || null, deposit: depositOut(dep) } });
+    const r = await goalSaving.addSaving(req.userId, req.params.id, amt.value);
+    await savingResponse(req, res, 201, r, 'บันทึกยอดออมเพิ่มแล้ว');
   } catch (e) {
+    if (e instanceof goalSaving.SavingError) return fail(res, e.status, e.message);
     console.error('[plan/goals/deposit]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });
 
-// ลบรายการออมเพิ่ม (กรอกผิด): ยอดปัจจุบันลดลงตาม (ไม่ต่ำกว่า 0) เฉพาะเป้าที่กำลังออม
-router.delete('/goals/:id/deposits/:depositId', async (req, res) => {
+router.post('/goals/:id/withdraw', async (req, res) => {
   try {
-    const goal = await ownGoal(req, res);
-    if (!goal) return;
-    if (isDone(goal)) return fail(res, 400, 'เป้าหมายนี้สำเร็จแล้ว ถ้าจะแก้ไข ให้ย้ายกลับไปกำลังออมก่อน');
-    if (!mongoose.isValidObjectId(req.params.depositId)) return fail(res, 404, 'ไม่พบรายการออม');
-    const dep = await GoalDeposit.findOneAndDelete({ _id: req.params.depositId, goal: goal._id, user: req.userId }).lean();
-    if (!dep) return fail(res, 404, 'ไม่พบรายการออม');
-    // ลดยอดด้วย $inc (Mongoose 9 ไม่รับ update pipeline แบบ array ถ้าไม่เปิด updatePipeline) แล้วกันยอดติดลบ/ทศนิยมเพี้ยน
-    const after = await Goal.findOneAndUpdate({ _id: goal._id }, { $inc: { saved_amount: -dep.amount } }, { returnDocument: 'after' }).lean();
-    if (after) {
-      const fixed = Math.max(0, Math.round(Number(after.saved_amount) * 100) / 100);
-      if (fixed !== after.saved_amount) await Goal.updateOne({ _id: goal._id }, { $set: { saved_amount: fixed } });
-    }
-    const { goalEvals } = await loadPlan(req.userId);
-    res.json({ success: true, message: 'ลบรายการออมแล้ว', data: { goal: goalEvals.find((g) => g.goal_id === String(goal._id)) || null } });
+    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, 'ไม่พบเป้าหมาย');
+    const amt = parseAmount(req.body && req.body.amount, 'ยอดถอน');
+    if (amt.error) return fail(res, 400, amt.error);
+    const r = await goalSaving.withdraw(req.userId, req.params.id, amt.value, req.body && req.body.reason);
+    await savingResponse(req, res, 201, r, 'ถอนออกจากเป้าแล้ว เงินกลับไปที่เงินคงเหลือ');
   } catch (e) {
-    console.error('[plan/goals/deposit/delete]', e.message);
+    if (e instanceof goalSaving.SavingError) return fail(res, e.status, e.message);
+    console.error('[plan/goals/withdraw]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });

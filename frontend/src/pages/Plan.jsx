@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import InfoTitle from '../components/InfoTitle.jsx';
 import GoalModal from '../components/GoalModal.jsx';
+import WithdrawModal from '../components/WithdrawModal.jsx';
 import MonthPicker from '../components/MonthPicker.jsx';
 import InstallmentsPanel from '../components/InstallmentsPanel.jsx';
 import { IconSpark, IconFlag, IconChart, IconEdit, IconTrash, IconThumb, IconWarning, IconPiggy, IconSprout, IconTrophy, IconParty, IconCheckCircle, AdviceIcon } from '../components/PlanIcons.jsx';
@@ -21,6 +22,11 @@ const isTab = (t) => TABS.some((x) => x.id === t);
 function readSavedTab() {
   try { const t = localStorage.getItem(TAB_KEY); return isTab(t) ? t : null; } catch { return null; }
 }
+
+// ไอคอนถอนออก (กระเป๋าเงิน + ลูกศรออก)
+const IconWithdraw = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v3" /><path d="M3 6v12a2 2 0 0 0 2 2h9" /><path d="M16 17h6" /><path d="m19 14 3 3-3 3" /></svg>
+);
 
 const css = `
 .pl-page { max-width: 1100px; margin: 0 auto; }
@@ -721,6 +727,7 @@ export default function Plan() {
   const [aiDropped, setAiDropped] = useState(0);
   const [goalModal, setGoalModal] = useState(null); // null | { goal, reopen } (goal = null เพิ่มใหม่ / reopen = ย้ายเป้าที่สำเร็จแล้วกลับ)
   const [confirmDel, setConfirmDel] = useState(null);
+  const [withdrawGoal, setWithdrawGoal] = useState(null); // เป้าที่กำลังถอนออก
   const [goalView, setGoalView] = useState('active'); // แท็บเป้าหมายออม: 'active' กำลังออม / 'done' สำเร็จแล้ว
   const [inst, setInst] = useState(null); // ข้อมูลรายการผ่อน (ไม่ขึ้นกับเดือนที่ดู)
   const [instAdd, setInstAdd] = useState(0); // เพิ่มค่า = เปิดฟอร์มเพิ่มรายการผ่อน (ปุ่มที่หัวข้อ)
@@ -1564,7 +1571,7 @@ export default function Plan() {
                         </dl>
                         {confirmDel === a.goal_id && (
                           <div className="pl-confirm" data-goal-confirm>
-                            <span>ลบออกจากประวัติ?</span>
+                            <span>ลบออกจากประวัติ?<small style={{ display: 'block', color: '#8A8177' }}>รายการออมยังอยู่ในหน้ารายการ เงินไม่กลับมา</small></span>
                             <button type="button" className="btn btn-sm btn-danger" data-goal-del-yes onClick={() => delGoal(a.goal_id)}>ลบ</button>
                             <button type="button" className="btn btn-sm btn-light" data-goal-del-no onClick={() => setConfirmDel(null)}>ยกเลิก</button>
                           </div>
@@ -1592,6 +1599,7 @@ export default function Plan() {
                     <div className="pl-goal-top">
                       <span className="pl-goal-name">{g.name}</span>
                       <span className="pl-goal-tools">
+                        {Number(g.saved_amount) > 0 && <button type="button" aria-label={`ถอนออกจากเป้าหมาย ${g.name}`} title="ถอนออก" data-goal-withdraw onClick={() => setWithdrawGoal(g)}><IconWithdraw size={15} /></button>}
                         <button type="button" aria-label={`แก้ไขเป้าหมาย ${g.name}`} title="แก้ไข" data-goal-edit onClick={() => setGoalModal({ goal: g })}><IconEdit size={15} /></button>
                         <button type="button" aria-label={`ลบเป้าหมาย ${g.name}`} title="ลบ" data-goal-del onClick={() => setConfirmDel(g.goal_id)}><IconTrash size={15} /></button>
                       </span>
@@ -1615,7 +1623,7 @@ export default function Plan() {
                     )}
                     {confirmDel === g.goal_id && (
                       <div className="pl-confirm" data-goal-confirm>
-                        <span>ลบเป้าหมายนี้?</span>
+                        <span>ลบเป้าหมายนี้?{Number(g.saved_amount) > 0 && <small style={{ display: 'block', color: '#8A8177' }}>ยอดที่กดออมไว้จะกลับไปที่เงินคงเหลือ</small>}</span>
                         <button type="button" className="btn btn-sm btn-danger" data-goal-del-yes onClick={() => delGoal(g.goal_id)}>ลบ</button>
                         <button type="button" className="btn btn-sm btn-light" data-goal-del-no onClick={() => setConfirmDel(null)}>ยกเลิก</button>
                       </div>
@@ -1655,6 +1663,13 @@ export default function Plan() {
             if (res && res.just_completed && res.achievement) setCelebrate(res.achievement);
             if (wasReopen) setGoalView('active');
           }}
+        />
+      )}
+      {withdrawGoal && (
+        <WithdrawModal
+          goal={withdrawGoal}
+          onClose={() => setWithdrawGoal(null)}
+          onSaved={async () => { setWithdrawGoal(null); await load(); }}
         />
       )}
       {celebrate && (

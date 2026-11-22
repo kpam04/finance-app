@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const Category = require('../models/Category');
+const Goal = require('../models/Goal');
+const goalSaving = require('../services/goalSaving');
 const auth = require('../middleware/auth');
 const checkBudgetAlert = require('../services/budgetAlert');
 const { parseAmount, cleanNote, yearInRange } = require('../utils/inputRules');
@@ -19,17 +21,41 @@ const spikeCheck = (userId, t) => {
 const router = express.Router();
 router.use(auth);
 
-const toDto = (t) => ({
-  transaction_id: t._id,
-  type: t.type,
-  amount: t.amount,
-  note: t.note,
-  transaction_date: t.date.toISOString().slice(0, 10),
-  category_id: t.category && t.category._id,
-  category_name: t.category && t.category.name,
-  category_color: t.category && t.category.color,
-  category_icon: t.category && t.category.icon,
-});
+const isSavingType = (type) => type === 'saving' || type === 'withdraw';
+
+// goals: Map(goal_id -> goal) ใช้บอกสถานะเป้าของรายการออม/ถอน (active = แก้/ลบได้, done = สำเร็จแล้ว, deleted = ลบเป้าแล้ว)
+const toDto = (t, goals) => {
+  const base = {
+    transaction_id: t._id,
+    type: t.type,
+    amount: t.amount,
+    note: t.note,
+    transaction_date: t.date.toISOString().slice(0, 10),
+    category_id: t.category && t.category._id,
+    category_name: t.category && t.category.name,
+    category_color: t.category && t.category.color,
+    category_icon: t.category && t.category.icon,
+  };
+  if (!isSavingType(t.type)) return base;
+  const g = goals && t.goal ? goals.get(String(t.goal)) : null;
+  const goalState = !g ? 'deleted' : g.completed_at ? 'done' : 'active';
+  return {
+    ...base,
+    category_name: 'การออม',
+    goal_id: t.goal || null,
+    goal_name: (g && g.name) || t.goal_name || '',
+    goal_state: goalState,
+    reason: t.reason || '',
+    editable: goalState === 'active',
+  };
+};
+
+async function goalMapFor(userId, rows) {
+  const ids = [...new Set(rows.filter((t) => isSavingType(t.type) && t.goal).map((t) => String(t.goal)))];
+  if (!ids.length) return new Map();
+  const goals = await Goal.find({ _id: { $in: ids }, user: userId }).select('name completed_at').lean();
+  return new Map(goals.map((g) => [String(g._id), g]));
+}
 
 const parseDate = (s) => {
   const d = new Date(s);
@@ -62,7 +88,10 @@ function buildFilter(req) {
     }
   }
   if (['income', 'expense'].includes(req.query.type)) q.type = req.query.type;
-  if (req.query.category_id && mongoose.isValidObjectId(req.query.category_id)) {
+  else if (req.query.type === 'saving') q.type = { $in: goalSaving.SAVING_TYPES }; // การออม = ออมเข้า + ถอนออก
+  if (q.type && q.type.$in) {
+    if (req.query.goal_id && mongoose.isValidObjectId(req.query.goal_id)) q.goal = req.query.goal_id;
+  } else if (req.query.category_id && mongoose.isValidObjectId(req.query.category_id)) {
     q.category = req.query.category_id;
   }
   return { q };
@@ -76,7 +105,7 @@ const csvCell = (v) => {
   return s;
 };
 const EXPORT_MAX = 10000;
-const TYPE_TH = { income: 'รายรับ', expense: 'รายจ่าย' };
+const TYPE_TH = { income: 'รายรับ', expense: 'รายจ่าย', saving: 'ออม', withdraw: 'ถอน' };
 
 // ดูรายการ (กรอง + แบ่งหน้า)
 router.get('/', async (req, res) => {
@@ -96,7 +125,16 @@ router.get('/', async (req, res) => {
         .limit(limit),
     ]);
 
-    res.json({ success: true, data: rows.map(toDto), pagination: { page, limit, total } });
+    const goals = await goalMapFor(req.userId, rows);
+    const out = { success: true, data: rows.map((t) => toDto(t, goals)), pagination: { page, limit, total } };
+    // กรอง "การออม": สรุปออมเข้า / ถอนออก / สุทธิ ตามช่วงที่กรอง
+    if (q.type && q.type.$in) {
+      const sums = await Transaction.aggregate([{ $match: { ...q, user: new mongoose.Types.ObjectId(String(req.userId)), ...(q.goal ? { goal: new mongoose.Types.ObjectId(String(q.goal)) } : {}) } }, { $group: { _id: '$type', total: { $sum: '$amount' }, n: { $sum: 1 } } }]);
+      const get = (k) => sums.find((s) => s._id === k) || { total: 0, n: 0 };
+      const r2 = (n) => Math.round(n * 100) / 100;
+      out.saving_summary = { saved: r2(get('saving').total), withdrawn: r2(get('withdraw').total), net: r2(get('saving').total - get('withdraw').total), count: get('saving').n + get('withdraw').n };
+    }
+    res.json(out);
   } catch (e) {
     console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
   }
@@ -114,12 +152,14 @@ router.get('/export', async (req, res) => {
     const rows = await Transaction.find(q).populate('category', 'name').sort({ date: -1, _id: -1 }).lean();
     const lines = [['วันที่', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ'].map(csvCell).join(',')];
     for (const t of rows) {
+      const sav = isSavingType(t.type);
+      const note = sav ? [`${t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} ${t.goal_name || ''}`.trim(), t.reason || ''].filter(Boolean).join(' · ') : (t.note || '');
       lines.push([
         t.date.toISOString().slice(0, 10),
         TYPE_TH[t.type] || t.type,
-        (t.category && t.category.name) || '',
+        sav ? 'การออม' : (t.category && t.category.name) || '',
         Number(t.amount).toFixed(2),
-        t.note || '',
+        note,
       ].map(csvCell).join(','));
     }
     const day = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10); // วันที่ตามเวลาไทย
@@ -200,7 +240,7 @@ router.get('/:id', async (req, res) => {
     const t = await Transaction.findOne({ _id: req.params.id, user: req.userId })
       .populate('category', 'name color icon');
     if (!t) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
-    res.json({ success: true, data: toDto(t) });
+    res.json({ success: true, data: toDto(t, await goalMapFor(req.userId, [t])) });
   } catch (e) {
     console.error(e); res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดของระบบ' });
   }
@@ -216,6 +256,30 @@ router.put('/:id', async (req, res) => {
 
     const b = req.body;
     let changed = false;
+
+    // รายการออม/ถอน: แก้ได้แค่จำนวนเงินกับวันที่ (หมวด เป้า เหตุผลแก้ไม่ได้) ยอดในเป้าปรับตาม
+    if (isSavingType(t.type)) {
+      const patch = {};
+      if ('amount' in b) {
+        const amt = parseAmount(b.amount);
+        if (amt.error) return res.status(400).json({ success: false, message: amt.error });
+        patch.amount = amt.value;
+      }
+      if ('transaction_date' in b) {
+        const d = parseDate(b.transaction_date);
+        if (!d || !yearInRange(d)) return res.status(400).json({ success: false, message: 'วันที่ไม่ถูกต้อง' });
+        if (d.toISOString().slice(0, 10) > bangkokToday()) return res.status(400).json({ success: false, message: 'วันที่ออมต้องไม่เกินวันนี้' });
+        patch.date = d;
+      }
+      if (patch.amount === undefined && !patch.date) return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });
+      try {
+        const r = await goalSaving.editSaving(req.userId, t, patch);
+        return res.json({ success: true, message: r.justCompleted ? 'แก้ไขแล้ว ยอดออมถึงเป้าหมาย ระบบย้ายไป "สำเร็จแล้ว" ให้' : 'แก้ไขรายการสำเร็จ', data: { just_completed: !!r.justCompleted } });
+      } catch (e2) {
+        if (e2 instanceof goalSaving.SavingError) return res.status(e2.status).json({ success: false, message: e2.message });
+        throw e2;
+      }
+    }
 
     if ('type' in b) {
       if (!['income', 'expense'].includes(b.type)) {
@@ -278,6 +342,15 @@ router.delete('/:id', async (req, res) => {
     const t = await Transaction.findOne({ _id: req.params.id, user: req.userId });
     if (!t) {
       return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
+    }
+    if (isSavingType(t.type)) {
+      try {
+        await goalSaving.deleteSaving(req.userId, t);
+        return res.json({ success: true, message: 'ลบรายการออมแล้ว' });
+      } catch (e2) {
+        if (e2 instanceof goalSaving.SavingError) return res.status(e2.status).json({ success: false, message: e2.message });
+        throw e2;
+      }
     }
     await Transaction.deleteOne({ _id: t._id, user: req.userId });
     if (t.installment) await syncFromTransaction(t, { deleted: true }); // ลบรายจ่ายของงวดผ่อน → งวดนั้นกลับเป็นยังไม่จ่าย

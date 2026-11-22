@@ -23,8 +23,8 @@ const lastDay = (ym) => {
   return `${ym}-${pad(new Date(y, m, 0).getDate())}`;
 };
 const be = (iso) => `${Number(iso.slice(0, 4)) + 543}${iso.slice(4)}`; // 2026-11 -> 2569-11
-const TYPE_TH = { income: 'รายรับ', expense: 'รายจ่าย' };
-const TYPES = [['', 'ทั้งหมด'], ['income', 'รายรับ'], ['expense', 'รายจ่าย']];
+const TYPE_TH = { income: 'รายรับ', expense: 'รายจ่าย', saving: 'การออม' };
+const TYPES = [['', 'ทั้งหมด'], ['income', 'รายรับ'], ['expense', 'รายจ่าย'], ['saving', 'การออม']];
 const MONTH_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const ymOf = (y, m) => `${y}-${pad(m)}`;
 const splitYm = (ym) => ym.split('-').map(Number);

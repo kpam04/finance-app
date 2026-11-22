@@ -14,7 +14,7 @@ async function analyzeMonth(userId, monthParam) {
   const from = new Date(Date.UTC(base.year, base.month - 1, 1));
   const to = new Date(Date.UTC(pm.year, pm.month, 1));
   const [txns, cats] = await Promise.all([
-    Transaction.find({ user: userId, date: { $gte: from, $lt: to } }).select('date type amount category note recurring installment').limit(MAX_TXNS).lean(),
+    Transaction.find({ user: userId, type: { $in: Transaction.CASH_TYPES }, date: { $gte: from, $lt: to } }).select('date type amount category note recurring installment').limit(MAX_TXNS).lean(),
     Category.find({ $or: [{ user: null }, { user: userId }] }).lean(),
   ]);
   // ค่าประจำที่รู้แน่นอน: งวดผ่อน และรายการเกิดซ้ำรายเดือน/รายปี (รายวัน/รายสัปดาห์ เช่น ค่าข้าว ยังนับเป็นพฤติกรรมการใช้จ่าย)

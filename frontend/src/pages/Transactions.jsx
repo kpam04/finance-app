@@ -8,6 +8,7 @@ import CategorySelect from '../components/CategorySelect.jsx';
 import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
 import InfoTitle from '../components/InfoTitle.jsx';
 import ExportCsvModal from '../components/ExportCsvModal.jsx';
+import SavingEditModal from '../components/SavingEditModal.jsx';
 import UnusualHint, { useUnusual, resetTypical } from '../components/UnusualHint.jsx';
 import { IconList, IconFilter, IconDownload } from '../components/PlanIcons.jsx';
 
@@ -61,7 +62,17 @@ const IconTrash = () => (
   </svg>
 );
 
-const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ่าย'], ['income', 'รายรับ']];
+const TYPE_OPTIONS = [['', 'ทั้งหมด'], ['expense', 'รายจ่าย'], ['income', 'รายรับ'], ['saving', 'การออม']];
+const TYPE_LABEL = { income: 'รายรับ', expense: 'รายจ่าย', saving: 'การออม' };
+
+// รายการออม/ถอน (สร้างจากหน้าเป้าหมายเท่านั้น): ออมเข้าเป้า = เงินคงเหลือลด / ถอนจากเป้า = เงินคงเหลือเพิ่ม ไม่ใช่รายรับ-รายจ่าย
+const isSaving = (t) => t.type === 'saving' || t.type === 'withdraw';
+const IconGoal = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" fill="currentColor" /></svg>
+);
+const IconLockSm = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+);
 
 // สไตล์เฉพาะหน้านี้ (เพิ่มชื่อโซน ป้ายกำกับช่องกรอง และกันช่องวันที่ล้นขอบบนมือถือ) ไม่แตะ index.css
 const txCss = `
@@ -87,6 +98,17 @@ const txCss = `
 .tx-empty strong { display: block; margin-bottom: 4px; color: #3F3A34; font-weight: 600; }
 .tx-empty .btn { margin-top: 10px; }
 .tx-scroll-hint { margin: 6px 0 0; font-size: 12px; color: #8A8177; text-align: center; }
+.tx-sav-cat { display: inline-flex; align-items: center; gap: 6px; color: #3E7E7A; font-weight: 600; }
+.tx-sav-cat.w { color: #4F6E80; }
+.tx-sav-note small { display: block; font-size: 12px; color: #8A8177; }
+.tx-sav-gone { color: #9a9184; font-size: 12px; }
+.transactions-table td.num.saving { color: #3E7E7A; font-weight: 600; }
+.transactions-table td.num.withdraw { color: #4F6E80; font-weight: 600; }
+.tx-locked { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: #9a9184; }
+.tx-sav-sum { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: -4px 0 12px; padding: 8px 12px; border-radius: 10px; background: #F1F6F5; font-size: 13.5px; color: #4b5563; }
+.tx-sav-sum b { color: #3F3A34; }
+.tx-sav-sum .in b { color: #3E7E7A; }
+.tx-sav-sum .out b { color: #4F6E80; }
 @media (max-width: 760px) { .tx-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tx-field.tx-wide { grid-column: 1 / -1; } }
 .tx-act .tx-ico { display: none; }
 @media (max-width: 640px) {
@@ -141,6 +163,8 @@ export default function Transactions() {
 
   // สถานะการแจ้งเตือนและการบันทึก
   const [showExport, setShowExport] = useState(false); // หน้าต่างส่งออก CSV
+  const [savingSum, setSavingSum] = useState(null); // สรุปตอนกรอง "การออม" { saved, withdrawn, net, count }
+  const [savingEdit, setSavingEdit] = useState(null); // รายการออม/ถอนที่กำลังแก้
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -170,6 +194,7 @@ export default function Transactions() {
 
       setRows(res.data);
       setPagination(res.pagination);
+      setSavingSum(res.saving_summary || null);
       setError('');
     } catch (err) {
       setError(err.message);
@@ -332,6 +357,7 @@ export default function Transactions() {
 
   // เปิดฟอร์มแก้ไขรายการ
   const startEdit = (t) => {
+    if (isSaving(t)) { setSavingEdit(t); return; } // รายการออม/ถอน: แก้ได้แค่จำนวนเงินกับวันที่
     setEditingId(t.transaction_id);
 
     setForm({
@@ -350,7 +376,9 @@ export default function Transactions() {
   // ลบรายการ
   const remove = async (t) => {
     const confirmed = window.confirm(
-      `ลบรายการ "${t.note || t.category_name}" ใช่หรือไม่?`
+      isSaving(t)
+        ? `ลบรายการ${t.type === 'withdraw' ? 'ถอน' : 'ออม'} ${money(t.amount)} ของเป้า "${t.goal_name}" ใช่หรือไม่?\n${t.type === 'withdraw' ? 'ยอดในเป้าจะเพิ่มกลับ และเงินคงเหลือลดลง' : 'ยอดในเป้าจะลดลง และเงินกลับไปที่เงินคงเหลือ'}`
+        : `ลบรายการ "${t.note || t.category_name}" ใช่หรือไม่?`
     );
 
     if (!confirmed) return;
@@ -383,7 +411,7 @@ export default function Transactions() {
   const filterSummary = useMemo(() => {
     const th = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { dateStyle: 'medium' });
     const parts = [];
-    if (filter.type) parts.push(filter.type === 'income' ? 'รายรับ' : 'รายจ่าย');
+    if (filter.type) parts.push(TYPE_LABEL[filter.type] || filter.type);
     if (filter.category_id) {
       const c = cats.find((x) => String(x.category_id) === String(filter.category_id));
       if (c) parts.push(c.name);
@@ -403,7 +431,7 @@ export default function Transactions() {
     setPage(1);
     setFilter((f) => {
       const cat = cats.find((c) => String(c.category_id) === String(f.category_id));
-      const keep = !val || !cat || cat.type === val;
+      const keep = val !== 'saving' && (!val || !cat || cat.type === val); // การออมไม่มีหมวดให้กรอง
       return { ...f, type: val, category_id: keep ? f.category_id : '' };
     });
   };
@@ -525,7 +553,10 @@ export default function Transactions() {
           </div>
 
           <div className="tx-field tx-wide">
-            <span data-tx-cat-label>หมวดหมู่{filter.type ? ` (เฉพาะ${filter.type === 'income' ? 'รายรับ' : 'รายจ่าย'})` : ''}</span>
+            <span data-tx-cat-label>หมวดหมู่{filter.type === 'income' || filter.type === 'expense' ? ` (เฉพาะ${TYPE_LABEL[filter.type]})` : ''}</span>
+            {filter.type === 'saving' ? (
+              <select disabled aria-label="กรองตามหมวดหมู่" data-tx-cat-saving><option>การออม (ทุกเป้าหมาย)</option></select>
+            ) : (
             <CategoryFilterSelect
               categories={cats}
               type={filter.type}
@@ -533,6 +564,7 @@ export default function Transactions() {
               onChange={setCategory}
               ariaLabel="กรองตามหมวดหมู่"
             />
+            )}
           </div>
 
           <label className="tx-field">
@@ -556,6 +588,16 @@ export default function Transactions() {
           </label>
 
         </div>
+
+        {/* กรอง "การออม": สรุปออมเข้า / ถอนออก / สุทธิ ตามช่วงที่กรอง */}
+        {filter.type === 'saving' && savingSum && savingSum.count > 0 && (
+          <div className="tx-sav-sum" data-tx-saving-sum>
+            <span className="in">ออมเข้า <b>{money(savingSum.saved)}</b></span>
+            <span className="out">ถอนออก <b>{money(savingSum.withdrawn)}</b></span>
+            <span>สุทธิ <b>{money(savingSum.net)}</b></span>
+            <span style={{ color: '#8A8177' }}>{savingSum.count} รายการ</span>
+          </div>
+        )}
 
         {/* ตารางรายการรายรับ-รายจ่าย */}
         <div className="transactions-table-wrap" ref={wrapRef}>
@@ -605,6 +647,19 @@ export default function Transactions() {
                     {t.transaction_date}
                   </td>
 
+                  {isSaving(t) ? (
+                    <>
+                      <td data-label="หมวดหมู่">
+                        <span className={`tx-sav-cat${t.type === 'withdraw' ? ' w' : ''}`} data-tx-saving-cat><IconGoal />การออม</span>
+                      </td>
+                      <td data-label="บันทึก" className="tx-sav-note" data-tx-saving-note>
+                        {t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} {t.goal_name}
+                        {t.goal_state === 'deleted' && <span className="tx-sav-gone"> (ลบเป้าแล้ว)</span>}
+                        {t.reason && <small>{t.reason}</small>}
+                      </td>
+                    </>
+                  ) : (
+                    <>
                   <td data-label="หมวดหมู่">
                     <span
                       className="dot"
@@ -619,17 +674,22 @@ export default function Transactions() {
                   <td data-label="บันทึก">
                     {t.note || '-'}
                   </td>
+                    </>
+                  )}
 
                   <td
                     data-label="จำนวนเงิน"
                     className={`num ${t.type}`}
                   >
-                    {t.type === 'income' ? '+' : '-'}
+                    {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}
                     {money(t.amount)}
                   </td>
 
                   <td data-label="จัดการ" className="actions">
-                    {/* ครอบปุ่มด้วย span (ไม่ใช้ display:flex ที่ตัว td) เส้นขอบแถวจึงต่อเนื่องไม่เหลื่อม */}
+                    {isSaving(t) && !t.editable ? (
+                      <span className="tx-locked" title={t.goal_state === 'done' ? 'เป้าหมายนี้สำเร็จแล้ว ดูได้อย่างเดียว' : 'เป้าหมายถูกลบแล้ว ดูได้อย่างเดียว'} data-tx-locked><IconLockSm />ดูอย่างเดียว</span>
+                    ) : (
+                    /* ครอบปุ่มด้วย span (ไม่ใช้ display:flex ที่ตัว td) เส้นขอบแถวจึงต่อเนื่องไม่เหลื่อม */
                     <span className="tx-actions">
                       <button
                         className="btn btn-sm btn-light tx-act"
@@ -651,6 +711,7 @@ export default function Transactions() {
                         <span className="tx-txt">ลบ</span>
                       </button>
                     </span>
+                    )}
                   </td>
 
                 </tr>
@@ -694,6 +755,14 @@ export default function Transactions() {
         </div>
 
       </div>
+
+      {savingEdit && (
+        <SavingEditModal
+          tx={savingEdit}
+          onClose={() => setSavingEdit(null)}
+          onSaved={async () => { setSavingEdit(null); await load(); }}
+        />
+      )}
 
       {/* =================================
           ADD / EDIT MODAL

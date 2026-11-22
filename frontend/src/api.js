@@ -133,9 +133,8 @@ export const api = {
   createGoal: (data) => request('/plan/goals', { method: 'POST', body: data }),
   updateGoal: (id, data) => request(`/plan/goals/${id}`, { method: 'PUT', body: data }),
   deleteGoal: (id) => request(`/plan/goals/${id}`, { method: 'DELETE' }),
-  getGoalDeposits: (id) => request(`/plan/goals/${id}/deposits`),
   addGoalDeposit: (id, amount) => request(`/plan/goals/${id}/deposits`, { method: 'POST', body: { amount } }),
-  deleteGoalDeposit: (id, depositId) => request(`/plan/goals/${id}/deposits/${depositId}`, { method: 'DELETE' }),
+  withdrawGoal: (id, amount, reason) => request(`/plan/goals/${id}/withdraw`, { method: 'POST', body: { amount, reason } }),
   planSimulate: (adjustments) => request('/plan/simulate', { method: 'POST', body: { adjustments } }),
 
   // รายการผ่อน
