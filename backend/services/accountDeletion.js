@@ -7,6 +7,7 @@ const Notification = require('../models/Notification');
 const AiUsage = require('../models/AiUsage');
 const AiEvent = require('../models/AiEvent');
 const Goal = require('../models/Goal');
+const GoalDeposit = require('../models/GoalDeposit');
 const PlanAdvice = require('../models/PlanAdvice');
 const RecurringDismiss = require('../models/RecurringDismiss');
 const Installment = require('../models/Installment');
@@ -22,6 +23,7 @@ async function deleteUserData(userId) {
   await Category.deleteMany({ user: userId }); // เฉพาะหมวดของผู้ใช้เอง (หมวดมาตรฐานมี user = null)
   await AiUsage.deleteMany({ user: userId });
   await AiEvent.deleteMany({ user: userId });
+  await GoalDeposit.deleteMany({ user: userId });
   await Goal.deleteMany({ user: userId });
   await PlanAdvice.deleteMany({ user: userId });
   await RecurringDismiss.deleteMany({ user: userId });

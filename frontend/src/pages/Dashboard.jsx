@@ -21,7 +21,7 @@ function closingSeries(trend, closing) {
   const out = new Array(trend.length);
   out[trend.length - 1] = closing;
   for (let i = trend.length - 2; i >= 0; i -= 1) {
-    out[i] = Math.round((out[i + 1] - (trend[i + 1].income - trend[i + 1].expense)) * 100) / 100;
+    out[i] = Math.round((out[i + 1] - (trend[i + 1].income - trend[i + 1].expense - (trend[i + 1].saving || 0))) * 100) / 100;
   }
   return out;
 }
@@ -674,7 +674,7 @@ export default function Dashboard() {
     typeof summary.opening_balance === 'number' && typeof summary.closing_balance === 'number';
   const opening = hasCarry ? summary.opening_balance : 0;
   const closing = hasCarry ? summary.closing_balance : summary.balance;
-  const monthNet = summary.balance;
+  const monthNet = Math.round((summary.balance - (summary.saving_month || 0)) * 100) / 100; // เงินที่ออมเข้าเป้าหมายหักออกแล้ว
   const round2 = (n) => Math.round(n * 100) / 100;
   const balances = hasCarry ? closingSeries(summary.monthly_trend, summary.closing_balance) : null;
 
@@ -831,7 +831,7 @@ export default function Dashboard() {
 
       {hasCarry && (
         <p data-carry-note style={{ fontSize: 12, color: '#9ca3af', margin: '-4px 0 16px' }}>
-          ยอดยกมาและยอดคงเหลือคำนวณจากรายการที่บันทึกในแอพเท่านั้น ไม่รวมเงินที่มีอยู่ก่อนเริ่มบันทึก
+          ยอดยกมาและยอดคงเหลือคำนวณจากรายการที่บันทึกในแอพเท่านั้น ไม่รวมเงินที่มีอยู่ก่อนเริ่มบันทึก และหักเงินที่ออมเข้าเป้าหมายแล้ว
         </p>
       )}
 

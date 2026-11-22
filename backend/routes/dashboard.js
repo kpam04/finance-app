@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
+const GoalDeposit = require('../models/GoalDeposit');
 const Budget = require('../models/Budget');
 const Category = require('../models/Category');
 const auth = require('../middleware/auth');
@@ -30,6 +31,17 @@ const monthRange = (year, month) => ({
   start: new Date(Date.UTC(year, month - 1, 1)),
   end: new Date(Date.UTC(year, month, 1)),
 });
+
+// ยอดที่ออมเข้าเป้าหมายในช่วงเวลา (ไม่ใช่รายจ่าย แต่หักออกจากเงินคงเหลือ) รายการก่อนมีช่อง date ใช้วันที่สร้าง
+const depositDate = { $ifNull: ['$date', '$createdAt'] };
+async function savingFor(userObjId, start, end) {
+  const rows = await GoalDeposit.aggregate([
+    { $match: { user: userObjId } },
+    { $match: { $expr: { $and: [{ $gte: [depositDate, start] }, { $lt: [depositDate, end] }] } } },
+    { $group: { _id: null, total: { $sum: '$amount' } } },
+  ]);
+  return rows.length ? rows[0].total : 0;
+}
 
 // ยอดรวมรายรับ/รายจ่ายในช่วงเวลา
 async function totalsFor(userObjId, start, end) {
@@ -82,9 +94,11 @@ router.get('/summary', async (req, res) => {
 
     // ยอดสะสมยกมา = (รายรับ - รายจ่าย) ของทุกรายการที่บันทึกไว้ก่อนต้นเดือนที่เลือก (ไม่รวมเงินที่มีอยู่ก่อนเริ่มบันทึก)
     // คงเหลือสะสมสิ้นเดือน = ยอดสะสมยกมา + รายรับ - รายจ่ายของเดือนที่เลือก
+    // เงินที่ออมเข้าเป้าหมายถูกหักออก (ย้ายไปอยู่ในเป้า) แต่ไม่นับเป็นรายจ่าย
     const beforeTotals = await totalsFor(userObjId, new Date(0), start);
-    const openingBalance = round(beforeTotals.income - beforeTotals.expense);
-    const closingBalance = round(openingBalance + totals.income - totals.expense);
+    const [savingBefore, savingMonth] = await Promise.all([savingFor(userObjId, new Date(0), start), savingFor(userObjId, start, end)]);
+    const openingBalance = round(beforeTotals.income - beforeTotals.expense - savingBefore);
+    const closingBalance = round(openingBalance + totals.income - totals.expense - savingMonth);
 
     // สัดส่วนรายจ่ายตามหมวด
     const byCat = (await expenseByCategory(userObjId, start, end)).map((c) => ({
@@ -109,11 +123,18 @@ router.get('/summary', async (req, res) => {
     const trend = {};
     for (let i = 5; i >= 0; i--) {
       const ym = new Date(Date.UTC(year, month - 1 - i, 1)).toISOString().slice(0, 7);
-      trend[ym] = { month: ym, income: 0, expense: 0 };
+      trend[ym] = { month: ym, income: 0, expense: 0, saving: 0 };
     }
     trendRows.forEach((r) => {
       if (trend[r._id.ym]) trend[r._id.ym][r._id.type] = round(r.total);
     });
+    const savingRows = await GoalDeposit.aggregate([
+      { $match: { user: userObjId } },
+      { $addFields: { d: depositDate } },
+      { $match: { d: { $gte: trendStart, $lt: end } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$d' } }, total: { $sum: '$amount' } } },
+    ]);
+    savingRows.forEach((r) => { if (trend[r._id]) trend[r._id].saving = round(r.total); });
 
     res.json({
       success: true,
@@ -124,6 +145,7 @@ router.get('/summary', async (req, res) => {
         balance: round(totals.income - totals.expense), // ส่วนต่างของเดือนนี้ (ค่าเดิม)
         opening_balance: openingBalance,
         closing_balance: closingBalance,
+        saving_month: round(savingMonth), // ออมเข้าเป้าหมายเดือนนี้ (หักจากเงินคงเหลือแล้ว)
         expense_by_category: byCat,
         monthly_trend: Object.values(trend),
         previous_month: { income: round(prevTotals.income), expense: round(prevTotals.expense) },
