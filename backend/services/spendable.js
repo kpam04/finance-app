@@ -141,7 +141,7 @@ async function spendableFor(userId, { now = Date.now() } = {}) {
         date: { $gte: monthStart(year, month), $lt: monthStart(year, month + 1) },
       },
     },
-    { $group: { _id: '$category', spent: { $sum: '$amount' } } },
+    { $group: { _id: '$category', spent: { $sum: { $subtract: ['$amount', { $ifNull: ['$goal_used', 0] }] } } } }, // ส่วนที่จ่ายจากเงินออมไม่กินงบ
   ]);
   const spentBy = new Map(spentRows.map((r) => [String(r._id), r.spent]));
   const limit = round2(budgets.reduce((s, b) => s + b.amountLimit, 0));

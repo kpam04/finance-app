@@ -35,11 +35,15 @@ const monthRange = (year, month) => ({
 async function totalsFor(userObjId, start, end) {
   const rows = await Transaction.aggregate([
     { $match: { user: userObjId, date: { $gte: start, $lt: end } } },
-    { $group: { _id: '$type', total: { $sum: '$amount' } } },
+    { $group: { _id: '$type', total: { $sum: '$amount' }, used: { $sum: { $ifNull: ['$goal_used', 0] } } } },
   ]);
   // saving / withdraw = ออมเข้า / ถอนออกจากเป้าหมาย (ไม่ใช่รายรับ-รายจ่าย แต่ทำให้เงินคงเหลือลด/เพิ่ม)
-  const t = { income: 0, expense: 0, saving: 0, withdraw: 0 };
-  rows.forEach((r) => { if (r._id in t) t[r._id] = r.total; });
+  // goal_used = ส่วนของรายจ่ายที่ "จ่ายจากเงินออม" (หักไปแล้วตอนออม จึงคืนเข้าเงินคงเหลือ)
+  const t = { income: 0, expense: 0, saving: 0, withdraw: 0, goal_used: 0 };
+  rows.forEach((r) => {
+    if (r._id in t) t[r._id] = r.total;
+    if (r._id === 'expense') t.goal_used = r.used || 0;
+  });
   return t;
 }
 
@@ -85,8 +89,8 @@ router.get('/summary', async (req, res) => {
     // คงเหลือสะสมสิ้นเดือน = ยอดสะสมยกมา + รายรับ - รายจ่ายของเดือนที่เลือก
     // เงินที่ออมเข้าเป้าหมายถูกหักออก (ย้ายไปอยู่ในเป้า) แต่ไม่นับเป็นรายจ่าย
     const beforeTotals = await totalsFor(userObjId, new Date(0), start);
-    const savingBefore = beforeTotals.saving - beforeTotals.withdraw;
-    const savingMonth = totals.saving - totals.withdraw; // ออมสุทธิเดือนนี้ (ออม - ถอน)
+    const savingBefore = beforeTotals.saving - beforeTotals.withdraw - beforeTotals.goal_used;
+    const savingMonth = totals.saving - totals.withdraw - totals.goal_used; // ออมสุทธิเดือนนี้ (ออม - ถอน - จ่ายจากเงินออม)
     const openingBalance = round(beforeTotals.income - beforeTotals.expense - savingBefore);
     const closingBalance = round(openingBalance + totals.income - totals.expense - savingMonth);
 
@@ -106,6 +110,7 @@ router.get('/summary', async (req, res) => {
         $group: {
           _id: { ym: { $dateToString: { format: '%Y-%m', date: '$date' } }, type: '$type' },
           total: { $sum: '$amount' },
+          used: { $sum: { $ifNull: ['$goal_used', 0] } },
         },
       },
     ]);
@@ -119,6 +124,7 @@ router.get('/summary', async (req, res) => {
       const m = trend[r._id.ym];
       if (!m) return;
       if (r._id.type === 'income' || r._id.type === 'expense') m[r._id.type] = round(r.total);
+      if (r._id.type === 'expense' && r.used) m.saving = round(m.saving - r.used); // จ่ายจากเงินออม = ดึงเงินออกจากเป้า
       else if (r._id.type === 'saving') m.saving = round(m.saving + r.total); // saving = ออมสุทธิของเดือน (ออม - ถอน)
       else if (r._id.type === 'withdraw') m.saving = round(m.saving - r.total);
     });

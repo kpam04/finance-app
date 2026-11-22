@@ -28,7 +28,7 @@ async function spentFor(userId, categoryId, month, year) {
   const end = new Date(Date.UTC(year, month, 1));
   const [row] = await Transaction.aggregate([
     { $match: { user: oid(userId), category: oid(categoryId), type: 'expense', date: { $gte: start, $lt: end } } },
-    { $group: { _id: null, spent: { $sum: '$amount' } } },
+    { $group: { _id: null, spent: { $sum: { $subtract: ['$amount', { $ifNull: ['$goal_used', 0] }] } } } }, // ส่วนที่จ่ายจากเงินออมไม่กินงบ
   ]);
   return row ? row.spent : 0;
 }

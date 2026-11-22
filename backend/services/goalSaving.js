@@ -131,4 +131,41 @@ async function deleteGoal(userId, goalId) {
   return { returned, wasDone: isDone(goal) };
 }
 
-module.exports = { SavingError, SAVING_TYPES, REASON_MAX, addSaving, withdraw, editSaving, deleteSaving, deleteGoal, netSaved, cleanReason, todayTH };
+// ---------- จ่ายจากเงินออม (รายจ่ายที่ใช้เงินของเป้าที่สำเร็จแล้ว) ----------
+// ยอดที่ใช้ไปของแต่ละเป้า = ผลรวม goal_used ของรายจ่ายที่ผูกกับเป้านั้น (คำนวณสด ลบ/แก้รายจ่ายแล้วยอดคืนเข้าเป้าเอง)
+// เงินคงเหลือ: รายจ่ายนับเต็มจำนวน แต่ส่วนที่ดึงจากเป้า (goal_used) บวกกลับ เพราะหักไปแล้วตอนออม
+async function usedByGoal(userId, goalIds, excludeTxId) {
+  if (!goalIds.length) return new Map();
+  const q = { user: userId, type: 'expense', goal: { $in: goalIds } };
+  const rows = await Transaction.find(q).select('_id goal goal_used').lean();
+  const m = new Map();
+  for (const r of rows) {
+    if (excludeTxId && String(r._id) === String(excludeTxId)) continue;
+    m.set(String(r.goal), round2((m.get(String(r.goal)) || 0) + (Number(r.goal_used) || 0)));
+  }
+  return m;
+}
+
+// เป้าที่สำเร็จแล้วและยังมีเงินเหลือให้ใช้ [{ goal_id, name, remaining }] (excludeTxId = ตอนแก้รายจ่าย: นับยอดของรายการนี้คืนก่อน)
+async function usableGoals(userId, excludeTxId) {
+  const goals = await Goal.find({ user: userId, completed_at: { $ne: null } }).sort({ completed_at: -1 }).lean();
+  const used = await usedByGoal(userId, goals.map((g) => g._id), excludeTxId);
+  return goals
+    .map((g) => ({ goal_id: String(g._id), name: g.name, saved: round2(g.saved_amount), used: used.get(String(g._id)) || 0 }))
+    .map((g) => ({ ...g, remaining: Math.max(0, round2(g.saved - g.used)) }))
+    .filter((g) => g.remaining > 0);
+}
+
+// คำนวณการจ่ายจากเงินออม: คืน { goal, goal_name, goal_used } (ดึงได้ไม่เกินยอดที่เหลือในเป้า ส่วนเกินหักจากเงินคงเหลือตามปกติ)
+async function goalFund(userId, goalId, amount, excludeTxId) {
+  if (!goalId) return { goal: null, goal_name: '', goal_used: 0 };
+  const goal = await Goal.findOne({ _id: goalId, user: userId }).lean();
+  if (!goal) throw new SavingError('ไม่พบเป้าหมายที่เลือกจ่ายจากเงินออม', 400);
+  if (!isDone(goal)) throw new SavingError('จ่ายจากเงินออมได้เฉพาะเป้าที่สำเร็จแล้ว');
+  const used = (await usedByGoal(userId, [goal._id], excludeTxId)).get(String(goal._id)) || 0;
+  const remaining = Math.max(0, round2(Number(goal.saved_amount) - used));
+  if (remaining <= 0) throw new SavingError(`เงินออมของเป้า "${goal.name}" ใช้ครบแล้ว`);
+  return { goal: goal._id, goal_name: goal.name, goal_used: round2(Math.min(amount, remaining)) };
+}
+
+module.exports = { usedByGoal, usableGoals, goalFund, SavingError, SAVING_TYPES, REASON_MAX, addSaving, withdraw, editSaving, deleteSaving, deleteGoal, netSaved, cleanReason, todayTH };

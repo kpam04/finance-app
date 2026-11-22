@@ -134,6 +134,7 @@ export const api = {
   updateGoal: (id, data) => request(`/plan/goals/${id}`, { method: 'PUT', body: data }),
   deleteGoal: (id) => request(`/plan/goals/${id}`, { method: 'DELETE' }),
   addGoalDeposit: (id, amount) => request(`/plan/goals/${id}/deposits`, { method: 'POST', body: { amount } }),
+  getUsableGoals: (exclude) => request('/plan/goals/usable', { params: exclude ? { exclude } : {} }),
   withdrawGoal: (id, amount, reason) => request(`/plan/goals/${id}/withdraw`, { method: 'POST', body: { amount, reason } }),
   planSimulate: (adjustments) => request('/plan/simulate', { method: 'POST', body: { adjustments } }),
 

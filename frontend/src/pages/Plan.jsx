@@ -208,6 +208,12 @@ const css = `
 .pl-add:disabled { color: #b0a99c; border-color: #E6E0D4; cursor: not-allowed; }
 .pl-add-n { font-weight: 500; font-size: 12px; color: #8A8177; }
 .pl-goal-tools { display: inline-flex; gap: 2px; }
+.pl-ach-use { margin-top: 10px; padding-top: 9px; border-top: 1px dashed #EADFC4; font-size: 13px; color: #6b6358; }
+.pl-ach-use > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; }
+.pl-ach-use b { color: #3F3A34; font-weight: 600; }
+.pl-ach-use small { flex-basis: 100%; font-size: 12px; color: #9a9184; }
+.pl-ach-ubar { height: 5px; margin-top: 6px; border-radius: 5px; background: #EFE9DF; overflow: hidden; }
+.pl-ach-ubar i { display: block; height: 100%; background: #6F8FA0; }
 .pl-goal-tools button { display: inline-flex; padding: 3px 5px; border: none; border-radius: 6px; background: none; color: #9a9185; cursor: pointer; }
 .pl-goal-tools button:hover { color: #4b5563; background: #F3EFE6; }
 .pl-bar { height: 8px; margin: 8px 0 6px; border-radius: 4px; background: #EEE9DD; overflow: hidden; }
@@ -1569,6 +1575,19 @@ export default function Plan() {
                           <div><dt>ช่วงที่ออม</dt><dd>{a.started_at ? `${thaiDate(a.started_at)} – ${thaiDate(a.completed_at)}` : thaiDate(a.completed_at)}</dd></div>
                           {a.target_date && <div><dt>กำหนดเดิม</dt><dd>{thaiDate(a.target_date)}</dd></div>}
                         </dl>
+                        {/* การใช้เงินของเป้า: จ่ายผ่านช่อง "จ่ายจากเงินออม" ตอนกรอกรายจ่าย */}
+                        {typeof a.used_amount === 'number' && (
+                          <div className="pl-ach-use" data-ach-use>
+                            {a.used_amount <= 0 ? (
+                              <span>พร้อมใช้ <b>{baht(a.remaining_amount)}</b><small>เลือก “จ่ายจากเงินออม” ตอนกรอกรายจ่าย</small></span>
+                            ) : (
+                              <>
+                                <span>{a.remaining_amount > 0 ? `ใช้ไปแล้ว ${baht(a.used_amount)}` : 'ใช้ครบแล้ว'}{a.remaining_amount > 0 && <b>เหลือ {baht(a.remaining_amount)}</b>}</span>
+                                <div className="pl-ach-ubar"><i style={{ width: `${Math.min(100, (a.used_amount / (a.used_amount + a.remaining_amount)) * 100)}%` }} /></div>
+                              </>
+                            )}
+                          </div>
+                        )}
                         {confirmDel === a.goal_id && (
                           <div className="pl-confirm" data-goal-confirm>
                             <span>ลบออกจากประวัติ?<small style={{ display: 'block', color: '#8A8177' }}>รายการออมยังอยู่ในหน้ารายการ เงินไม่กลับมา</small></span>

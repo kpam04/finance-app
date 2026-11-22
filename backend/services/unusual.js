@@ -55,7 +55,7 @@ async function statsFor(userId, todayIso) {
   const Transaction = require('../models/Transaction');
   const since = new Date(Date.parse(`${todayIso}T00:00:00Z`) - WINDOW_DAYS * DAY);
   const [txns, first] = await Promise.all([
-    Transaction.find({ user: userId, type: 'expense', date: { $gte: since } }).select('date amount category recurring installment').lean(),
+    Transaction.find({ user: userId, type: 'expense', goal: null, date: { $gte: since } }).select('date amount category recurring installment').lean(), // ไม่นับรายจ่ายที่จ่ายจากเงินออม
     Transaction.findOne({ user: userId }).sort({ date: 1 }).select('date').lean(),
   ]);
   const firstIso = first ? new Date(first.date).toISOString().slice(0, 10) : null;

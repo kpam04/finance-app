@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
       Budget.find({ user: req.userId, month, year, stopped: { $ne: true } }),
       Transaction.aggregate([
         { $match: { user: new mongoose.Types.ObjectId(req.userId), type: 'expense', date: { $gte: start, $lt: end } } },
-        { $group: { _id: '$category', spent: { $sum: '$amount' } } },
+        { $group: { _id: '$category', spent: { $sum: { $subtract: ['$amount', { $ifNull: ['$goal_used', 0] }] } } } }, // ส่วนที่จ่ายจากเงินออมไม่กินงบ
       ]),
     ]);
     const spentMap = new Map(spentRows.map((r) => [String(r._id), r.spent]));

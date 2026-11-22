@@ -9,6 +9,7 @@ import CategoryFilterSelect from '../components/CategoryFilterSelect.jsx';
 import InfoTitle from '../components/InfoTitle.jsx';
 import ExportCsvModal from '../components/ExportCsvModal.jsx';
 import SavingEditModal from '../components/SavingEditModal.jsx';
+import GoalFundPicker, { IconGoalSm } from '../components/GoalFundPicker.jsx';
 import UnusualHint, { useUnusual, resetTypical } from '../components/UnusualHint.jsx';
 import { IconList, IconFilter, IconDownload } from '../components/PlanIcons.jsx';
 
@@ -34,6 +35,7 @@ const emptyForm = () => ({
   category_id: '',
   note: '',
   transaction_date: today(),
+  goal_id: '', // จ่ายจากเงินออม (เฉพาะรายจ่าย)
 });
 
 // แจ้งให้กระดิ่งแจ้งเตือนโหลดใหม่ทันที (บันทึกรายจ่ายแล้วอาจใช้งบถึงเกณฑ์ ไม่ต้องรอรอบ 60 วินาที)
@@ -101,12 +103,16 @@ const txCss = `
 .tx-empty strong { display: block; margin-bottom: 4px; color: #3F3A34; font-weight: 600; }
 .tx-empty .btn { margin-top: 10px; }
 .tx-scroll-hint { margin: 6px 0 0; font-size: 12px; color: #8A8177; text-align: center; }
-.tx-sav-cat { display: inline-flex; align-items: center; gap: 6px; color: #3E7E7A; font-weight: 600; }
-.tx-sav-cat.w { color: #4F6E80; }
-.tx-sav-note small { display: block; font-size: 12px; color: #8A8177; }
+/* ข้อความ + ป้าย: อยู่บรรทัดเดียวกัน ถ้าไม่พอจะตกบรรทัดใหม่พร้อมระยะห่าง (เฉพาะแถวที่ตก) */
+.tx-note-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 6px; padding: 2px 0; }
+.tx-fund-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: #EEF6F5; color: #3E7E7A; font-size: 12px; }
+.tx-sav-cat { display: inline-flex; align-items: center; gap: 6px; }
+.tx-sav-cat svg { width: 11px; height: 11px; color: #3E7E7A; }
+.tx-sav-cat.w svg { color: #6F8FA0; }
+.tx-sav-note small { font-size: 12px; color: #8A8177; }
 .tx-sav-gone { color: #9a9184; font-size: 12px; }
-.transactions-table td.num.saving { color: #3E7E7A; font-weight: 600; }
-.transactions-table td.num.withdraw { color: #4F6E80; font-weight: 600; }
+.transactions-table td.num.saving { color: #3E7E7A; }
+.transactions-table td.num.withdraw { color: #4F6E80; }
 .tx-locked { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: #9a9184; }
 .tx-sav-sum { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 4px; padding: 8px 12px; border-radius: 10px; background: #F1F6F5; font-size: 13.5px; color: #4b5563; }
 .tx-sav-sum b { color: #3F3A34; }
@@ -116,6 +122,14 @@ const txCss = `
 /* จอกว้าง: ทั้งหน้ากว้างสุด 1040px อยู่กลางจอ (การ์ดเพิ่มรายการกับการ์ดรายการขอบตรงกัน) และช่องกรองกว้างพอดีข้อมูล ชิดซ้าย */
 .transactions-page { max-width: 1040px; margin-left: auto; margin-right: auto; }
 @media (min-width: 900px) {
+  /* ความกว้างคอลัมน์คงที่ทุกหน้า (เดิมตารางคำนวณตามเนื้อหา คอลัมน์จึงขยับเมื่อเปลี่ยนหน้าหรือกรอง) */
+  .transactions-table { table-layout: fixed; width: 100%; }
+  .transactions-table th:nth-child(1) { width: 120px; }
+  .transactions-table th:nth-child(2) { width: 170px; }
+  .transactions-table th:nth-child(4) { width: 160px; }
+  .transactions-table th:nth-child(5) { width: 210px; }
+  .transactions-table th:nth-child(4), .transactions-table td[data-label="จำนวนเงิน"] { padding-right: 28px; }
+  .transactions-table td[data-label="บันทึก"] { overflow-wrap: anywhere; }
   .tx-filter-grid { display: flex; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between; gap: 10px 14px; }
   /* ประเภทยืดเต็มพื้นที่ที่เหลือ / ช่องวันที่กว้างเท่ากล่องปฏิทินที่เด้งขึ้นมา */
   /* จอเล็กลง: ทุกช่องหดตามสัดส่วน (ไม่ตกบรรทัด) แต่ไม่ต่ำกว่า min-width */
@@ -179,6 +193,13 @@ export default function Transactions() {
   const [showExport, setShowExport] = useState(false); // หน้าต่างส่งออก CSV
   const [savingSum, setSavingSum] = useState(null); // สรุปตอนกรอง "การออม" { saved, withdrawn, net, count }
   const [savingEdit, setSavingEdit] = useState(null); // รายการออม/ถอนที่กำลังแก้
+  const [usableGoals, setUsableGoals] = useState([]); // เป้าที่สำเร็จแล้วและยังมีเงินเหลือ (จ่ายจากเงินออม)
+  const [formGoals, setFormGoals] = useState([]); // ตัวเลือกในฟอร์มเพิ่ม/แก้ (ตอนแก้นับยอดเดิมของรายการนั้นคืน)
+  const refreshGoals = useCallback(() => {
+    if (!api.getUsableGoals) return;
+    Promise.resolve(api.getUsableGoals()).then((r) => setUsableGoals((r && r.data) || [])).catch(() => {});
+  }, []);
+  useEffect(() => { refreshGoals(); }, [refreshGoals]);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -258,6 +279,24 @@ export default function Transactions() {
   }, [wantAdd, location.pathname, navigate]);
 
   // ปิดฟอร์มและคืนค่าเริ่มต้น
+  // เปิดฟอร์ม: โหลดเป้าที่ใช้ได้ (ตอนแก้ ส่งรหัสรายการเพื่อให้ยอดเดิมของรายการนี้นับคืน)
+  useEffect(() => {
+    if (!showForm || !api.getUsableGoals) return undefined;
+    let live = true;
+    Promise.resolve(api.getUsableGoals(editingId || undefined))
+      .then((r) => {
+        if (!live) return;
+        let list = (r && r.data) || [];
+        // รายจ่ายเดิมผูกเป้าที่ถูกลบไปแล้ว: ยังแสดงเป้าเดิมให้เห็น
+        if (editExtra && editExtra.goal_id && !list.some((g) => g.goal_id === editExtra.goal_id)) {
+          list = [{ goal_id: editExtra.goal_id, name: `${editExtra.goal_name} (ลบเป้าแล้ว)`, remaining: editExtra.goal_used || 0 }, ...list];
+        }
+        setFormGoals(list);
+      })
+      .catch(() => { if (live) setFormGoals([]); });
+    return () => { live = false; };
+  }, [showForm, editingId, editExtra]);
+
   const closeForm = useCallback(() => {
     setShowForm(false);
     setEditingId(null);
@@ -288,7 +327,8 @@ export default function Transactions() {
   };
 
   // เตือนยอดสูงผิดปกติของหมวด (นับใหม่ทุกครั้งที่เปิดฟอร์ม)
-  const unusual = useUnusual(form.type, form.category_id, form.amount, `${showForm}-${editingId || 'new'}`);
+  // จ่ายจากเงินออม = ใช้เงินที่ตั้งใจเก็บไว้ ไม่ต้องเตือนยอดสูงผิดปกติ
+  const unusual = useUnusual(form.goal_id ? '' : form.type, form.category_id, form.amount, `${showForm}-${editingId || 'new'}`);
 
   // บันทึกข้อมูลเพิ่มหรือแก้ไขรายการ
   const submit = async (e) => {
@@ -303,8 +343,10 @@ export default function Transactions() {
     setFormError('');
     setBusy(true);
 
+    const { goal_id: goalId, ...rest } = form;
     const payload = {
-      ...form,
+      ...rest,
+      ...(form.type === 'expense' ? { goal_id: goalId || '' } : {}),
       amount: Number(form.amount),
       ...(unusual.flag ? { unusual: unusual.flag } : {}),
     };
@@ -319,6 +361,7 @@ export default function Transactions() {
       resetTypical();
       closeForm();
       await load();
+      refreshGoals();
       refreshBell();
     } catch (err) {
       setFormError(err.message);
@@ -366,6 +409,7 @@ export default function Transactions() {
     setError('');
 
     await load();
+    refreshGoals();
     refreshBell();
   };
 
@@ -380,9 +424,10 @@ export default function Transactions() {
       category_id: t.category_id,
       note: t.note || '',
       transaction_date: t.transaction_date,
+      goal_id: t.goal_id ? String(t.goal_id) : '',
     });
 
-    setEditExtra({ category_id: t.category_id, name: t.category_name, type: t.type });
+    setEditExtra({ category_id: t.category_id, name: t.category_name, type: t.type, goal_id: t.goal_id ? String(t.goal_id) : '', goal_name: t.goal_name, goal_used: t.goal_used });
     setFormError('');
     setShowForm(true);
   };
@@ -667,9 +712,10 @@ export default function Transactions() {
                         <span className={`tx-sav-cat${t.type === 'withdraw' ? ' w' : ''}`} data-tx-saving-cat><IconGoal />การออม</span>
                       </td>
                       <td data-label="บันทึก" className="tx-sav-note" data-tx-saving-note>
-                        {t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} {t.goal_name}
-                        {t.goal_state === 'deleted' && <span className="tx-sav-gone"> (ลบเป้าแล้ว)</span>}
-                        {t.reason && <small>{t.reason}</small>}
+                        <span className="tx-note-line">
+                          <span>{t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} {t.goal_name}{t.goal_state === 'deleted' && <span className="tx-sav-gone"> (ลบเป้าแล้ว)</span>}</span>
+                          {t.reason && <small>· {t.reason}</small>}
+                        </span>
                       </td>
                     </>
                   ) : (
@@ -686,7 +732,12 @@ export default function Transactions() {
                   </td>
 
                   <td data-label="บันทึก">
-                    {t.note || '-'}
+                    {t.goal_used > 0 ? (
+                      <span className="tx-note-line">
+                        {t.note && <span>{t.note}</span>}
+                        <span className="tx-fund-tag" title={`ใช้เงินออม ${money(t.goal_used)}`} data-tx-fund-tag><IconGoalSm />จ่ายจากเงินออม: {t.goal_name}</span>
+                      </span>
+                    ) : (t.note || '-')}
                   </td>
                     </>
                   )}
@@ -695,7 +746,8 @@ export default function Transactions() {
                     data-label="จำนวนเงิน"
                     className={`num ${t.type}`}
                   >
-                    {t.type === 'income' ? '+' : t.type === 'expense' ? '-' : ''}
+                    {/* ออมเข้าเป้า = เงินคงเหลือลด (−) / ถอนจากเป้า = เงินคงเหลือเพิ่ม (+) */}
+                    {t.type === 'income' || t.type === 'withdraw' ? '+' : '-'}
                     {money(t.amount)}
                   </td>
 
@@ -906,6 +958,11 @@ export default function Transactions() {
 
               </div>
 
+              {/* จ่ายจากเงินออม: เฉพาะรายจ่าย และมีเป้าที่สำเร็จแล้วที่ยังมีเงินเหลือ */}
+              {form.type === 'expense' && (formGoals.length > 0 || form.goal_id) && (
+                <GoalFundPicker goals={formGoals} value={form.goal_id} amount={form.amount} onChange={(v) => setForm((fm) => ({ ...fm, goal_id: v }))} />
+              )}
+
               {/* แจ้งเตือนข้อผิดพลาดในฟอร์ม */}
               {formError && (
                 <div className="alert">
@@ -957,6 +1014,7 @@ export default function Transactions() {
           key={aiDraft.ai ? `${aiDraft.ai.event_id}-${aiDraft.ai.index}` : 'single'}
           draft={aiDraft}
           categories={activeCats}
+          usableGoals={usableGoals}
           onCategoryCreated={addCat}
           onConfirm={confirmAiDraft}
           onSkip={skipAiDraft}

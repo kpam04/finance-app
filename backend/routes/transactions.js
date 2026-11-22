@@ -14,7 +14,7 @@ const { bangkokToday } = require('../services/plan/dateUtil');
 const UNUSUAL_FLAGS = ['warned', 'corrected'];
 // รายจ่ายของเดือนปัจจุบัน: ตรวจว่ายอดทั้งเดือนของหมวดสูงผิดปกติไหม (แจ้งกระดิ่ง) ไม่รอผล ไม่ให้กระทบการบันทึก
 const spikeCheck = (userId, t) => {
-  if (t.type !== 'expense' || t.date.toISOString().slice(0, 7) !== bangkokToday().slice(0, 7)) return;
+  if (t.type !== 'expense' || t.goal_used > 0 || t.date.toISOString().slice(0, 7) !== bangkokToday().slice(0, 7)) return;
   checkCategorySpike(userId, t.category).catch((e) => console.error('[spike]', e.message));
 };
 
@@ -36,7 +36,14 @@ const toDto = (t, goals) => {
     category_color: t.category && t.category.color,
     category_icon: t.category && t.category.icon,
   };
-  if (!isSavingType(t.type)) return base;
+  if (!isSavingType(t.type)) {
+    // รายจ่ายที่จ่ายจากเงินออมของเป้าที่สำเร็จแล้ว
+    if (t.type === 'expense' && t.goal && t.goal_used > 0) {
+      const g = goals ? goals.get(String(t.goal)) : null;
+      return { ...base, goal_id: t.goal, goal_name: (g && g.name) || t.goal_name || '', goal_used: t.goal_used };
+    }
+    return base;
+  }
   const g = goals && t.goal ? goals.get(String(t.goal)) : null;
   const goalState = !g ? 'deleted' : g.completed_at ? 'done' : 'active';
   return {
@@ -51,7 +58,7 @@ const toDto = (t, goals) => {
 };
 
 async function goalMapFor(userId, rows) {
-  const ids = [...new Set(rows.filter((t) => isSavingType(t.type) && t.goal).map((t) => String(t.goal)))];
+  const ids = [...new Set(rows.filter((t) => t.goal).map((t) => String(t.goal)))];
   if (!ids.length) return new Map();
   const goals = await Goal.find({ _id: { $in: ids }, user: userId }).select('name completed_at').lean();
   return new Map(goals.map((g) => [String(g._id), g]));
@@ -153,7 +160,8 @@ router.get('/export', async (req, res) => {
     const lines = [['วันที่', 'ประเภท', 'หมวดหมู่', 'จำนวนเงิน', 'บันทึกช่วยจำ'].map(csvCell).join(',')];
     for (const t of rows) {
       const sav = isSavingType(t.type);
-      const note = sav ? [`${t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} ${t.goal_name || ''}`.trim(), t.reason || ''].filter(Boolean).join(' · ') : (t.note || '');
+      const fromGoal = t.type === 'expense' && t.goal_used > 0 ? `จ่ายจากเงินออม: ${t.goal_name || ''} ${Number(t.goal_used).toFixed(2)}` : '';
+      const note = sav ? [`${t.type === 'withdraw' ? 'ถอนจากเป้า' : 'ออมเข้าเป้า'} ${t.goal_name || ''}`.trim(), t.reason || ''].filter(Boolean).join(' · ') : [t.note || '', fromGoal].filter(Boolean).join(' · ');
       lines.push([
         t.date.toISOString().slice(0, 10),
         TYPE_TH[t.type] || t.type,
@@ -202,6 +210,18 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: 'หมวดหมู่ไม่ถูกต้องหรือไม่ตรงกับประเภทรายการ' });
     }
 
+    // จ่ายจากเงินออม (เฉพาะรายจ่าย): ดึงจากเป้าที่สำเร็จแล้วได้ไม่เกินยอดที่เหลือในเป้า
+    let fund = { goal: null, goal_name: '', goal_used: 0 };
+    if (type === 'expense' && req.body.goal_id) {
+      if (!mongoose.isValidObjectId(req.body.goal_id)) return res.status(400).json({ success: false, message: 'เป้าหมายไม่ถูกต้อง' });
+      try {
+        fund = await goalSaving.goalFund(req.userId, req.body.goal_id, amount);
+      } catch (e2) {
+        if (e2 instanceof goalSaving.SavingError) return res.status(e2.status).json({ success: false, message: e2.message });
+        throw e2;
+      }
+    }
+
     const t = await Transaction.create({
       user: req.userId,
       category: category_id,
@@ -209,7 +229,8 @@ router.post('/', async (req, res) => {
       amount,
       note: noteCheck.value,
       date,
-      unusual: type === 'expense' && UNUSUAL_FLAGS.includes(req.body.unusual) ? req.body.unusual : null,
+      ...fund,
+      unusual: type === 'expense' && !fund.goal && UNUSUAL_FLAGS.includes(req.body.unusual) ? req.body.unusual : null,
     });
 
     // ขั้นที่ 5 จะเพิ่มการตรวจงบประมาณตรงนี้
@@ -315,10 +336,31 @@ router.put('/:id', async (req, res) => {
       t.date = d; changed = true;
     }
 
+    // จ่ายจากเงินออม: เปลี่ยน/ยกเลิกเป้า หรือแก้ยอดของรายจ่ายที่ผูกเป้าอยู่ → คำนวณยอดที่ดึงจากเป้าใหม่
+    if (t.type === 'expense') {
+      const nextGoal = 'goal_id' in b ? (b.goal_id || null) : (t.goal ? String(t.goal) : null);
+      if (nextGoal && !mongoose.isValidObjectId(nextGoal)) return res.status(400).json({ success: false, message: 'เป้าหมายไม่ถูกต้อง' });
+      const sameGoal = String(nextGoal || '') === String(t.goal || '');
+      if (!nextGoal) {
+        if (t.goal) { t.goal = null; t.goal_name = ''; t.goal_used = 0; changed = true; }
+      } else {
+        try {
+          const f2 = await goalSaving.goalFund(req.userId, nextGoal, t.amount, t._id);
+          if (!sameGoal || f2.goal_used !== t.goal_used) changed = true;
+          Object.assign(t, f2);
+        } catch (e2) {
+          // เป้าเดิมถูกลบไปแล้ว: เก็บการผูกเดิมไว้ (ยอดดึงไม่เกินยอดรายจ่าย)
+          if (sameGoal && e2 instanceof goalSaving.SavingError) t.goal_used = Math.min(t.goal_used, t.amount);
+          else if (e2 instanceof goalSaving.SavingError) return res.status(e2.status).json({ success: false, message: e2.message });
+          else throw e2;
+        }
+      }
+    }
+
     if (!changed) {
       return res.status(400).json({ success: false, message: 'ไม่มีข้อมูลให้แก้ไข' });
     }
-    if (t.type === 'expense' && UNUSUAL_FLAGS.includes(b.unusual)) t.unusual = b.unusual;
+    if (t.type === 'expense' && !t.goal && UNUSUAL_FLAGS.includes(b.unusual)) t.unusual = b.unusual;
     await t.save();
     if (t.installment) await syncFromTransaction(t); // รายจ่ายจากงวดผ่อน: แก้ยอด → ยอดที่จ่ายของงวดนั้นเปลี่ยนตาม
     if (t.type === 'expense') {

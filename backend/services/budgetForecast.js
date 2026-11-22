@@ -29,7 +29,8 @@ async function forecastFor(budget, { now = Date.now() } = {}) {
   }).lean();
   if (rows.length < MIN_TX) return null;
 
-  const spent = rows.reduce((s, r) => s + r.amount, 0);
+  const own = (r) => r.amount - (Number(r.goal_used) || 0); // ส่วนที่จ่ายจากเงินออมไม่กินงบ
+  const spent = rows.reduce((s, r) => s + own(r), 0);
   if (spent >= budget.amountLimit) return null;
 
   const w = Math.min(WINDOW_DAYS, d);
@@ -37,7 +38,7 @@ async function forecastFor(budget, { now = Date.now() } = {}) {
   const winEnd = Date.UTC(y, m - 1, d + 1); // ไม่รวมรายการที่ลงวันที่ล่วงหน้า
   const windowSpent = rows
     .filter((r) => new Date(r.date).getTime() >= winStart && new Date(r.date).getTime() < winEnd)
-    .reduce((s, r) => s + r.amount, 0);
+    .reduce((s, r) => s + own(r), 0);
 
   const rate = windowSpent / w;
   const projected = spent + rate * (daysInMonth - d);

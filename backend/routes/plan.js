@@ -85,7 +85,13 @@ async function loadPlan(userId, monthParam) {
   ]);
   await autoComplete(goals);
   const active = goals.filter((g) => !isDone(g));
-  const achievements = goals.filter(isDone).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at)).map(achievementOut);
+  const doneGoals = goals.filter(isDone).sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+  // เงินของเป้าที่สำเร็จแล้วที่ "จ่ายจากเงินออม" ไปแล้ว / ยังเหลือ
+  const usedMap = await goalSaving.usedByGoal(userId, doneGoals.map((g) => g._id));
+  const achievements = doneGoals.map((g) => {
+    const used = usedMap.get(String(g._id)) || 0;
+    return { ...achievementOut(g), used_amount: used, remaining_amount: Math.max(0, Math.round((Number(g.saved_amount) - used) * 100) / 100) };
+  });
   // เป้าหมายการออมเป็นเรื่องระยะยาว ไม่ผูกกับเดือนที่ดู: ประเมิน ณ ปัจจุบันเสมอ (ดูเดือนที่ผ่านมาก็เห็นสถานะปัจจุบันของเป้าหมาย)
   // ส่วนข้อเท็จจริง/คำแนะนำของเดือนที่ผ่านมาไม่พูดถึงเป้าหมาย (ตัวเลขฐานเป็นของเดือนนั้น)
   let goalEvals;
@@ -332,6 +338,17 @@ router.get('/goals', async (req, res) => {
     res.json({ success: true, data: { goals: goalEvals, achievements, max_goals: MAX_GOALS } });
   } catch (e) {
     console.error('[plan/goals]', e.message);
+    fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
+  }
+});
+
+// เป้าที่สำเร็จแล้วและยังมีเงินเหลือ (ตัวเลือก "จ่ายจากเงินออม" ในฟอร์มรายจ่าย) exclude = รหัสรายการที่กำลังแก้ (นับยอดของรายการนั้นคืน)
+router.get('/goals/usable', async (req, res) => {
+  try {
+    const ex = req.query.exclude && mongoose.isValidObjectId(req.query.exclude) ? req.query.exclude : null;
+    res.json({ success: true, data: await goalSaving.usableGoals(req.userId, ex) });
+  } catch (e) {
+    console.error('[plan/goals/usable]', e.message);
     fail(res, 500, 'เกิดข้อผิดพลาดของระบบ');
   }
 });

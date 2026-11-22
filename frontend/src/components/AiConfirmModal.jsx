@@ -3,6 +3,7 @@ import CategorySelect from './CategorySelect.jsx';
 import ReceiptPanel from './ReceiptPanel.jsx';
 import UnusualHint, { useUnusual, resetTypical } from './UnusualHint.jsx';
 import { IconBot, IconSpark, IconCheckCircle } from './PlanIcons.jsx';
+import GoalFundPicker, { guessGoal } from './GoalFundPicker.jsx';
 
 const overlay = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000,
@@ -22,13 +23,15 @@ const warnRing = { boxShadow: '0 0 0 2px #fbbf24', borderRadius: 8 };
 const hint = { fontSize: 12, color: '#b45309', marginTop: 4 };
 
 // AI วิเคราะห์ข้อความก่อนเปิดการ์ดนี้แล้ว (ถ้า AI ใช้ไม่ได้ ร่างมาจากกฎพร้อมเหตุผล fallback_reason) การ์ดนี้จึงไม่มีปุ่มเรียก AI ซ้ำ
-export default function AiConfirmModal({ draft, categories, onConfirm, onClose, onSkip, onCategoryCreated }) {
+export default function AiConfirmModal({ draft, categories, onConfirm, onClose, onSkip, onCategoryCreated, usableGoals = [] }) {
   const [form, setForm] = useState({
     type: draft.type || 'expense',
     category_id: draft.category_id || '',
     amount: draft.amount === '' || draft.amount == null ? '' : String(draft.amount),
     transaction_date: draft.transaction_date,
     note: draft.note || '',
+    // จ่ายจากเงินออม: เดาจากข้อความ (ชื่อเป้า หรือคำว่า เงินออม/จากเป้า) ผู้ใช้เปลี่ยนได้
+    goal_id: (draft.type || 'expense') === 'expense' ? guessGoal(`${draft.note || ''} ${draft.raw_text || ''}`, usableGoals) : '',
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,7 +57,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
     : !ai.flags.total_checked && ai.confidence < lowConf ? 'low' : null;
   const flagAmount = !!amountFlag && amountUntouched;
 
-  const unusual = useUnusual(form.type, form.category_id, form.amount, draft);
+  const unusual = useUnusual(form.goal_id ? '' : form.type, form.category_id, form.amount, draft);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -71,6 +74,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
         amount,
         transaction_date: form.transaction_date,
         note: form.note.trim(),
+        ...(form.type === 'expense' && form.goal_id ? { goal_id: form.goal_id } : {}),
         ...(unusual.flag ? { unusual: unusual.flag } : {}),
       });
       resetTypical();
@@ -149,7 +153,7 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
           <div style={grid}>
             <div>
               <label style={label}>ประเภท</label>
-              <select style={field} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, category_id: '' })}>
+              <select style={field} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, category_id: '', goal_id: e.target.value === 'expense' ? form.goal_id : '' })}>
                 <option value="expense">รายจ่าย</option>
                 <option value="income">รายรับ</option>
               </select>
@@ -187,6 +191,10 @@ export default function AiConfirmModal({ draft, categories, onConfirm, onClose, 
             <label style={label}>บันทึกช่วยจำ</label>
             <input style={field} value={form.note} onChange={set('note')} placeholder="ไม่บังคับ" />
           </div>
+
+          {form.type === 'expense' && usableGoals.length > 0 && (
+            <GoalFundPicker goals={usableGoals} value={form.goal_id} amount={form.amount} onChange={(v) => setForm((f) => ({ ...f, goal_id: v }))} />
+          )}
 
           {error && <div className="alert" style={{ marginBottom: 12 }}>{error}</div>}
 

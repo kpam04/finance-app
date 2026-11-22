@@ -11,8 +11,10 @@ const schema = new mongoose.Schema({
   recurring: { type: mongoose.Schema.Types.ObjectId, ref: 'Recurring', default: null },
   installment:   { type: mongoose.Schema.Types.ObjectId, ref: 'Installment', default: null }, // รายจ่ายที่มาจากการกด "จ่ายแล้ว" ของงวดผ่อน
   installment_n: { type: Number, default: null },
-  goal:      { type: mongoose.Schema.Types.ObjectId, ref: 'Goal', default: null }, // เฉพาะ saving / withdraw (เปลี่ยนเป้าไม่ได้)
+  // saving / withdraw: เป้าที่ออม/ถอน (เปลี่ยนไม่ได้) / expense: "จ่ายจากเงินออม" ของเป้าที่สำเร็จแล้ว (goal_used = ยอดที่ดึงจากเป้า ≤ amount)
+  goal:      { type: mongoose.Schema.Types.ObjectId, ref: 'Goal', default: null },
   goal_name: { type: String, default: '' },                                        // ชื่อเป้า ณ ตอนบันทึก (ยังแสดงได้หลังลบเป้า)
+  goal_used: { type: Number, default: 0, min: 0 },
   reason:    { type: String, default: '', maxlength: 100 },                         // เหตุผลที่ถอน (ไม่บังคับ แก้ไม่ได้)
   // ตรวจยอดผิดปกติตอนบันทึก (เก็บไว้ทำสถิติ): warned = บันทึกตอนมีคำเตือน / corrected = เคยขึ้นคำเตือนแล้วผู้ใช้แก้ยอดจนหาย
   unusual: { type: String, enum: ['warned', 'corrected'], default: null },
